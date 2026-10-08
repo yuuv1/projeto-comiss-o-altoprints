@@ -1,0 +1,20 @@
+# Dependências e build
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+
+# Variáveis de ambiente (chaves do Supabase) — nunca subir para o Git
+.env
+.env.local
+.env.*.local
+*.local
+
+# Cache e arquivos de sistema
+.vite/
+node_modules/.cache/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
