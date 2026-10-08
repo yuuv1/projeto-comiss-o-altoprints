@@ -62,8 +62,9 @@ Tabela oficial (toda editável pelo proprietário):
 | 5 a 10 m | 3,5% |
 | 10 a 20 m | 3% |
 | 20 a 50 m | 2,5% |
-| acima de 50 m | 1,5% |
-| sem metragem informada | 3% (editável) |
+| 50 a 100 m | 2% |
+| acima de 100 m | 1,5% |
+| sem metragem informada | 0% (editável) |
 
 > Cada faixa vale de `de` até **antes** de `ate` — ou seja, um pedido de 5 m entra na faixa
 > "5 a 10 m".

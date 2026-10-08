@@ -196,7 +196,8 @@ async function main() {
   const textoComissoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const tabelaOk =
     textoComissoes.includes('1 a 5 m') &&
-    textoComissoes.includes('acima de 50 m') &&
+    textoComissoes.includes('50 a 100 m') &&
+    textoComissoes.includes('acima de 100 m') &&
     textoComissoes.includes('Usar tabela oficial')
   if (!tabelaOk) falhas++
   console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela oficial e o botão de restaurar`)

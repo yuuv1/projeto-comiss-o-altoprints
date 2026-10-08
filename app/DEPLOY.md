@@ -104,6 +104,23 @@ em todos os aparelhos.
 
 ---
 
+## Publicar pela pasta pronta (Netlify Drop)
+
+Se você prefere não conectar o GitHub, o sistema gera uma pasta pronta para arrastar:
+
+```bash
+cd app
+npm run publicar      # cria a pasta ../publicar (site + _redirects + LEIA-ME.txt)
+```
+
+1. Abra <https://app.netlify.com/drop>
+2. Arraste a **pasta `publicar`** inteira para a área pontilhada
+3. Clique em **Claim site** para o site ficar seu (site não reivindicado é apagado pelo Netlify)
+4. Para atualizar depois: `npm run publicar` e arraste a pasta de novo em *Deploys*
+
+> Sem o Supabase configurado, cada aparelho guarda os próprios dados. Para a equipe ver os mesmos
+> pedidos, vale o passo do Supabase (acima) e então gerar a pasta com as chaves no `.env`.
+
 ## Esqueci a senha (login)
 
 Cada pessoa entra com **nome de usuário + senha**. O proprietário resolve a senha de

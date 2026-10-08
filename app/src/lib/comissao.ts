@@ -155,27 +155,36 @@ export function validarFaixas(faixas: FaixaComissao[]): string[] {
 /* Compatibilidade                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Faixas que o sistema usava antes (5% / 4% / 3% / 2%) — só para migrar quem nunca mexeu */
-const FAIXAS_ANTIGAS: FaixaComissao[] = [
-  { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
-  { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
-  { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
-  { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+/** Tabelas que o sistema usou antes — só para migrar quem nunca editou as faixas */
+const TABELAS_ANTERIORES: FaixaComissao[][] = [
+  // 5% / 4% / 3% / 2%
+  [
+    { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
+    { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
+    { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
+    { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+  ],
+  // 4% / 3,5% / 3% / 2,5% / 1,5% (sem a faixa de 50 a 100 m)
+  [
+    { id: 'faixa-1', de: 1, ate: 5, percentual: 4, rotulo: '1 a 5 m' },
+    { id: 'faixa-2', de: 5, ate: 10, percentual: 3.5, rotulo: '5 a 10 m' },
+    { id: 'faixa-3', de: 10, ate: 20, percentual: 3, rotulo: '10 a 20 m' },
+    { id: 'faixa-4', de: 20, ate: 50, percentual: 2.5, rotulo: '20 a 50 m' },
+    { id: 'faixa-5', de: 50, ate: null, percentual: 1.5, rotulo: 'acima de 50 m' },
+  ],
 ]
 
+const mesmaTabela = (a: FaixaComissao[], b: FaixaComissao[]) =>
+  a.length === b.length &&
+  a.every((f, i) => f.de === b[i].de && f.ate === b[i].ate && Number(f.percentual) === b[i].percentual)
+
 /**
- * Traz as faixas salvas para os valores atuais quando elas ainda são exatamente
- * as antigas (ou seja: o proprietário nunca editou). Faixas editadas são mantidas.
+ * Traz as faixas salvas para a tabela atual quando elas ainda são exatamente uma
+ * das tabelas antigas (ou seja: o proprietário nunca editou). Tabela editada é mantida.
  */
 export function migrarFaixas(faixas?: FaixaComissao[] | null): FaixaComissao[] {
   if (!faixas || !faixas.length) return FAIXAS_PADRAO
-  const iguaisAsAntigas =
-    faixas.length === FAIXAS_ANTIGAS.length &&
-    faixas.every((f, i) => {
-      const antiga = FAIXAS_ANTIGAS[i]
-      return f.de === antiga.de && f.ate === antiga.ate && Number(f.percentual) === antiga.percentual
-    })
-  if (iguaisAsAntigas) return FAIXAS_PADRAO.map((f) => ({ ...f }))
+  if (TABELAS_ANTERIORES.some((t) => mesmaTabela(faixas, t))) return FAIXAS_PADRAO.map((f) => ({ ...f }))
   return faixas
 }
 

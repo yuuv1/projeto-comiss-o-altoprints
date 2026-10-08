@@ -1,0 +1,20 @@
+Altoprints — Sistema de Pedidos DTF  (versão 1.0.0)
+
+COMO PUBLICAR (Netlify Drop):
+  1. Abra https://app.netlify.com/drop
+  2. Arraste ESTA PASTA inteira (a pasta "publicar") para a área pontilhada
+  3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu
+  4. Pronto: o endereço aparece no topo da página
+
+COMO ATUALIZAR DEPOIS:
+  - Rode de novo:  npm run publicar
+  - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)
+
+ACESSO DO PROPRIETÁRIO:
+  - Endereço:   .../#/administracao   (salve na tela de início do celular)
+  - Alternativa: 5 toques no logo, ou Ctrl + Alt + D no computador
+  - Na primeira vez, essa tela cria o acesso do proprietário.
+
+IMPORTANTE:
+  - Sem o Supabase configurado, os dados ficam salvos no navegador de cada aparelho.
+  - Para a equipe ver os mesmos pedidos, conecte o Supabase (veja app/DEPLOY.md).

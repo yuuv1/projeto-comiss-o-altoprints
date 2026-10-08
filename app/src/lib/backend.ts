@@ -18,11 +18,20 @@ export type Registro = Vendedor | Cliente | Pedido | Arquivo | Usuario
 
 const LS_KEY = 'altoprints:db:v1'
 
-/** mantém as faixas de comissão no formato/valores atuais do sistema */
-const comFaixasAtuais = (c: Configuracoes): Configuracoes => ({
-  ...c,
-  faixas_comissao: migrarFaixas(c.faixas_comissao),
-})
+/**
+ * Ajusta a configuração para o padrão atual: quem nunca editou as faixas recebe a
+ * tabela de comissão nova, e o "sem metragem" antigo (3%) passa a ser 0% como
+ * combinado com o proprietário.
+ */
+const comConfigAtual = (c: Configuracoes): Configuracoes => {
+  const faixas = migrarFaixas(c.faixas_comissao)
+  const migrou = faixas !== c.faixas_comissao
+  return {
+    ...c,
+    faixas_comissao: faixas,
+    comissao_sem_metragem: migrou && Number(c.comissao_sem_metragem) === 3 ? 0 : c.comissao_sem_metragem,
+  }
+}
 
 const dbVazio = (): DB => ({
   vendedores: [],
@@ -48,7 +57,7 @@ const lerLocal = (): DB => {
       pedidos: parsed.pedidos ?? [],
       arquivos: parsed.arquivos ?? [],
       usuarios: parsed.usuarios ?? [],
-      configuracoes: comFaixasAtuais({ ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) }),
+      configuracoes: comConfigAtual({ ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) }),
     }
   } catch {
     return dbVazio()
@@ -102,7 +111,7 @@ export async function carregarTudo(): Promise<DB> {
     pedidos: (pedidos.data ?? []) as Pedido[],
     arquivos: (arquivos.data ?? []) as Arquivo[],
     usuarios: (usuarios.data ?? []) as Usuario[],
-    configuracoes: comFaixasAtuais({ ...CONFIG_PADRAO, ...cfg }),
+    configuracoes: comConfigAtual({ ...CONFIG_PADRAO, ...cfg }),
   }
 }
 

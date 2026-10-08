@@ -138,7 +138,8 @@ export const FAIXAS_PADRAO: FaixaComissao[] = [
   { id: 'faixa-2', de: 5, ate: 10, percentual: 3.5, rotulo: '5 a 10 m' },
   { id: 'faixa-3', de: 10, ate: 20, percentual: 3, rotulo: '10 a 20 m' },
   { id: 'faixa-4', de: 20, ate: 50, percentual: 2.5, rotulo: '20 a 50 m' },
-  { id: 'faixa-5', de: 50, ate: null, percentual: 1.5, rotulo: 'acima de 50 m' },
+  { id: 'faixa-5', de: 50, ate: 100, percentual: 2, rotulo: '50 a 100 m' },
+  { id: 'faixa-6', de: 100, ate: null, percentual: 1.5, rotulo: 'acima de 100 m' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -190,7 +191,7 @@ export interface Configuracoes {
   openai_key: string
   /** faixas de metragem x percentual de comissão */
   faixas_comissao: FaixaComissao[]
-  /** percentual aplicado em pedidos sem metragem informada */
+  /** percentual aplicado em pedidos sem metragem informada (padrão: 0) */
   comissao_sem_metragem: number
   /** o que o vendedor pode fazer com os próprios pedidos */
   permissao_vendedor: PermissaoVendedor
@@ -202,7 +203,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   revisao_ultima_em: null,
   openai_key: '',
   faixas_comissao: FAIXAS_PADRAO,
-  comissao_sem_metragem: 3,
+  comissao_sem_metragem: 0,
   permissao_vendedor: 'sem_excluir',
 }
 

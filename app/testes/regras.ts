@@ -13,7 +13,13 @@ import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
 import { gerarDadosDemo } from '../src/lib/seed'
-import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro, type Pedido } from '../src/lib/types'
+import {
+  CONFIG_PADRAO,
+  FAIXAS_PADRAO,
+  isPedidoCompleto,
+  pedidoPendenteFinanceiro,
+  type Pedido,
+} from '../src/lib/types'
 
 let ok = 0
 const falhas: string[] = []
@@ -101,7 +107,8 @@ igual(
 const pedidoCom = (metragem: number | null, valor: number): Pedido =>
   ({ ...base, metragem, valor })
 
-igual('tabela oficial tem 5 faixas', FAIXAS_PADRAO.length, 5)
+igual('tabela oficial tem 6 faixas', FAIXAS_PADRAO.length, 6)
+igual('sem metragem começa em 0%', CONFIG_PADRAO.comissao_sem_metragem, 0)
 igual('faixa 3 m -> 4%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 4)
 igual('faixa 4,99 m -> 4%', faixaDoPedido(4.99, FAIXAS_PADRAO, 3).percentual, 4)
 igual('faixa 5 m -> 3,5% (já é a faixa seguinte)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 3.5)
@@ -109,12 +116,18 @@ igual('faixa 9,99 m -> 3,5%', faixaDoPedido(9.99, FAIXAS_PADRAO, 3).percentual, 
 igual('faixa 10 m -> 3%', faixaDoPedido(10, FAIXAS_PADRAO, 3).percentual, 3)
 igual('faixa 19,99 m -> 3%', faixaDoPedido(19.99, FAIXAS_PADRAO, 3).percentual, 3)
 igual('faixa 20 m -> 2,5%', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 2.5)
-igual('faixa 49,99 m -> 2,5%', faixaDoPedido(49.99, FAIXAS_PADRAO, 3).percentual, 2.5)
-igual('faixa 50 m -> 1,5%', faixaDoPedido(50, FAIXAS_PADRAO, 3).percentual, 1.5)
-igual('faixa 80,25 m -> 1,5%', faixaDoPedido(80.25, FAIXAS_PADRAO, 3).percentual, 1.5)
-igual('sem metragem -> percentual configurado', faixaDoPedido(null, FAIXAS_PADRAO, 3).percentual, 3)
+igual('faixa 49,99 m -> 2,5%', faixaDoPedido(49.99, FAIXAS_PADRAO, 0).percentual, 2.5)
+igual('faixa 50 m -> 2%', faixaDoPedido(50, FAIXAS_PADRAO, 0).percentual, 2)
+igual('faixa 80,25 m -> 2%', faixaDoPedido(80.25, FAIXAS_PADRAO, 0).percentual, 2)
+igual('faixa 99,99 m -> 2%', faixaDoPedido(99.99, FAIXAS_PADRAO, 0).percentual, 2)
+igual('faixa 100 m -> 1,5%', faixaDoPedido(100, FAIXAS_PADRAO, 0).percentual, 1.5)
+igual('faixa 250 m -> 1,5%', faixaDoPedido(250, FAIXAS_PADRAO, 0).percentual, 1.5)
+igual('sem metragem -> 0% (padrão do sistema)', faixaDoPedido(null, FAIXAS_PADRAO, CONFIG_PADRAO.comissao_sem_metragem).percentual, 0)
+igual('sem metragem -> percentual configurado quando o dono quiser', faixaDoPedido(null, FAIXAS_PADRAO, 2).percentual, 2)
+igual('pedido sem metragem não gera comissão por padrão', comissaoDoPedido(pedidoCom(null, 500), FAIXAS_PADRAO, 0), 0)
 igual('comissão de 2 m (R$ 119,80) a 4%', Number(comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO).toFixed(3)), 4.792)
 igual('comissão de 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 16.47)
+igual('comissão de 80,25 m (R$ 3.602,77) a 2%', Number(comissaoDoPedido(pedidoCom(80.25, 3602.77), FAIXAS_PADRAO).toFixed(2)), 72.06)
 
 const resultado = calcularComissao(
   [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],
@@ -124,12 +137,12 @@ const resultado = calcularComissao(
 igual(
   'comissão total das 4 faixas',
   Number(resultado.total.toFixed(2)),
-  Number((4.79 + 16.47 + 54.04 + 6).toFixed(2)),
+  Number((4.792 + 16.47 + 72.0554 + 6).toFixed(2)),
 )
 igual('base de cálculo = faturamento', Number(resultado.base.toFixed(2)), Number((119.8 + 549 + 3602.77 + 200).toFixed(2)))
 igual('percentual médio entre 0 e 5', resultado.percentualMedio > 0 && resultado.percentualMedio < 5, true)
 igual('resumo por faixa agrupa os pedidos certos', resultado.porFaixa.filter((l) => l.pedidos > 0).length + (resultado.semMetragem.pedidos > 0 ? 1 : 0), 4)
-igual('as 5 faixas aparecem no resumo', resultado.porFaixa.length, 5)
+igual('as 6 faixas aparecem no resumo', resultado.porFaixa.length, 6)
 igual('faixas válidas (padrão)', validarFaixas(FAIXAS_PADRAO), [])
 igual(
   'faixas encostadas (1 a 5 e 5 a 10) são aceitas',
@@ -146,8 +159,19 @@ igual(
     { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
     { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
     { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
-  ])[2].percentual,
-  3,
+  ]).length,
+  6,
+)
+igual(
+  'tabela anterior (sem a faixa de 50 a 100 m) também é atualizada',
+  migrarFaixas([
+    { id: 'faixa-1', de: 1, ate: 5, percentual: 4, rotulo: '1 a 5 m' },
+    { id: 'faixa-2', de: 5, ate: 10, percentual: 3.5, rotulo: '5 a 10 m' },
+    { id: 'faixa-3', de: 10, ate: 20, percentual: 3, rotulo: '10 a 20 m' },
+    { id: 'faixa-4', de: 20, ate: 50, percentual: 2.5, rotulo: '20 a 50 m' },
+    { id: 'faixa-5', de: 50, ate: null, percentual: 1.5, rotulo: 'acima de 50 m' },
+  ])[4].percentual,
+  2,
 )
 igual(
   'faixas editadas pelo proprietário são preservadas',
