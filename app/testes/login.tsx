@@ -88,6 +88,13 @@ async function main() {
     criarContaProprietario: (d: { nome: string; usuario: string; senha: string }) => Promise<void>
     criarContaVendedor: (d: { nome: string; usuario: string; senha: string }) => Promise<void>
     trocarMinhaSenha: (a: string, n: string) => Promise<void>
+    criarContaComoDono: (d: {
+      nome: string
+      usuario: string
+      senha: string
+      vendedorId?: string
+      administrador?: boolean
+    }) => Promise<void>
     alternarAtivo: (id: string, ativo: boolean) => Promise<void>
   }
   let auth: Auth | null = null
@@ -157,6 +164,62 @@ async function main() {
   )
   const banco2 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
   igual('nenhuma conta duplicada foi criada', banco2.usuarios.length, 2)
+
+  /* ---------------- o dono cria as contas da equipe ------------------- */
+  // a JESSICA acabou de criar o acesso dela; um segundo acesso no mesmo vendedor é recusado
+  const idVendedorJessica = banco2.usuarios.find((u: { usuario: string }) => u.usuario === 'jessica')?.vendedor_id
+  igual('vendedor da jessica existe', Boolean(idVendedorJessica), true)
+  await esperaErro(
+    'não deixa criar duas contas para o mesmo vendedor',
+    pegar().criarContaComoDono({
+      nome: 'JESSICA',
+      usuario: 'jessica2',
+      senha: '1234',
+      vendedorId: idVendedorJessica,
+    }),
+    'já tem um acesso criado',
+  )
+  await esperaErro(
+    'cadastro pelo login também recusa nome já usado',
+    pegar().criarContaVendedor({ nome: 'JESSICA', usuario: 'jessica3', senha: '1234' }),
+    'Já existe um acesso para este nome',
+  )
+
+  // o proprietário cria a conta da RAISSA (vendedor novo) sem trocar a própria sessão
+  const sessaoAntes = pegar().usuario?.usuario
+  await pegar().criarContaComoDono({ nome: 'RAISSA', usuario: 'raissa', senha: '1234' })
+  await respirar()
+  igual('criar conta pela Equipe não troca a sessão de quem criou', pegar().usuario?.usuario, sessaoAntes)
+  const banco3 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
+  const contaRaissa = banco3.usuarios.find((u: { usuario: string }) => u.usuario === 'raissa')
+  igual('conta da raissa criada com vendedor novo', Boolean(contaRaissa?.vendedor_id), true)
+  igual(
+    'vendedor novo da raissa foi criado uma única vez',
+    banco3.vendedores.filter((v: { nome: string }) => v.nome === 'RAISSA').length,
+    1,
+  )
+
+  // o dono também pode criar outro administrador
+  await pegar().criarContaComoDono({ nome: 'Sócio', usuario: 'socio', senha: '1234', administrador: true })
+  await respirar()
+  await pegar().sair()
+  await respirar()
+  await pegar().entrar('socio', '1234', true)
+  await respirar()
+  igual('conta criada como administrador entra como proprietário', pegar().usuario?.papel, 'proprietario')
+  igual('usuário criado pelo dono aparece no sistema', pegar().usuario?.usuario, 'socio')
+  await pegar().sair()
+  await respirar()
+  await pegar().entrar('dona', '1234', true)
+  await respirar()
+  igual('dono volta a entrar normalmente', pegar().usuario?.usuario, 'dona')
+
+  // volta a sessão para a JESSICA (é ela que troca a própria senha abaixo)
+  await pegar().sair()
+  await respirar()
+  await pegar().entrar('jessica', '4321', true)
+  await respirar()
+  igual('jessica entra de novo para trocar a própria senha', pegar().usuario?.usuario, 'jessica')
 
   /* --------------------------- trocar senha --------------------------- */
   await esperaErro(

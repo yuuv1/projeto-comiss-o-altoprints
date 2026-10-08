@@ -1,9 +1,11 @@
 import { AlertTriangle, Loader2, ShieldAlert } from 'lucide-react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { ROTA_ADMIN, useAtalhoAdmin } from './lib/admin'
 import { Layout } from './components/Layout'
 import { Toaster, Vazio } from './components/ui'
 import { useAuth } from './lib/auth'
 import { useStore } from './lib/store'
+import Administracao from './pages/Administracao'
 import Clientes from './pages/Clientes'
 import Configuracoes from './pages/Configuracoes'
 import Entregas from './pages/Entregas'
@@ -81,11 +83,17 @@ function Inicio() {
 }
 
 export default function App() {
+  const navegar = useNavigate()
+
+  // atalho do proprietário no teclado: Ctrl + Alt + D
+  useAtalhoAdmin(() => navegar(ROTA_ADMIN))
+
   return (
     <>
       <AvisoErro />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/administracao" element={<Administracao />} />
         <Route
           element={
             <Protegido>

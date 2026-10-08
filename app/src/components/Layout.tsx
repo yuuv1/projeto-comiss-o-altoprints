@@ -19,7 +19,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import { useTema } from '../lib/tema'
@@ -40,8 +41,12 @@ export function Layout() {
   const { db, nomeVendedor } = useStore()
   const { usuario, ehProprietario, vendedorNome, sair } = useAuth()
   const { escuro, alternar } = useTema()
+  const navegar = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
+
+  // 5 toques seguidos no logo abrem a porta do proprietário
+  const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
 
   const meusPedidos = useMemo(
     () => (ehProprietario ? db.pedidos : db.pedidos.filter((p) => p.vendedor_id === usuario?.vendedor_id)),
@@ -83,7 +88,7 @@ export function Layout() {
 
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/80 backdrop-blur-xl print:hidden dark:border-slate-800 dark:bg-slate-950/85">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <NavLink to="/" className="shrink-0">
+          <NavLink to="/" className="shrink-0" onClick={tocarNoLogo}>
             <Logo />
           </NavLink>
 

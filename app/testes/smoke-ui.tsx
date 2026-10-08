@@ -92,7 +92,8 @@ async function main() {
   const { HashRouter } = await import('react-router-dom')
 
   const raiz = dom.window.document.getElementById('root')
-  createRoot(raiz as unknown as Element).render(
+  const root1 = createRoot(raiz as unknown as Element)
+  root1.render(
     React.createElement(
       HashRouter,
       null,
@@ -111,6 +112,15 @@ async function main() {
   )?.id
 
   let falhas = 0
+
+  /** clica no primeiro botão cujo texto contém o trecho indicado */
+  const clicar = (onde: Element | null, trecho: string) => {
+    const alvo = [...(onde?.querySelectorAll('button') ?? [])].find((b) =>
+      (b.textContent ?? '').includes(trecho),
+    )
+    alvo?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+    return Boolean(alvo)
+  }
 
   const visitar = async (rotulo: string, rotas: string[], esperaTexto?: string) => {
     console.log(`\n  ${rotulo}`)
@@ -155,6 +165,20 @@ async function main() {
   if (!temPainel) falhas++
   console.log(`  ${temPainel ? '✅' : '❌'} início do proprietário mostra o painel geral`)
 
+  // a tela Equipe precisa abrir a janela de criar conta (por ela o dono registra a equipe)
+  dom.window.location.hash = '#/equipe'
+  await espera(700)
+  const abriuNovaConta = clicar(raiz, 'Nova conta')
+  await espera(500)
+  const textoNovaConta = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const novaContaOk =
+    abriuNovaConta &&
+    textoNovaConta.includes('Nova conta de acesso') &&
+    textoNovaConta.includes('Já trabalha aqui?') &&
+    textoNovaConta.includes('criar vendedor novo com este nome')
+  if (!novaContaOk) falhas++
+  console.log(`\n  ${novaContaOk ? '✅' : '❌'} Equipe abre a janela “Nova conta” com o vínculo e o histórico`)
+
   // agora entra como vendedor
   sessaoDe(vendedor.id)
   dom.window.location.reload?.()
@@ -162,7 +186,8 @@ async function main() {
   const { AuthProvider: AP2 } = await import('../src/lib/auth')
   const raiz2 = dom.window.document.createElement('div')
   dom.window.document.body.appendChild(raiz2)
-  createRoot(raiz2 as unknown as Element).render(
+  const root2 = createRoot(raiz2 as unknown as Element)
+  root2.render(
     React.createElement(
       HashRouter,
       null,
@@ -203,7 +228,8 @@ async function main() {
   dom.window.document.body.appendChild(raiz3)
   const { StoreProvider: SP3 } = await import('../src/lib/store')
   const { AuthProvider: AP3 } = await import('../src/lib/auth')
-  createRoot(raiz3 as unknown as Element).render(
+  const root3 = createRoot(raiz3 as unknown as Element)
+  root3.render(
     React.createElement(
       HashRouter,
       null,
@@ -215,6 +241,105 @@ async function main() {
   const temLogin = textoLogin.includes('Entrar no sistema') || textoLogin.includes('criar meu acesso')
   if (!temLogin) falhas++
   console.log(`\n  ${temLogin ? '✅' : '❌'} sem sessão, o sistema pede login`)
+
+  // a tela comum não pode revelar a porta do proprietário
+  const naoRevelaPorta =
+    !textoLogin.toLowerCase().includes('proprietário') &&
+    !textoLogin.toLowerCase().includes('proprietario') &&
+    !(raiz3.innerHTML ?? '').includes('/administracao')
+  if (!naoRevelaPorta) falhas++
+  console.log(`  ${naoRevelaPorta ? '✅' : '❌'} tela comum não menciona nem aponta para a administração`)
+
+  // porta administrativa com um dono já existente: pede o login do dono
+  // (desmonta as telas anteriores: elas continuariam reagindo ao endereço e mudariam a rota)
+  root1.unmount()
+  root2.unmount()
+  root3.unmount()
+  await espera(150)
+  const raiz4 = dom.window.document.createElement('div')
+  dom.window.document.body.appendChild(raiz4)
+  const { StoreProvider: SP4 } = await import('../src/lib/store')
+  const { AuthProvider: AP4 } = await import('../src/lib/auth')
+  dom.window.location.hash = '#/administracao'
+  await espera(120)
+  const root4 = createRoot(raiz4 as unknown as Element)
+  root4.render(
+    React.createElement(
+      HashRouter,
+      null,
+      React.createElement(SP4, null, React.createElement(AP4, null, React.createElement(App))),
+    ),
+  )
+  await espera(2000)
+  const textoPorta = (raiz4.textContent ?? '').replace(/\s+/g, ' ')
+  const portaOk =
+    textoPorta.includes('Administração') &&
+    textoPorta.includes('Entrar como administrador') &&
+    // quem descobrir a porta não encontra lista de nomes nem cadastro na tela
+    !textoPorta.includes('Criar meu acesso') &&
+    !textoPorta.includes('RAISSA') &&
+    !textoPorta.includes('Faturamento')
+  if (!portaOk) falhas++
+  console.log(`  ${portaOk ? '✅' : '❌'} porta administrativa pede o login do proprietário (sem dados na tela)`)
+  if (!portaOk) console.log('     TEXTO:', textoPorta.slice(0, 220))
+
+  // sem nenhum dono cadastrado, a porta oferece criar o primeiro acesso
+  const bancoSemDono = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
+  bancoSemDono.usuarios = []
+  dom.window.localStorage.setItem('altoprints:db:v1', JSON.stringify(bancoSemDono))
+  dom.window.localStorage.removeItem('altoprints:sessao')
+  root4.unmount()
+  await espera(150)
+  const raiz5 = dom.window.document.createElement('div')
+  dom.window.document.body.appendChild(raiz5)
+  const { StoreProvider: SP5 } = await import('../src/lib/store')
+  const { AuthProvider: AP5 } = await import('../src/lib/auth')
+  dom.window.location.hash = '#/administracao'
+  await espera(120)
+  const root5 = createRoot(raiz5 as unknown as Element)
+  root5.render(
+    React.createElement(
+      HashRouter,
+      null,
+      React.createElement(SP5, null, React.createElement(AP5, null, React.createElement(App))),
+    ),
+  )
+  await espera(2000)
+  const textoCriar = (raiz5.textContent ?? '').replace(/\s+/g, ' ')
+  const criarOk = textoCriar.includes('Criar acesso do proprietário') && textoCriar.includes('Acesso restrito')
+  if (!criarOk) falhas++
+  console.log(`  ${criarOk ? '✅' : '❌'} sem dono cadastrado, a porta cria o primeiro acesso do proprietário`)
+  if (!criarOk) console.log('     TEXTO:', textoCriar.slice(0, 220))
+
+  // 5 toques no logo (na tela de login) abrem a porta administrativa
+  root5.unmount()
+  await espera(150)
+  dom.window.localStorage.removeItem('altoprints:sessao')
+  dom.window.location.hash = '#/login'
+  await espera(120)
+  const raiz6 = dom.window.document.createElement('div')
+  dom.window.document.body.appendChild(raiz6)
+  const { StoreProvider: SP6 } = await import('../src/lib/store')
+  const { AuthProvider: AP6 } = await import('../src/lib/auth')
+  createRoot(raiz6 as unknown as Element).render(
+    React.createElement(
+      HashRouter,
+      null,
+      React.createElement(SP6, null, React.createElement(AP6, null, React.createElement(App))),
+    ),
+  )
+  await espera(2000)
+  const logoTap = [...raiz6.querySelectorAll('button')].find((b) => (b.title ?? '') === 'Altoprints')
+  for (let i = 0; i < 5; i++) {
+    logoTap?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+    await espera(60)
+  }
+  await espera(800)
+  const textoToques = (raiz6.textContent ?? '').replace(/\s+/g, ' ')
+  const toquesOk = textoToques.includes('Criar acesso do proprietário') || textoToques.includes('Administração')
+  if (!toquesOk) falhas++
+  console.log(`  ${toquesOk ? '✅' : '❌'} 5 toques no logo abrem a porta do proprietário`)
+  if (!toquesOk) console.log('     TEXTO:', textoToques.slice(0, 200))
 
   console.log(`\n  Problemas encontrados: ${falhas}`)
   if (falhas) process.exit(1)

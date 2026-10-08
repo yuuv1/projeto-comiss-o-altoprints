@@ -95,6 +95,14 @@ export interface AuthContexto {
   sair: () => Promise<void>
   criarContaProprietario: (dados: { nome: string; usuario: string; senha: string }) => Promise<void>
   criarContaVendedor: (dados: { nome: string; usuario: string; senha: string; vendedorId?: string }) => Promise<void>
+  /** cria a conta pelo painel do proprietário (Equipe → Nova conta) */
+  criarContaComoDono: (dados: {
+    nome: string
+    usuario: string
+    senha: string
+    vendedorId?: string
+    administrador?: boolean
+  }) => Promise<void>
   trocarMinhaSenha: (senhaAtual: string, nova: string) => Promise<void>
   atualizarMeuPerfil: (dados: { nome: string }) => Promise<void>
   redefinirSenha: (usuarioId: string, novaSenha: string) => Promise<void>
@@ -271,44 +279,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avisar(`Bem-vindo, ${conta.nome}! Sua conta de proprietário foi criada.`)
   }
 
-  const criarContaVendedor: AuthContexto['criarContaVendedor'] = async ({ nome, usuario, senha, vendedorId }) => {
-    const erro = validarUsuario(usuario)
+  /**
+   * Regras comuns das telas de cadastro (login e painel do proprietário).
+   * Confere tudo no banco na hora, liga o vendedor e cria o vendedor novo quando
+   * a pessoa informa um nome que ainda não existe.
+   */
+  const prepararConta = async (
+    dados: { nome: string; usuario: string; senha: string; vendedorId?: string },
+    papel: 'proprietario' | 'vendedor',
+  ): Promise<Usuario> => {
+    const erro = validarUsuario(dados.usuario)
     if (erro) throw new Error(erro)
-    if (senha.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.')
-    if (!nome.trim()) throw new Error('Informe o seu nome.')
+    if (dados.senha.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.')
+    if (!dados.nome.trim()) throw new Error('Informe o seu nome.')
+
     const noBanco = await lerUsuarios()
-    if ((noBanco.length ? noBanco : usuarios).some((u) => u.usuario === normalizarUsuario(usuario)))
+    const contas = noBanco.length ? noBanco : usuarios
+    if (contas.some((u) => u.usuario === normalizarUsuario(dados.usuario)))
       throw new Error('Este nome de usuário já está em uso.')
 
-    // sem vendedor escolhido: liga ao vendedor de mesmo nome; se não existir, cria um
-    let idVendedor = vendedorId ?? ''
-    if (!idVendedor) {
-      const existente = db.vendedores.find(
-        (v) => v.nome.trim().toLowerCase() === nome.trim().toLowerCase(),
-      )
-      if (existente) {
-        idVendedor = existente.id
+    let idVendedor = ''
+    if (papel === 'vendedor') {
+      idVendedor = dados.vendedorId ?? ''
+      if (idVendedor) {
+        // nome escolhido na lista: só pode ser assumido se ninguém tiver conta nele
+        if (contas.some((u) => u.vendedor_id === idVendedor))
+          throw new Error('Este nome já tem um acesso criado. Fale com o proprietário.')
       } else {
-        const novoVendedor: Vendedor = {
-          id: novoId(),
-          nome: nome.trim(),
-          created_at: new Date().toISOString(),
+        // sem escolha: aproveita o vendedor de mesmo nome ou cria um novo
+        const existente = db.vendedores.find((v) => v.nome.trim().toLowerCase() === dados.nome.trim().toLowerCase())
+        if (existente) {
+          if (contas.some((u) => u.vendedor_id === existente.id))
+            throw new Error('Já existe um acesso para este nome. Fale com o proprietário.')
+          idVendedor = existente.id
+        } else {
+          const novoVendedor: Vendedor = {
+            id: novoId(),
+            nome: dados.nome.trim(),
+            created_at: new Date().toISOString(),
+          }
+          await salvarRegistro('vendedores', novoVendedor)
+          idVendedor = novoVendedor.id
         }
-        await salvarRegistro('vendedores', novoVendedor)
-        idVendedor = novoVendedor.id
       }
     }
 
-    const conta: Usuario = {
+    return {
       id: novoId(),
-      nome: nome.trim(),
-      usuario: normalizarUsuario(usuario),
-      senha_hash: await gerarHashSenha(senha),
-      papel: 'vendedor',
+      nome: dados.nome.trim(),
+      usuario: normalizarUsuario(dados.usuario),
+      senha_hash: await gerarHashSenha(dados.senha),
+      papel,
       vendedor_id: idVendedor,
       ativo: true,
       criado_em: new Date().toISOString(),
     }
+  }
+
+  const criarContaVendedor: AuthContexto['criarContaVendedor'] = async ({ nome, usuario, senha, vendedorId }) => {
+    const conta = await prepararConta({ nome, usuario, senha, vendedorId }, 'vendedor')
 
     if (CLOUD && supabase) {
       const { error } = await supabase.auth.signUp({ email: emailInterno(conta.usuario), password: senha })
@@ -322,6 +351,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuarioId(conta.id)
     guardarSessao(conta.id, true)
     avisar(`Acesso criado! Bem-vindo, ${conta.nome}.`)
+  }
+
+  /** usado pelo proprietário na tela Equipe: cria a conta sem trocar a sessão dele */
+  const criarContaComoDono: AuthContexto['criarContaComoDono'] = async ({
+    nome,
+    usuario,
+    senha,
+    vendedorId,
+    administrador,
+  }) => {
+    const conta = await prepararConta({ nome, usuario, senha, vendedorId }, administrador ? 'proprietario' : 'vendedor')
+    await salvarRegistro('usuarios', conta)
+    await recarregar()
+    avisar(`Acesso de ${conta.nome} criado. Usuário: ${conta.usuario}.`)
   }
 
   /* ------------------------------ perfil ------------------------------ */
@@ -409,6 +452,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sair,
     criarContaProprietario,
     criarContaVendedor,
+    criarContaComoDono,
     trocarMinhaSenha,
     atualizarMeuPerfil,
     redefinirSenha,

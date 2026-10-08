@@ -79,12 +79,29 @@ O sistema tem **login próprio** (nome de usuário + senha). Existem dois perfis
 | **Proprietário** | Tudo: todos os pedidos, relatórios, comissões, equipe e configurações |
 | **Vendedor** | Só o que é dele: os próprios pedidos, clientes, metragem e comissão |
 
-**Primeiro acesso:** o sistema ainda não tem nenhum proprietário, então a tela inicial já
-abre em *"criar o acesso do proprietário"* — basta escolher nome, usuário e senha.
-
 **Funcionário:** na tela de entrada, toque em *"Criar meu acesso"* e escolha o vínculo
 (o próprio nome na lista de vendedores ou *"criar novo com o meu nome"*). A conta já
 entra em uso na hora, sem precisar de aprovação.
+
+### Porta do proprietário (separada do login dos funcionários)
+
+A criação do acesso do dono **não** aparece na tela comum — a tela de entrada só mostra
+*Entrar* e *Criar meu acesso*. A porta administrativa abre de três formas:
+
+| Forma | Como |
+| --- | --- |
+| Endereço | `…/#/administracao` (salve como ícone na tela de início do celular: entra com 1 toque) |
+| 5 toques no logo | toque/clique 5 vezes seguidas no logo, em qualquer tela |
+| Teclado | `Ctrl + Alt + D` |
+
+Na primeira vez ela pede para **criar o acesso do proprietário**; depois disso só pede
+usuário e senha. Quem descobrir a porta vê apenas um login — **sem a senha do
+administrador não há nada para fazer ali** (nem lista de nomes, nem dados).
+
+**Contas da equipe:** o proprietário pode registrar cada pessoa em **Equipe → Nova conta**
+(nome, usuário, a senha que a pessoa escolher e o vínculo com o vendedor), útil para
+colocar quem já trabalhava aqui com o histórico ligado. O dono também redefine senhas e
+troca vínculos nessa tela.
 
 - No menu do dono também aparecem **Equipe** (criar, ligar a um vendedor, redefinir
   senha, desativar ou excluir contas), **Relatório**, **Para imprimir**, **Entregas** e
@@ -153,6 +170,8 @@ app/
 - [x] Tema claro/escuro
 - [x] Comissão por faixas de metragem, configurável em Configurações → Comissões
 - [x] Login com dois perfis (proprietário e vendedor) e permissões escolhidas pelo dono
+- [x] Porta administrativa escondida (endereço `#/administracao`, 5 toques no logo, Ctrl+Alt+D)
+- [x] Equipe → Nova conta (o dono registra a equipe já com o histórico antigo ligado)
 - [ ] Colocar no ar (Netlify conectado ao GitHub) e conectar o Supabase
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia

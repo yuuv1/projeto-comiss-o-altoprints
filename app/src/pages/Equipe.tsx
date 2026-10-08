@@ -1,5 +1,5 @@
 import { Crown, KeyRound, Pencil, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { dataBR, moeda } from '../lib/format'
@@ -20,7 +20,8 @@ import {
 
 export default function Equipe() {
   const { db, avisar } = useStore()
-  const { usuario: eu, redefinirSenha, atualizarVinculo, alternarAtivo, excluirUsuario } = useAuth()
+  const { usuario: eu, redefinirSenha, atualizarVinculo, alternarAtivo, excluirUsuario, criarContaComoDono } =
+    useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
@@ -29,6 +30,40 @@ export default function Equipe() {
   const [vendedorId, setVendedorId] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   const [salvando, setSalvando] = useState(false)
+
+  const [criando, setCriando] = useState(false)
+  const [novoNome, setNovoNome] = useState('')
+  const [novoUsuario, setNovoUsuario] = useState('')
+  const [senhaNovaConta, setSenhaNovaConta] = useState('')
+  const [novoVendedor, setNovoVendedor] = useState('')
+  const [novoAdmin, setNovoAdmin] = useState(false)
+
+  const abrirNovaConta = () => {
+    setNovoNome('')
+    setNovoUsuario('')
+    setSenhaNovaConta('')
+    setNovoVendedor('')
+    setNovoAdmin(false)
+    setCriando(true)
+  }
+
+  const salvarNovaConta = async () => {
+    setSalvando(true)
+    try {
+      await criarContaComoDono({
+        nome: novoNome,
+        usuario: novoUsuario,
+        senha: senhaNovaConta,
+        vendedorId: novoVendedor,
+        administrador: novoAdmin,
+      })
+      setCriando(false)
+    } catch (e) {
+      avisar((e as Error).message, 'erro')
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   const abrirEdicao = (u: Usuario) => {
     setEditando(u)
@@ -64,12 +99,38 @@ export default function Equipe() {
   const contas = [...db.usuarios].sort((a, b) => a.papel.localeCompare(b.papel) || a.nome.localeCompare(b.nome))
   const vendedores = contas.filter((c) => c.papel === 'vendedor')
 
+  /** vendedores que ainda não têm acesso (com o histórico, para o dono ver o que a conta vai enxergar) */
+  const semAcesso = useMemo(
+    () =>
+      db.vendedores
+        .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
+        .map((v) => {
+          const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
+          const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+          return {
+            id: v.id,
+            nome: v.nome,
+            pedidos: pedidos.length,
+            faturamento: pagos.reduce((s, p) => s + Number(p.valor || 0), 0),
+          }
+        })
+        .sort((a, b) => b.pedidos - a.pedidos),
+    [db.pedidos, db.usuarios, db.vendedores],
+  )
+  const escolhido = semAcesso.find((v) => v.id === novoVendedor)
+  const comAcesso = db.vendedores.filter((v) => db.usuarios.some((u) => u.vendedor_id === v.id))
+
   return (
     <>
       <TituloPagina
         icone={Users}
         titulo="Equipe"
         subtitulo="Contas de acesso, vínculo com o vendedor, senhas e liberação."
+        acoes={
+          <Botao icone={UserPlus} onClick={abrirNovaConta}>
+            Nova conta
+          </Botao>
+        }
       />
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -95,7 +156,16 @@ export default function Equipe() {
       </div>
 
       {contas.length === 0 ? (
-        <Vazio icone={UserPlus} titulo="Nenhuma conta criada ainda" descricao="As contas são criadas na tela de login." />
+        <Vazio
+          icone={UserPlus}
+          titulo="Nenhuma conta criada ainda"
+          descricao="Use “Nova conta” para registrar quem já trabalha aqui (com a senha que a pessoa escolher) ou peça para cada um criar o próprio acesso na tela de entrada."
+          acao={
+            <Botao icone={UserPlus} onClick={abrirNovaConta}>
+              Nova conta
+            </Botao>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {contas.map((c) => {
@@ -206,6 +276,98 @@ export default function Equipe() {
         proprietário vê tudo. Aqui você pode trocar a senha de quem esqueceu, desativar quem saiu e ligar cada acesso
         ao vendedor correspondente — é esse vínculo que define quais pedidos aparecem para cada pessoa.
       </p>
+
+      <Modal
+        aberto={criando}
+        onFechar={() => setCriando(false)}
+        icone={UserPlus}
+        largura="max-w-lg"
+        titulo="Nova conta de acesso"
+        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui."
+        rodape={
+          <>
+            <Botao variante="secundario" onClick={() => setCriando(false)}>
+              Cancelar
+            </Botao>
+            <Botao
+              icone={ShieldCheck}
+              onClick={salvarNovaConta}
+              carregando={salvando}
+              disabled={!novoNome.trim() || !novoUsuario.trim() || senhaNovaConta.length < 4}
+            >
+              Criar acesso
+            </Botao>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo label="Nome da pessoa" obrigatorio>
+              <Entrada value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Ex.: JESSICA" />
+            </Campo>
+            <Campo label="Usuário" obrigatorio dica="Só letras, números, ponto, traço e underline.">
+              <Entrada
+                value={novoUsuario}
+                onChange={(e) => setNovoUsuario(e.target.value)}
+                placeholder="ex.: jessica"
+                autoCapitalize="none"
+                autoCorrect="off"
+              />
+            </Campo>
+            <Campo label="Senha" obrigatorio dica="A senha que a pessoa escolheu (mínimo 4 caracteres).">
+              <Entrada value={senhaNovaConta} onChange={(e) => setSenhaNovaConta(e.target.value)} placeholder="••••••" />
+            </Campo>
+            <Campo label="Tipo de acesso">
+              <Selecao value={novoAdmin ? 'admin' : 'vendedor'} onChange={(e) => setNovoAdmin(e.target.value === 'admin')}>
+                <option value="vendedor">Vendedor — vê só o que é dele</option>
+                <option value="admin">Proprietário — vê tudo</option>
+              </Selecao>
+            </Campo>
+          </div>
+
+          {novoAdmin ? (
+            <p className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+              Esta conta é de <b>proprietário</b>: entra pela porta administrativa e vê todos os pedidos, relatórios e
+              configurações.
+            </p>
+          ) : (
+            <>
+              <Campo
+                label="Já trabalha aqui? (vínculo)"
+                dica="O vínculo define quais pedidos e comissões esta pessoa vê. Nomes já usados por outra conta não aparecem aqui."
+              >
+                <Selecao value={novoVendedor} onChange={(e) => setNovoVendedor(e.target.value)}>
+                  <option value="">Sou novo/no cadastro — criar vendedor novo com este nome</option>
+                  {semAcesso.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome} · {v.pedidos} pedido(s) · {moeda(v.faturamento)}
+                    </option>
+                  ))}
+                </Selecao>
+              </Campo>
+
+              {escolhido ? (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  Esta conta vai entrar vendo <b>{escolhido.pedidos}</b> pedido(s) de {escolhido.nome} —{' '}
+                  <b>{moeda(escolhido.faturamento)}</b> já pagos.
+                </p>
+              ) : (
+                <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                  Sem vínculo escolhido: o sistema cria um vendedor novo com o nome informado (a pessoa começa com a
+                  lista de pedidos vazia).
+                </p>
+              )}
+
+              {comAcesso.length ? (
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  Já têm acesso: {comAcesso.map((v) => v.nome).join(', ')}. Para trocar o vínculo ou a senha de uma
+                  dessas contas, use “Vínculo e senha” na lista abaixo.
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         aberto={Boolean(editando)}

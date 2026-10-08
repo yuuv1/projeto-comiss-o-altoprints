@@ -1,18 +1,22 @@
-import { ArrowRight, Eye, EyeOff, KeyRound, LogIn, ShieldCheck, Sparkles, UserPlus } from 'lucide-react'
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { ArrowRight, Eye, EyeOff, KeyRound, LogIn, ShieldCheck, Sparkles, UserPlus, Users } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
-import { Botao, Campo, Entrada, Selecao, cn } from '../components/ui'
+import { Botao, Campo, Entrada, Etiqueta, Selecao, cn } from '../components/ui'
+import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { normalizarUsuario, useAuth } from '../lib/auth'
+import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
 
-type Tela = 'entrar' | 'criar-proprietario' | 'criar-vendedor'
+type Tela = 'entrar' | 'criar'
 
+/** tela comum de entrada: só vendedores. Nada aqui fala do proprietário. */
 export default function Login() {
-  const { usuario, entrar, criarContaProprietario, criarContaVendedor, temProprietario, nuvem } = useAuth()
+  const { usuario, entrar, criarContaVendedor, nuvem } = useAuth()
   const { db } = useStore()
+  const navegar = useNavigate()
 
-  const [tela, setTela] = useState<Tela>(temProprietario ? 'entrar' : 'criar-proprietario')
+  const [tela, setTela] = useState<Tela>('entrar')
   const [login, setLogin] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrar, setMostrar] = useState(false)
@@ -23,6 +27,30 @@ export default function Login() {
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
+  // o logo esconde a porta do proprietário: 5 toques seguidos
+  const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
+
+  /** nomes de vendedores que ainda não têm acesso — para a pessoa "assumir" o dela */
+  const disponiveis = useMemo(
+    () =>
+      db.vendedores
+        .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
+        .map((v) => {
+          const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
+          const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+          return {
+            id: v.id,
+            nome: v.nome,
+            pedidos: pedidos.length,
+            faturamento: pagos.reduce((s, p) => s + Number(p.valor || 0), 0),
+          }
+        })
+        .sort((a, b) => b.pedidos - a.pedidos),
+    [db.pedidos, db.usuarios, db.vendedores],
+  )
+
+  const escolhido = disponiveis.find((v) => v.id === vendedorId)
+
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
     setErro('')
@@ -30,9 +58,6 @@ export default function Login() {
     try {
       if (tela === 'entrar') {
         await entrar(login, senha, manter)
-      } else if (tela === 'criar-proprietario') {
-        if (senha !== repetir) throw new Error('As duas senhas precisam ser iguais.')
-        await criarContaProprietario({ nome, usuario: login, senha })
       } else {
         if (senha !== repetir) throw new Error('As duas senhas precisam ser iguais.')
         await criarContaVendedor({ nome, usuario: login, senha, vendedorId })
@@ -44,9 +69,6 @@ export default function Login() {
     }
   }
 
-  // quem já está conectado não precisa ver a tela de login
-  const jaConectado = Boolean(usuario)
-
   const trocarTela = (nova: Tela) => {
     setTela(nova)
     setErro('')
@@ -54,21 +76,8 @@ export default function Login() {
     setRepetir('')
   }
 
-  const titulo =
-    tela === 'entrar'
-      ? 'Entrar no sistema'
-      : tela === 'criar-proprietario'
-        ? 'Criar a conta do proprietário'
-        : 'Criar meu acesso'
-
-  const subtitulo =
-    tela === 'entrar'
-      ? 'Use o seu usuário e senha.'
-      : tela === 'criar-proprietario'
-        ? 'Esta conta é do dono do sistema: ela vê tudo — pedidos, comissões, equipe e relatórios.'
-        : 'Preencha os dados e comece a lançar seus pedidos agora mesmo.'
-
-  if (jaConectado) return <Navigate to="/" replace />
+  // quem já está conectado não precisa ver a tela de login
+  if (usuario) return <Navigate to="/" replace />
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-fuchsia-50 via-slate-50 to-sky-50 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
@@ -79,7 +88,9 @@ export default function Login() {
 
       <div className="relative w-full max-w-md">
         <div className="mb-5 flex flex-col items-center text-center">
-          <Logo />
+          <button type="button" onClick={tocarNoLogo} className="cursor-default" title="Altoprints">
+            <Logo />
+          </button>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Sistema de pedidos DTF — acesse com o seu usuário
           </p>
@@ -90,37 +101,53 @@ export default function Login() {
           className="rounded-3xl border border-slate-100 bg-white/95 p-6 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
         >
           <div className="mb-5">
-            <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">{titulo}</h1>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitulo}</p>
+            <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+              {tela === 'entrar' ? 'Entrar no sistema' : 'Criar meu acesso'}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              {tela === 'entrar'
+                ? 'Use o seu usuário e senha.'
+                : 'Escolha um usuário, invente a sua senha e comece a lançar seus pedidos agora mesmo.'}
+            </p>
           </div>
 
-          {tela !== 'entrar' ? (
-            <Campo label="Seu nome" obrigatorio className="mb-3">
-              <Entrada
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex.: JESSICA"
-                required
-                autoFocus
-              />
-            </Campo>
-          ) : null}
+          {tela === 'criar' ? (
+            <>
+              <Campo label="Seu nome" obrigatorio className="mb-3">
+                <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: JESSICA" required autoFocus />
+              </Campo>
 
-          {tela === 'criar-vendedor' ? (
-            <Campo
-              label="Vendedor correspondente"
-              dica="Serve para os seus pedidos e a sua comissão aparecerem certos."
-              className="mb-3"
-            >
-              <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-                <option value="">Criar um novo com o meu nome</option>
-                {db.vendedores.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.nome}
-                  </option>
-                ))}
-              </Selecao>
-            </Campo>
+              <Campo
+                label="Já trabalho aqui?"
+                dica="Escolha o seu nome para continuar vendo os seus pedidos. Se você é novo na equipe, deixe em “sou novo aqui”."
+                className="mb-3"
+              >
+                <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+                  <option value="">Sou novo aqui — criar com o meu nome</option>
+                  {disponiveis.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome} · {v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'}
+                    </option>
+                  ))}
+                </Selecao>
+              </Campo>
+
+              {escolhido ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  <Etiqueta className="border-emerald-200 bg-white text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" icone={Users}>
+                    {escolhido.nome}
+                  </Etiqueta>
+                  <span>
+                    Você vai continuar de onde parou: <b>{escolhido.pedidos}</b> pedido(s) e{' '}
+                    <b>{moeda(escolhido.faturamento)}</b> já pagos.
+                  </span>
+                </div>
+              ) : (
+                <p className="mb-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                  Nenhum nome escolhido: vamos criar um cadastro novo com o seu nome.
+                </p>
+              )}
+            </>
           ) : null}
 
           <Campo label="Usuário" obrigatorio className="mb-3" dica="Só letras, números, ponto, traço e underline.">
@@ -156,7 +183,7 @@ export default function Login() {
             </div>
           </Campo>
 
-          {tela !== 'entrar' ? (
+          {tela === 'criar' ? (
             <Campo label="Repita a senha" obrigatorio className="mb-3">
               <Entrada
                 type={mostrar ? 'text' : 'password'}
@@ -191,7 +218,7 @@ export default function Login() {
             icone={tela === 'entrar' ? LogIn : UserPlus}
             carregando={enviando}
           >
-            {tela === 'entrar' ? 'Entrar' : tela === 'criar-proprietario' ? 'Criar conta do proprietário' : 'Criar meu acesso'}
+            {tela === 'entrar' ? 'Entrar' : 'Criar meu acesso'}
             <ArrowRight className="h-4 w-4" />
           </Botao>
 
@@ -199,7 +226,7 @@ export default function Login() {
             {tela === 'entrar' ? (
               <button
                 type="button"
-                onClick={() => trocarTela(temProprietario ? 'criar-vendedor' : 'criar-proprietario')}
+                onClick={() => trocarTela('criar')}
                 className="font-semibold text-purple-700 hover:underline dark:text-purple-300"
               >
                 Sou funcionário — criar meu acesso
@@ -231,7 +258,7 @@ export default function Login() {
               : 'Modo local: as contas ficam neste navegador. Configure o Supabase para usar em vários aparelhos.'}
           </p>
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-            <Sparkles className="h-3 w-3" /> Esqueceu a senha? O proprietário redefine no painel dele.
+            <Sparkles className="h-3 w-3" /> Esqueceu a senha? Peça para redefinirem para você.
           </p>
         </div>
       </div>
