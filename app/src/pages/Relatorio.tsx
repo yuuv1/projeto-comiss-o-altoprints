@@ -15,10 +15,11 @@ import {
 import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
 import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
+import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
-import type { Pedido, Vendedor } from '../lib/types'
+import { FAIXAS_PADRAO, type Pedido, type Vendedor } from '../lib/types'
 
 type Campo = 'pagamento' | 'pedido' | 'envio'
 
@@ -41,6 +42,8 @@ const primeiroDiaDoMes = () => {
 
 export default function Relatorio() {
   const { db, nomeVendedor, avisar } = useStore()
+  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
+  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
   const [campo, setCampo] = useState<Campo>('pagamento')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)
@@ -95,38 +98,31 @@ export default function Relatorio() {
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
 
   const resumoVendedores = useMemo(() => {
-    const mapa = new Map<string, { vendedor: Vendedor | undefined; pedidos: number; metragem: number; total: number }>()
-    for (const p of visiveis) {
-      const chave = p.vendedor_id || 'sem-vendedor'
-      const item = mapa.get(chave) ?? {
-        vendedor: db.vendedores.find((v) => v.id === p.vendedor_id),
-        pedidos: 0,
-        metragem: 0,
-        total: 0,
-      }
-      item.pedidos += 1
-      item.metragem += Number(p.metragem || 0)
-      item.total += Number(p.valor || 0)
-      mapa.set(chave, item)
-    }
-    return [...mapa.entries()]
-      .map(([chave, v]) => ({ chave, ...v }))
-      .sort((a, b) => b.total - a.total)
-  }, [db.vendedores, visiveis])
+    return comissaoPorVendedor(visiveis, faixas, semMetragem)
+      .map((linha) => ({
+        ...linha,
+        vendedor: db.vendedores.find((v) => v.id === linha.chave) as Vendedor | undefined,
+        comissao: linha.resultado.total,
+        percentualMedio: linha.resultado.percentualMedio,
+      }))
+      .sort((a, b) => b.faturamento - a.faturamento)
+  }, [db.vendedores, faixas, semMetragem, visiveis])
+
+  const resultado = useMemo(() => calcularComissao(visiveis, faixas, semMetragem), [faixas, semMetragem, visiveis])
 
   const totais = useMemo(
     () => ({
       pedidos: visiveis.length,
       metragem: visiveis.reduce((s, p) => s + Number(p.metragem || 0), 0),
-      faturamento: visiveis.reduce((s, p) => s + Number(p.valor || 0), 0),
-      comissao: visiveis.reduce((s, p) => s + Number(p.valor || 0), 0) * 0.015,
+      faturamento: resultado.base,
+      comissao: resultado.total,
     }),
-    [visiveis],
+    [resultado, visiveis],
   )
 
   const exportarCSV = () => {
     const linhas: (string | number)[][] = [
-      ['Nº', 'Cliente', 'Vendedor', 'Observação', 'Metragem', 'Valor', 'Data do pagamento'],
+      ['Nº', 'Cliente', 'Vendedor', 'Observação', 'Metragem', 'Valor', 'Data do pagamento', '% comissão', 'Comissão'],
       ...visiveis.map((p) => [
         p.numero,
         p.cliente_nome,
@@ -135,10 +131,14 @@ export default function Relatorio() {
         numeroBR(p.metragem),
         numeroBR(p.valor),
         p.data_pagamento ? dataBR(p.data_pagamento) : '',
+        `${numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 2)}%`,
+        numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
       ]),
       [],
-      ['TOTAL', '', '', '', numeroBR(totais.metragem), numeroBR(totais.faturamento), ''],
-      ['COMISSÃO 1,5%', '', '', '', '', numeroBR(totais.comissao), ''],
+      ['TOTAL', '', '', '', numeroBR(totais.metragem), numeroBR(totais.faturamento), '', '', numeroBR(totais.comissao)],
+      ...resultado.porFaixa
+        .filter((l) => l.pedidos > 0)
+        .map((l) => [`COMISSÃO ${l.rotulo} (${numeroBR(l.percentual, 2)}%)`, '', '', '', '', '', '', '', numeroBR(l.comissao)]),
     ]
     baixarCSV(`relatorio-altoprints-${inicio}-a-${fim}`, linhas)
     avisar('CSV gerado! O arquivo abre no Excel com os acentos corretos.')
@@ -235,10 +235,11 @@ export default function Relatorio() {
             gradiente="from-emerald-500 to-green-600"
           />
           <CartaoResumo
-            titulo="Comissão (1,5%)"
+            titulo="Comissão"
             valor={moeda(totais.comissao)}
             icone={Percent}
             gradiente="from-amber-500 to-orange-600"
+            sub={`média de ${numeroBR(totais.faturamento ? (totais.comissao / totais.faturamento) * 100 : 0, 2)}% no período`}
           />
         </div>
 
@@ -256,7 +257,7 @@ export default function Relatorio() {
                   <th className="px-3 py-2.5 text-right">Pedidos</th>
                   <th className="px-3 py-2.5 text-right">Metragem</th>
                   <th className="px-3 py-2.5 text-right">Faturamento</th>
-                  <th className="px-3 py-2.5 text-right">Comissão 1,5%</th>
+                  <th className="px-3 py-2.5 text-right">Comissão</th>
                   <th className="px-3 py-2.5 text-right">Ticket médio</th>
                   <th className="px-3 py-2.5 text-right">Ações</th>
                 </tr>
@@ -267,9 +268,14 @@ export default function Relatorio() {
                     <td className="px-3 py-2.5 font-bold text-slate-800">{linha.vendedor?.nome ?? 'Sem vendedor'}</td>
                     <td className="px-3 py-2.5 text-right">{linha.pedidos}</td>
                     <td className="px-3 py-2.5 text-right">{numeroBR(linha.metragem)} m</td>
-                    <td className="px-3 py-2.5 text-right font-bold text-emerald-600">{moeda(linha.total)}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-amber-600">{moeda(linha.total * 0.015)}</td>
-                    <td className="px-3 py-2.5 text-right">{moeda(linha.total / (linha.pedidos || 1))}</td>
+                    <td className="px-3 py-2.5 text-right font-bold text-emerald-600">{moeda(linha.faturamento)}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-amber-600">
+                      {moeda(linha.comissao)}
+                      <span className="block text-[11px] font-normal text-slate-400">
+                        {numeroBR(linha.percentualMedio, 2)}% médio
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">{moeda(linha.faturamento / (linha.pedidos || 1))}</td>
                     <td className="px-3 py-2.5 text-right">
                       <Botao
                         tamanho="sm"
@@ -306,6 +312,44 @@ export default function Relatorio() {
                 </tfoot>
               ) : null}
             </table>
+          </div>
+        </Cartao>
+
+        {/* comissão por faixa de metragem */}
+        <Cartao className="mb-5" hover={false}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+              Comissão por faixa de metragem
+            </h2>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Regra definida em ⚙️ Painel → Comissões
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[...resultado.porFaixa, resultado.semMetragem]
+              .filter((l) => l.pedidos > 0)
+              .map((l) => (
+                <div
+                  key={l.id}
+                  className="rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-4 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
+                >
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    {l.rotulo}
+                  </p>
+                  <p className="text-lg font-black text-purple-600 dark:text-purple-400">
+                    {numeroBR(l.percentual, 1)}%
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {moeda(l.comissao)}
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                    {l.pedidos} pedido(s) • {numeroBR(l.metragem)} m • {moeda(l.faturamento)}
+                  </p>
+                </div>
+              ))}
+            {!resultado.porFaixa.some((l) => l.pedidos > 0) && resultado.semMetragem.pedidos === 0 ? (
+              <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum pedido pago no período.</p>
+            ) : null}
           </div>
         </Cartao>
 
@@ -348,6 +392,8 @@ export default function Relatorio() {
                     <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
                     <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
                     <th className="border border-slate-200 px-3 py-2">Pagamento</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
                     <th className="border border-slate-200 px-3 py-2 text-center">Ações</th>
                   </tr>
                 </thead>
@@ -370,6 +416,12 @@ export default function Relatorio() {
                         {moeda(p.valor)}
                       </td>
                       <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">{dataBR(p.data_pagamento)}</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
+                        {numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 1)}%
+                      </td>
+                      <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
+                        {moeda(comissaoDoPedido(p, faixas, semMetragem))}
+                      </td>
                       <td className="border border-slate-200 px-3 py-2 text-center">
                         <button
                           title="Tirar do relatório (não apaga o pedido)"
@@ -393,8 +445,11 @@ export default function Relatorio() {
                     <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-emerald-700">
                       {moeda(totais.faturamento)}
                     </td>
-                    <td className="border border-slate-200 px-3 py-2" colSpan={2}>
-                      Comissão 1,5%: {moeda(totais.comissao)}
+                    <td className="border border-slate-200 px-3 py-2" colSpan={3}>
+                      Comissão: {moeda(totais.comissao)} ({numeroBR(
+                        totais.faturamento ? (totais.comissao / totais.faturamento) * 100 : 0,
+                        2,
+                      )}% médio)
                     </td>
                   </tr>
                 </tfoot>
@@ -425,7 +480,7 @@ export default function Relatorio() {
                 <th className="num">Pedidos</th>
                 <th className="num">Metragem</th>
                 <th className="num">Faturamento</th>
-                <th className="num">Comissão 1,5%</th>
+                <th className="num">Comissão</th>
               </tr>
             </thead>
             <tbody>
@@ -434,8 +489,8 @@ export default function Relatorio() {
                   <td>{l.vendedor?.nome ?? 'Sem vendedor'}</td>
                   <td className="num">{l.pedidos}</td>
                   <td className="num">{numeroBR(l.metragem)} m</td>
-                  <td className="num">{moeda(l.total)}</td>
-                  <td className="num">{moeda(l.total * 0.015)}</td>
+                  <td className="num">{moeda(l.faturamento)}</td>
+                  <td className="num">{moeda(l.comissao)}</td>
                 </tr>
               ))}
             </tbody>

@@ -14,9 +14,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, Campo, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
+import { calcularComissao } from '../lib/comissao'
 import { dataBR, fimDoDia, hojeISO, inicioDoDia, moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import type { Pedido } from '../lib/types'
+import { FAIXAS_PADRAO, type Pedido } from '../lib/types'
 
 type Periodo = '7' | '30' | '90' | 'personalizado'
 
@@ -24,6 +25,8 @@ export default function PorVendedor() {
   const { db } = useStore()
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
+  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
+  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
 
   const [vendedorId, setVendedorId] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('30')
@@ -63,8 +66,10 @@ export default function PorVendedor() {
   )
 
   const total = pedidos.reduce((s, p) => s + Number(p.valor || 0), 0)
-  const pago = pedidos.filter((p) => p.status_pagamento === 'pago').reduce((s, p) => s + Number(p.valor || 0), 0)
+  const pedidosPagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+  const pago = pedidosPagos.reduce((s, p) => s + Number(p.valor || 0), 0)
   const metragem = pedidos.reduce((s, p) => s + Number(p.metragem || 0), 0)
+  const comissao = calcularComissao(pedidosPagos, faixas, semMetragem)
 
   const nome = db.vendedores.find((v) => v.id === vendedorId)?.nome ?? '—'
 
@@ -182,8 +187,11 @@ export default function PorVendedor() {
       </div>
 
       <p className={cn('mb-3 text-sm font-semibold text-slate-500', !pedidos.length && 'hidden')}>
-        {pedidos.length} pedido(s) de {nome} no período • comissão estimada (1,5% dos pagos):{' '}
-        <span className="font-bold text-emerald-600">{moeda(pago * 0.015)}</span>
+        {pedidos.length} pedido(s) de {nome} no período • comissão sobre os pedidos pagos:{' '}
+        <span className="font-bold text-emerald-600">{moeda(comissao.total)}</span>{' '}
+        <span className="text-xs text-slate-400">
+          (percentual médio {comissao.percentualMedio.toFixed(2).replace('.', ',')}%)
+        </span>
       </p>
 
       {pedidos.length === 0 ? (

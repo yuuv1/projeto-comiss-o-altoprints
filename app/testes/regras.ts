@@ -2,13 +2,25 @@
  * Testes das regras de negócio (preço por metragem, datas, formatação).
  * Rode com:  npm run testar
  */
+import { calcularComissao, comissaoDoPedido, faixaDoPedido, validarFaixas } from '../src/lib/comissao'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
+import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
 import { gerarDadosDemo } from '../src/lib/seed'
-import { isPedidoCompleto, pedidoPendenteFinanceiro, type Pedido } from '../src/lib/types'
+import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro, type Pedido } from '../src/lib/types'
 
 let ok = 0
 const falhas: string[] = []
+const assincronos: Promise<void>[] = []
+
+/** verificações que precisam aguardar (criptografia da senha) */
+const igualAsync = (descricao: string, promessa: Promise<unknown>, esperado: unknown) => {
+  assincronos.push(
+    promessa.then((recebido) => igual(descricao, recebido, esperado)).catch((e) => {
+      falhas.push(`${descricao}\n     erro: ${String(e)}`)
+    }),
+  )
+}
 
 /** espaço comum e espaço fixo (nbsp) contam como iguais na comparação */
 const normalizar = (v: unknown) =>
@@ -79,10 +91,57 @@ igual(
   true,
 )
 
-/* ------------------------------- resultado ---------------------------- */
-console.log(`\n✅ ${ok} verificações passaram`)
-if (falhas.length) {
-  console.log(`\n❌ ${falhas.length} falha(s):`)
-  for (const f of falhas) console.log('  - ' + f)
-  process.exit(1)
+/* ------------------------------ comissão ------------------------------ */
+const pedidoCom = (metragem: number | null, valor: number): Pedido =>
+  ({ ...base, metragem, valor })
+
+igual('faixa 3 m -> 5%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 5)
+igual('faixa 5 m -> 5% (limite da faixa)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 5)
+igual('faixa 6 m -> 4%', faixaDoPedido(6, FAIXAS_PADRAO, 3).percentual, 4)
+igual('faixa 20 m -> 4% (limite da faixa)', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 4)
+igual('faixa 21 m -> 3%', faixaDoPedido(21, FAIXAS_PADRAO, 3).percentual, 3)
+igual('faixa 80,25 m -> 2%', faixaDoPedido(80.25, FAIXAS_PADRAO, 3).percentual, 2)
+igual('sem metragem -> percentual configurado', faixaDoPedido(null, FAIXAS_PADRAO, 3).percentual, 3)
+igual('comissão de 2 m (R$ 119,80) a 5%', comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO), 5.99)
+igual('comissão de 10 m (R$ 549,00) a 4%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 21.96)
+
+const resultado = calcularComissao(
+  [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],
+  FAIXAS_PADRAO,
+  3,
+)
+igual('comissão total das 4 faixas', Number(resultado.total.toFixed(2)), Number((5.99 + 21.96 + 72.06 + 6).toFixed(2)))
+igual('base de cálculo = faturamento', Number(resultado.base.toFixed(2)), Number((119.8 + 549 + 3602.77 + 200).toFixed(2)))
+igual('percentual médio entre 0 e 5', resultado.percentualMedio > 0 && resultado.percentualMedio < 5, true)
+igual('resumo por faixa tem 4 linhas com pedidos', resultado.porFaixa.filter((l) => l.pedidos > 0).length + (resultado.semMetragem.pedidos > 0 ? 1 : 0), 4)
+igual('faixas válidas (padrão)', validarFaixas(FAIXAS_PADRAO), [])
+igual('faixas sobrepostas são recusadas', validarFaixas([
+  { id: 'a', de: 1, ate: 10, percentual: 5, rotulo: '1 a 10 m' },
+  { id: 'b', de: 5, ate: 20, percentual: 4, rotulo: '5 a 20 m' },
+]).length > 0, true)
+
+/* ------------------------------- senha -------------------------------- */
+async function testarSenha() {
+  const hash = await gerarHashSenha('1234')
+  igual('a senha não é guardada em texto puro', hash !== '1234' && hash.length > 20, true)
+  igual('senha correta confere', await senhaConfere('1234', hash), true)
+  igual('senha errada não confere', await senhaConfere('4321', hash), false)
+  igual('sem senha definida, o painel abre', await senhaConfere('qualquer', ''), true)
 }
+
+const senhaOk = testarSenha()
+
+/* ------------------------------- resultado ---------------------------- */
+function relatorio() {
+  console.log(`\n✅ ${ok} verificações passaram`)
+  if (falhas.length) {
+    console.log(`\n❌ ${falhas.length} falha(s):`)
+    for (const f of falhas) console.log('  - ' + f)
+    process.exit(1)
+  }
+}
+
+senhaOk.then(relatorio).catch((e) => {
+  console.log('erro no teste de senha:', e)
+  process.exit(1)
+})

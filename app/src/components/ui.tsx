@@ -31,12 +31,15 @@ type Tamanho = 'sm' | 'md' | 'lg' | 'icone'
 
 const variantes: Record<Variante, string> = {
   primario:
-    'text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:brightness-110 shadow-soft hover:shadow-hover',
-  secundario: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm',
-  ghost: 'text-slate-600 hover:bg-slate-100',
-  perigo: 'text-white bg-gradient-to-r from-rose-500 to-red-600 hover:brightness-110 shadow-soft',
-  sucesso: 'text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 shadow-soft',
-  aviso: 'text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 shadow-soft',
+    'text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:brightness-110 shadow-soft hover:shadow-hover dark:shadow-dark-soft',
+  secundario:
+    'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700',
+  ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+  perigo:
+    'text-white bg-gradient-to-r from-rose-500 to-red-600 hover:brightness-110 shadow-soft dark:shadow-dark-soft',
+  sucesso:
+    'text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 shadow-soft dark:shadow-dark-soft',
+  aviso: 'text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 shadow-soft dark:shadow-dark-soft',
 }
 
 const tamanhos: Record<Tamanho, string> = {
@@ -96,8 +99,8 @@ export function Cartao({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-slate-100 bg-white p-5 shadow-soft transition-all duration-200',
-        hover && 'hover:-translate-y-0.5 hover:shadow-hover',
+        'rounded-2xl border border-slate-100 bg-white p-5 shadow-soft transition-all duration-200 dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft',
+        hover && 'hover:-translate-y-0.5 hover:shadow-hover dark:hover:shadow-dark-hover',
         className,
       )}
     >
@@ -123,16 +126,16 @@ export function CartaoResumo({
     <Cartao className="flex items-center gap-4">
       <div
         className={cn(
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft',
+          'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
           gradiente,
         )}
       >
         <Icone className="h-6 w-6" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</p>
-        <p className="truncate text-2xl font-extrabold text-slate-800">{valor}</p>
-        {sub ? <p className="truncate text-xs text-slate-400">{sub}</p> : null}
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
+        <p className="truncate text-2xl font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
+        {sub ? <p className="truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p> : null}
       </div>
     </Cartao>
   )
@@ -186,19 +189,19 @@ export function Campo({
   return (
     <label className={cn('block', className)}>
       {label ? (
-        <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+        <span className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">
           {label} {obrigatorio ? <span className="text-rose-500">*</span> : null}
         </span>
       ) : null}
       {children}
-      {erro ? <span className="mt-1 block text-xs font-medium text-rose-600">{erro}</span> : null}
-      {dica && !erro ? <span className="mt-1 block text-xs text-slate-400">{dica}</span> : null}
+      {erro ? <span className="mt-1 block text-xs font-medium text-rose-600 dark:text-rose-400">{erro}</span> : null}
+      {dica && !erro ? <span className="mt-1 block text-xs text-slate-400 dark:text-slate-500">{dica}</span> : null}
     </label>
   )
 }
 
 const baseCampo =
-  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50'
+  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
 
 export const Entrada = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => (
   <input {...props} className={cn(baseCampo, className)} />
@@ -229,12 +232,12 @@ export function Interruptor({
     <button
       type="button"
       onClick={() => onChange(!ativo)}
-      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50"
+      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
     >
       <span
         className={cn(
           'relative h-6 w-11 shrink-0 rounded-full transition',
-          ativo ? 'bg-gradient-to-r from-pink-500 to-purple-600' : 'bg-slate-300',
+          ativo ? 'bg-gradient-to-r from-pink-500 to-purple-600' : 'bg-slate-300 dark:bg-slate-600',
         )}
       >
         <span
@@ -245,8 +248,8 @@ export function Interruptor({
         />
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-slate-700">{label}</span>
-        {descricao ? <span className="block text-xs text-slate-400">{descricao}</span> : null}
+        <span className="block text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</span>
+        {descricao ? <span className="block text-xs text-slate-400 dark:text-slate-500">{descricao}</span> : null}
       </span>
     </button>
   )
@@ -294,31 +297,27 @@ export function Modal({
   if (!aberto) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-3 backdrop-blur-sm sm:p-6 print:hidden">
-      <div
-        className="absolute inset-0"
-        onClick={() => fecharAoClicarFora && onFechar()}
-        aria-hidden="true"
-      />
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-3 backdrop-blur-sm sm:p-6 print:hidden dark:bg-black/70">
+      <div className="absolute inset-0" onClick={() => fecharAoClicarFora && onFechar()} aria-hidden="true" />
       <div
         className={cn(
-          'relative my-4 w-full animate-pop-in rounded-2xl bg-white shadow-2xl',
+          'relative my-4 w-full animate-pop-in rounded-2xl bg-white shadow-2xl dark:border dark:border-slate-800 dark:bg-slate-900',
           largura,
         )}
       >
-        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
           {Icone ? (
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft">
               <Icone className="h-5 w-5" />
             </div>
           ) : null}
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-extrabold text-slate-800">{titulo}</h2>
-            {subtitulo ? <p className="text-sm text-slate-500">{subtitulo}</p> : null}
+            <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">{titulo}</h2>
+            {subtitulo ? <p className="text-sm text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
           </div>
           <button
             onClick={onFechar}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             aria-label="Fechar"
           >
             <X className="h-5 w-5" />
@@ -326,7 +325,7 @@ export function Modal({
         </div>
         <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
         {rodape ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
             {rodape}
           </div>
         ) : null}
@@ -379,7 +378,7 @@ export function useConfirmacao() {
         </>
       }
     >
-      <div className="text-sm text-slate-600">{estado.mensagem}</div>
+      <div className="text-sm text-slate-600 dark:text-slate-300">{estado.mensagem}</div>
     </Modal>
   ) : null
 
@@ -390,15 +389,25 @@ export function useConfirmacao() {
 /* Diversos                                                            */
 /* ------------------------------------------------------------------ */
 
-export function Vazio({ titulo, descricao, icone: Icone, acao }: { titulo: string; descricao?: string; icone: LucideIcon; acao?: ReactNode }) {
+export function Vazio({
+  titulo,
+  descricao,
+  icone: Icone,
+  acao,
+}: {
+  titulo: string
+  descricao?: string
+  icone: LucideIcon
+  acao?: ReactNode
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-indigo-500/10 text-purple-600">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-white/60 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/60">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500/10 via-purple-500/10 to-indigo-500/10 text-purple-600 dark:text-purple-400">
         <Icone className="h-7 w-7" />
       </div>
       <div>
-        <p className="text-base font-bold text-slate-700">{titulo}</p>
-        {descricao ? <p className="mt-0.5 text-sm text-slate-500">{descricao}</p> : null}
+        <p className="text-base font-bold text-slate-700 dark:text-slate-200">{titulo}</p>
+        {descricao ? <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{descricao}</p> : null}
       </div>
       {acao}
     </div>
@@ -407,8 +416,8 @@ export function Vazio({ titulo, descricao, icone: Icone, acao }: { titulo: strin
 
 export function Carregando({ texto = 'Carregando...' }: { texto?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 py-16 text-slate-500">
-      <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
+    <div className="flex items-center justify-center gap-3 py-16 text-slate-500 dark:text-slate-400">
+      <Loader2 className="h-5 w-5 animate-spin text-purple-600 dark:text-purple-400" />
       <span className="text-sm font-medium">{texto}</span>
     </div>
   )
@@ -434,8 +443,10 @@ export function TituloPagina({
           </div>
         ) : null}
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 sm:text-3xl">{titulo}</h1>
-          {subtitulo ? <p className="text-sm text-slate-500">{subtitulo}</p> : null}
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-3xl">
+            {titulo}
+          </h1>
+          {subtitulo ? <p className="text-sm text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">{acoes}</div>
@@ -453,7 +464,7 @@ export function Abas<T extends string>({
   onChange: (id: T) => void
 }) {
   return (
-    <div className="mb-4 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft">
+    <div className="mb-4 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft">
       {abas.map((aba) => {
         const Icone = aba.icone
         const selecionada = aba.id === ativa
@@ -465,7 +476,7 @@ export function Abas<T extends string>({
               'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
               selecionada
                 ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                : 'text-slate-600 hover:bg-slate-100',
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
             )}
           >
             {Icone ? <Icone className="h-4 w-4" /> : null}
@@ -474,7 +485,7 @@ export function Abas<T extends string>({
               <span
                 className={cn(
                   'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                  selecionada ? 'bg-white/25' : 'bg-slate-200 text-slate-600',
+                  selecionada ? 'bg-white/25' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
                 )}
               >
                 {aba.contador}
@@ -504,12 +515,17 @@ export function Toaster() {
           <button
             key={t.id}
             onClick={() => fecharToast(t.id)}
-            className="pointer-events-auto flex animate-fade-in-up items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left shadow-hover"
+            className="pointer-events-auto flex animate-fade-in-up items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left shadow-hover dark:border-slate-800 dark:bg-slate-900"
           >
-            <span className={cn('mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white', cor)}>
+            <span
+              className={cn(
+                'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white',
+                cor,
+              )}
+            >
               <Icone className="h-4 w-4" />
             </span>
-            <span className="text-sm font-medium text-slate-700">{t.texto}</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.texto}</span>
           </button>
         )
       })}
@@ -531,7 +547,7 @@ export function BarraBusca({
   return (
     <div className={cn('relative', className)}>
       <svg
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 dark:text-slate-500"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -546,8 +562,11 @@ export function BarraBusca({
         value={valor}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-base text-slate-800 shadow-soft outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100"
+        className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-base text-slate-800 shadow-soft outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-dark-soft dark:focus:border-purple-500 dark:focus:ring-purple-500/20"
       />
     </div>
   )
 }
+
+/** Ícone de chave/senha usado no cadeado do painel */
+export { AlertTriangle }

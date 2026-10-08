@@ -113,11 +113,37 @@ export interface Arquivo {
   created_at: string
 }
 
+/** Faixa de metragem que define o percentual de comissão do pedido */
+export interface FaixaComissao {
+  id: string
+  /** metragem inicial da faixa (inclusive) */
+  de: number
+  /** metragem final da faixa (inclusive) — null = sem limite */
+  ate: number | null
+  /** percentual de comissão sobre o faturamento do pedido */
+  percentual: number
+  rotulo: string
+}
+
+/** Valores iniciais das faixas — podem ser trocados no painel de comissões (⚙️ com senha) */
+export const FAIXAS_PADRAO: FaixaComissao[] = [
+  { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
+  { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
+  { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
+  { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+]
+
 export interface Configuracoes {
   empresa_nome: string
   logo_url: string
   revisao_ultima_em: string | null
   openai_key: string
+  /** senha (criptografada) que protege o painel de configurações e comissões */
+  senha_admin_hash: string
+  /** faixas de metragem x percentual de comissão */
+  faixas_comissao: FaixaComissao[]
+  /** percentual aplicado em pedidos sem metragem informada */
+  comissao_sem_metragem: number
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -125,6 +151,20 @@ export const CONFIG_PADRAO: Configuracoes = {
   logo_url: '',
   revisao_ultima_em: null,
   openai_key: '',
+  senha_admin_hash: '',
+  faixas_comissao: FAIXAS_PADRAO,
+  comissao_sem_metragem: 3,
+}
+
+/** Resumo de uma faixa de comissão (usado nos relatórios) */
+export interface FaixaResumo {
+  id: string
+  rotulo: string
+  percentual: number
+  pedidos: number
+  metragem: number
+  faturamento: number
+  comissao: number
 }
 
 export interface DB {

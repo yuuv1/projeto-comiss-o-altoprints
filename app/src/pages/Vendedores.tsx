@@ -1,12 +1,15 @@
 import { Pencil, Plus, Trash2, UserPlus, UsersRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Botao, Campo, CartaoResumo, Entrada, Modal, TituloPagina, Vazio, useConfirmacao } from '../components/ui'
+import { calcularComissao } from '../lib/comissao'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import type { Vendedor } from '../lib/types'
+import { FAIXAS_PADRAO, type Vendedor } from '../lib/types'
 
 export default function Vendedores() {
   const { db, salvarVendedor, excluirVendedor } = useStore()
+  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
+  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
   const { confirmar, dialog } = useConfirmacao()
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Vendedor | null>(null)
@@ -26,11 +29,11 @@ export default function Vendedores() {
             pedidos: pedidos.length,
             total,
             pago: pagos.reduce((s, p) => s + Number(p.valor || 0), 0),
-            comissao: pagos.reduce((s, p) => s + Number(p.valor || 0), 0) * 0.015,
+            comissao: calcularComissao(pagos, faixas, semMetragem).total,
             clientes: db.clientes.filter((c) => c.vendedor_id === v.id).length,
           }
         }),
-    [db.clientes, db.pedidos, db.vendedores],
+    [db.clientes, db.pedidos, db.vendedores, faixas, semMetragem],
   )
 
   const abrirNovo = () => {
@@ -80,7 +83,7 @@ export default function Vendedores() {
           gradiente="from-emerald-500 to-green-600"
         />
         <CartaoResumo
-          titulo="Comissão (1,5%)"
+          titulo="Comissão (paga)"
           valor={moeda(dados.reduce((s, d) => s + d.comissao, 0))}
           icone={Plus}
           gradiente="from-amber-500 to-orange-600"

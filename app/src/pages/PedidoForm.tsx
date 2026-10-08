@@ -32,7 +32,8 @@ import {
   useConfirmacao,
 } from '../components/ui'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
-import { dataBR, hojeISO, moeda, metros, paraInputDate, paraInputDateTime } from '../lib/format'
+import { calcularComissao } from '../lib/comissao'
+import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
 import { FAIXAS, calcularValor, precoMetro } from '../lib/pricing'
 import { useStore } from '../lib/store'
 import {
@@ -157,6 +158,15 @@ export default function PedidoForm() {
   const valorAuto = calcularValor(metrosNum, valorEspecial)
   const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
   const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum)
+  const faixasComissao = db.configuracoes.faixas_comissao ?? []
+  const percentualComissao = useMemo(() => {
+    const exemplo = calcularComissao(
+      [{ metragem: metrosNum, valor: valorFinal } as Pedido],
+      faixasComissao,
+      db.configuracoes.comissao_sem_metragem ?? 0,
+    )
+    return exemplo.percentualMedio
+  }, [db.configuracoes.comissao_sem_metragem, faixasComissao, metrosNum, valorFinal])
 
   const arquivosDoPedido = useMemo(
     () => db.arquivos.filter((a) => a.pedido_id === existente?.id),
@@ -569,8 +579,14 @@ export default function PedidoForm() {
                 <span className="font-semibold text-slate-800">{moeda(precoAtual)}</span>
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
-                <span className="font-bold text-slate-600">Total</span>
+                <span className="font-bold text-slate-600 dark:text-slate-300">Total</span>
                 <span className="text-xl font-black text-emerald-600">{moeda(valorFinal)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Comissão ({numeroBR(percentualComissao, 1)}%)</span>
+                <span className="font-semibold text-amber-600">
+                  {moeda(valorFinal * (percentualComissao / 100))}
+                </span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 <EtiquetaProducao status={statusProducaoAtual} />

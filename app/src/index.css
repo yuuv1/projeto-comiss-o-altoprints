@@ -13,6 +13,35 @@
     @apply bg-slate-50 text-slate-800 antialiased;
   }
 
+  /* --- modo escuro --- */
+  .dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    color-scheme: dark;
+  }
+
+  .dark ::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #c4b5fd;
+    border-radius: 999px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #4c1d95;
+  }
+
   /* inputs de data no padrão do sistema */
   input[type='date'],
   input[type='datetime-local'] {
@@ -68,6 +97,30 @@
     background: #fff !important;
   }
 
+  /* mesmo com o tema escuro ligado, o papel sai branco com letra preta */
+  html.dark body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .print-area,
+  .print-area * {
+    color: #000 !important;
+    background-color: transparent !important;
+  }
+
+  .tabela-print thead th {
+    background-color: #e9e9e9 !important;
+  }
+
+  .tabela-print tbody tr:nth-child(even) {
+    background-color: #f6f6f6 !important;
+  }
+
+  .tabela-print tfoot td {
+    background-color: #eee !important;
+  }
+
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -106,4 +159,181 @@
 .tabela-scroll::-webkit-scrollbar-thumb {
   background: #d8b4fe;
   border-radius: 999px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tema escuro                                                        */
+/* ------------------------------------------------------------------ */
+/* Em vez de repetir "dark:alguma-coisa" em cada tela, o tema escuro   */
+/* reinveste as cores claras do Tailwind. Este bloco fica no fim do    */
+/* arquivo (depois das classes do Tailwind) e só vale na tela — a      */
+/* impressão continua sempre branca com letra preta.                  */
+
+@media screen {
+  /* fundos */
+  .dark .bg-white,
+  .dark .bg-white\/60,
+  .dark .bg-white\/70,
+  .dark .bg-white\/80,
+  .dark .bg-white\/95 {
+    background-color: #0f172a !important;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-slate-50\/70,
+  .dark .bg-slate-50\/60 {
+    background-color: #131c31 !important;
+  }
+
+  .dark .bg-slate-100 {
+    background-color: #1e293b !important;
+  }
+
+  .dark .bg-slate-200,
+  .dark .bg-slate-300 {
+    background-color: #334155 !important;
+  }
+
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-slate-100:hover,
+  .dark .hover\:bg-slate-50\/70:hover {
+    background-color: #1e293b !important;
+  }
+
+  .dark .hover\:bg-purple-50\/40:hover,
+  .dark .hover\:bg-rose-50:hover {
+    background-color: rgba(88, 28, 135, 0.25) !important;
+  }
+
+  /* textos */
+  .dark .text-slate-800,
+  .dark .text-slate-900 {
+    color: #f1f5f9 !important;
+  }
+
+  .dark .text-slate-700 {
+    color: #e2e8f0 !important;
+  }
+
+  .dark .text-slate-600 {
+    color: #cbd5e1 !important;
+  }
+
+  .dark .text-slate-500 {
+    color: #94a3b8 !important;
+  }
+
+  .dark .text-slate-400 {
+    color: #7f8ea3 !important;
+  }
+
+  /* campos */
+  .dark input,
+  .dark textarea,
+  .dark select {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #7f8ea3 !important;
+  }
+
+  /* bordas */
+  .dark .border-slate-100 {
+    border-color: #1e293b !important;
+  }
+
+  .dark .border-slate-200,
+  .dark .border-slate-300 {
+    border-color: #334155 !important;
+  }
+
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #1e293b !important;
+  }
+
+  /* tabelas (relatórios, entregas) */
+  .dark thead.bg-slate-50,
+  .dark thead.bg-slate-100 {
+    background-color: #1e293b !important;
+    color: #cbd5e1 !important;
+  }
+
+  .dark tbody tr.bg-white {
+    background-color: #0f172a !important;
+  }
+
+  .dark tbody tr.bg-slate-50\/70 {
+    background-color: rgba(30, 41, 59, 0.55) !important;
+  }
+
+  .dark tfoot tr.bg-slate-100,
+  .dark tfoot tr.bg-slate-50 {
+    background-color: #1e293b !important;
+  }
+
+  .dark table th,
+  .dark table td {
+    border-color: #334155 !important;
+  }
+
+  /* etiquetas de status e avisos coloridos */
+  .dark .bg-emerald-50,
+  .dark .bg-emerald-100 {
+    background-color: rgba(6, 78, 59, 0.55) !important;
+    color: #a7f3d0 !important;
+  }
+
+  .dark .bg-amber-50,
+  .dark .bg-amber-100 {
+    background-color: rgba(120, 53, 15, 0.5) !important;
+    color: #fde68a !important;
+  }
+
+  .dark .bg-sky-50,
+  .dark .bg-sky-100 {
+    background-color: rgba(12, 74, 110, 0.5) !important;
+    color: #bae6fd !important;
+  }
+
+  .dark .bg-violet-50,
+  .dark .bg-violet-100 {
+    background-color: rgba(76, 29, 149, 0.5) !important;
+    color: #ddd6fe !important;
+  }
+
+  .dark .bg-fuchsia-50,
+  .dark .bg-fuchsia-100 {
+    background-color: rgba(112, 26, 117, 0.45) !important;
+    color: #f5d0fe !important;
+  }
+
+  .dark .bg-rose-50,
+  .dark .bg-rose-100 {
+    background-color: rgba(136, 19, 55, 0.45) !important;
+    color: #fecdd3 !important;
+  }
+
+  .dark .bg-orange-100 {
+    background-color: rgba(154, 52, 18, 0.5) !important;
+    color: #fed7aa !important;
+  }
+
+  /* sombras mais discretas no escuro */
+  .dark .shadow-soft {
+    box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.7) !important;
+  }
+
+  .dark .shadow-hover,
+  .dark .hover\:shadow-hover:hover {
+    box-shadow: 0 16px 34px -12px rgba(0, 0, 0, 0.8) !important;
+  }
+
+  /* cartões claros com borda branca ficam melhores com borda escura */
+  .dark .border-white\/60 {
+    border-color: rgba(30, 41, 59, 0.8) !important;
+  }
 }

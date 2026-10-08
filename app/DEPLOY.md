@@ -102,6 +102,22 @@ em todos os aparelhos.
 
 ---
 
+## Esqueci a senha do painel
+
+A senha protege só o painel de configurações (os vendedores não precisam dela).
+
+- **Modo nuvem (Supabase):** abra o **SQL Editor** e rode:
+  ```sql
+  update public.configuracoes
+     set valor = jsonb_set(valor, '{senha_admin_hash}', '""')
+   where id = 1;
+  ```
+  Depois abra o sistema e crie uma senha nova em ⚙️ → Senha.
+- **Modo local:** no navegador do computador, abra o console (F12) e rode
+  `localStorage.clear()` e recarregue — isso apaga os dados locais, então use apenas se
+  você não tiver pedidos salvos ali (no modo local, prefira apagar somente a linha do
+  `JSON` do `altoprints:db:v1`, campo `configuracoes.senha_admin_hash`).
+
 ## Dicas importantes
 
 - **Logo oficial**: envie em ⚙️ Configurações (PNG/JPG até 400 KB). Ele aparece no

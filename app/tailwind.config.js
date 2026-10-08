@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -18,6 +19,8 @@ export default {
       boxShadow: {
         soft: '0 4px 16px -4px rgba(88, 28, 135, 0.18)',
         hover: '0 14px 32px -12px rgba(88, 28, 135, 0.38)',
+        'dark-soft': '0 4px 18px -4px rgba(0, 0, 0, 0.5)',
+        'dark-hover': '0 16px 34px -12px rgba(0, 0, 0, 0.65)',
       },
       keyframes: {
         'fade-in-up': {

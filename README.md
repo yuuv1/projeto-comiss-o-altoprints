@@ -25,7 +25,7 @@ Outros comandos:
 | `npm run dev` | abre o sistema no seu computador (desenvolvimento) |
 | `npm run build` | gera a versão final na pasta `dist/` |
 | `npm run preview` | testa a versão final |
-| `npm run testar` | roda os testes das regras de preço e das telas |
+| `npm run testar` | roda os testes das regras (preço, comissão, senha) e das telas |
 
 ---
 
@@ -43,8 +43,43 @@ Outros comandos:
 | **Cliente especial** | `/relatorio-cliente-especial` | Extrato do cliente especial (pagos e pendentes) em A4 |
 
 Extras: janela de **revisão a cada 3 dias** com os pedidos que não estão "DTF pronto"
-e "Pago" ao mesmo tempo, e **Importar comprovante** (a IA lê a foto e preenche o
-pedido — precisa de uma chave configurada em ⚙️ Configurações).
+e "Pago" ao mesmo tempo, **Importar comprovante** (a IA lê a foto e preenche o pedido)
+e **tema claro/escuro** (botão no cabeçalho, cada pessoa escolhe o seu).
+
+---
+
+## Comissão por faixas de metragem (configurável)
+
+A comissão de cada pedido é calculada pela **metragem do pedido**: o percentual da faixa
+em que ele cai é aplicado sobre o valor do pedido. Vale apenas para pedidos com
+pagamento confirmado.
+
+Faixas iniciais (todas editáveis):
+
+| Metragem | Comissão |
+| --- | --- |
+| 1 a 5 m | 5% |
+| 6 a 20 m | 4% |
+| 21 a 50 m | 3% |
+| acima de 50 m | 2% |
+| sem metragem informada | 3% |
+
+Onde alterar: **⚙️ (cadeado) → Comissões**. O painel tem uma **prévia ao vivo** que mostra,
+com os pedidos pagos do mês, quantos pedidos caem em cada faixa e quanto sai de comissão —
+antes mesmo de salvar.
+
+---
+
+## Painel do administrador (protegido por senha)
+
+O cadeado ⚙️ no cabeçalho abre o painel, que pede uma **senha** (na primeira vez, o
+responsável cria a senha). Dentro dele: regras de comissão, nome e logo da empresa,
+chave da IA e limpeza/carga de dados de teste. O painel volta a pedir a senha quando a
+página é recarregada.
+
+> A senha é um **cadeado de uso diário** (evita que os vendedores mexam nas regras por
+> engano), não um login: o sistema continua sem tela de login. Se quiser proteção forte
+> (contas por usuário, cada vendedor vendo só os pedidos dele), é o próximo passo natural.
 
 ---
 
@@ -81,7 +116,7 @@ O sistema funciona de duas formas, sem mudar nenhuma tela:
 ```
 app/
 ├── src/
-│   ├── lib/            regras e dados (tipos, preços, formatação, banco, arquivos, exemplos)
+│   ├── lib/            regras e dados (tipos, preços, comissão, senha, tema, banco, arquivos)
 │   ├── components/     telas de apoio (menu, cartões, modais, etiquetas de status, logo)
 │   ├── pages/          as 8 telas do menu + formulário de pedido
 │   └── index.css       estilos + regras de impressão A4
@@ -96,8 +131,10 @@ app/
 
 - [x] Recriar o sistema fielmente ao antigo
 - [x] Hospedagem gratuita documentada (`app/DEPLOY.md`) + robô de publicação no GitHub Pages
-- [ ] Colocar no ar (GitHub Pages / Netlify) e conectar o Supabase
-- [ ] Enviar o logo oficial (o sistema aceita upload em ⚙️ Configurações)
+- [x] Tema claro/escuro
+- [x] Comissão por faixas de metragem, configurável em painel com senha
+- [ ] Colocar no ar (Netlify conectado ao GitHub) e conectar o Supabase
+- [ ] Enviar o logo oficial (upload no painel do administrador → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
 
 > Observação: o sistema não tem tela de login. Como o link pode ser aberto por

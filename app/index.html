@@ -9,6 +9,15 @@
       content="Sistema de gestão de pedidos DTF da Altoprints — pedidos, clientes, vendedores, impressão, entregas e relatórios."
     />
     <title>Altoprints — Sistema de Pedidos DTF</title>
+    <script>
+      // aplica o tema escolhido antes de desenhar a tela (evita "piscar" branco)
+      try {
+        if (localStorage.getItem('altoprints:tema') === 'escuro') {
+          document.documentElement.classList.add('dark')
+          document.documentElement.style.colorScheme = 'dark'
+        }
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
