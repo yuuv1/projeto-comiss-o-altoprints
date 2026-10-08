@@ -26,18 +26,39 @@ Você pode fazer em duas etapas:
 
 O arquivo `.github/workflows/publicar.yml` já cuida de instalar, testar e publicar.
 
-### Opção B: Netlify (arrastar e soltar)
+### Opção B: Netlify
 
-1. No seu computador:
-   ```bash
-   cd app
-   npm install
-   npm run build
-   ```
-2. Abra <https://app.netlify.com/drop> e arraste a pasta `app/dist` para a página.
-3. Pronto: o Netlify gera um link na hora (dá para renomear, ex.: `altoprints.netlify.app`).
+O Netlify é confiável (empresa grande, CDN mundial, HTTPS grátis) e o plano Free permite
+uso comercial: **100 GB de tráfego e 300 minutos de build por mês**. Para um sistema
+interno isso é muito mais do que o necessário. Se estourar o limite do mês, o site fica
+pausado até o dia 1º do mês seguinte (não gera cobrança surpresa).
 
-### Opção C: Vercel
+**B1 — Recomendado: Netlify conectado ao GitHub (atualiza sozinho)**
+
+Uma vez conectado, toda alteração enviada ao repositório publica o sistema automaticamente
+(e dá para voltar para uma versão anterior com um clique):
+
+1. Já existe o arquivo [`netlify.toml`](../netlify.toml) na raiz do repositório com tudo
+   configurado (pasta `app`, comando de build e pasta publicada).
+2. Em <https://app.netlify.com> crie a conta (dá para entrar com o GitHub).
+3. Clique em **Add new site → Import an existing project → GitHub** e escolha este repositório.
+4. Confirme as opções detectadas (o Netlify lê o `netlify.toml` sozinho) e clique em **Deploy**.
+5. Se estiver usando o Supabase, antes de publicar adicione em
+   **Site configuration → Environment variables**: `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_ANON_KEY`.
+6. Depois é só: **eu altero o sistema → envio para o GitHub → o Netlify publica sozinho.**
+
+**B2 — Netlify Drop (só para testar rápido, sem conta)**
+
+1. No seu computador: `cd app && npm install && npm run build`
+2. Abra <https://app.netlify.com/drop> e arraste a pasta `app/dist`.
+3. ⚠️ **Importante:** o site criado sem login é temporário — ele é apagado se você não
+   **reivindicar ("Claim")** ele para uma conta Netlify. Clique no botão de claim e crie a
+   conta na hora; depois disso o endereço fica firme.
+4. No Drop a atualização é manual: gere o build de novo e arraste em
+   **Deploys → drag and drop**. Para atualizar sozinho, conecte o repositório (opção B1).
+
+### Opção C: Vercel (alternativa)
 
 1. Abra <https://vercel.com>, clique em **Add New → Project** e importe este repositório.
 2. Configure **Root Directory: `app`** e **Build Command: `npm run build`**.
@@ -90,6 +111,10 @@ em todos os aparelhos.
   logo no cabeçalho e os totais no final.
 - **Dados de exemplo**: em ⚙️ Configurações existe *Carregar demonstração* e
   *Apagar todos os dados* para começar a usar de verdade.
+- **Atualizar o sistema publicado**: com o GitHub conectado (GitHub Pages ou Netlify B1)
+  basta enviar a alteração para o repositório que o site se atualiza sozinho, em 1 a 2
+  minutos. As alterações **não apagam nada**: os pedidos ficam no Supabase (nuvem) ou,
+  no modo local, continuam salvos no navegador do usuário.
 - **Backup**: no Supabase, em **Database → Backups**, os planos gratuitos guardam
   cópias diárias por alguns dias. Também é possível exportar CSV pelo próprio relatório.
 - **Celular**: o sistema é responsivo — dá para usar no celular do vendedor durante a
