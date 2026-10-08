@@ -4,6 +4,7 @@ import {
   Check,
   Cloud,
   Database,
+  Download,
   Image as ImageIcon,
   KeyRound,
   Percent,
@@ -35,7 +36,8 @@ import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmac
 type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso'
 
 export default function Configuracoes() {
-  const { db, nuvem, salvarConfig, resetarDados, carregarDemo, avisar } = useStore()
+  const { db, nuvem, salvarConfig, resetarDados, carregarDemo, baixarBackup, restaurarBackup, avisar } =
+    useStore()
   const { usuario, trocarMinhaSenha, trocarMeuUsuario, atualizarMeuPerfil } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const [aba, setAba] = useState<Aba>('comissoes')
@@ -543,10 +545,10 @@ export default function Configuracoes() {
                   const ok = await confirmar({
                     titulo: 'Apagar todos os dados?',
                     mensagem:
-                      'Pedidos, clientes, vendedores, arquivos e contas de acesso serão apagados definitivamente.',
+                      'Pedidos, clientes, vendedores, arquivos e as contas da equipe serão apagados definitivamente. O seu acesso de proprietário é mantido para você não perder a entrada no sistema.',
                     textoBotao: 'Apagar tudo',
                   })
-                  if (ok) await resetarDados()
+                  if (ok) await resetarDados(usuario?.id)
                 }}
               >
                 Apagar todos os dados
@@ -554,7 +556,53 @@ export default function Configuracoes() {
             </div>
             <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              As senhas nunca são guardadas em texto puro: fica só uma “impressão digital” (hash) de cada uma.
+              As senhas nunca são guardadas em texto puro: fica só uma “impressão digital” (hash) de cada uma. Ao
+              apagar os dados, <b>o seu acesso de proprietário é mantido</b> — assim você não fica trancado fora.
+            </p>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
+              <Upload className="h-4 w-4" /> Backup (cópia de segurança)
+            </p>
+            <p className="mb-3 text-xs text-emerald-800 dark:text-emerald-300">
+              O plano grátis do Supabase <b>não faz backup automático</b>. Baixe um arquivo de vez em quando (ex.: toda
+              semana) e guarde no computador ou na nuvem. Se algo der errado, é só restaurar este arquivo.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Botao tamanho="sm" icone={Download} onClick={baixarBackup}>
+                Baixar backup
+              </Botao>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                <Upload className="h-4 w-4" />
+                Restaurar backup
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const arquivo = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!arquivo) return
+                    const ok = await confirmar({
+                      titulo: 'Restaurar este backup?',
+                      mensagem:
+                        'Os dados atuais (pedidos, clientes, vendedores, contas e configurações) serão substituídos pelos do arquivo.',
+                      textoBotao: 'Restaurar',
+                    })
+                    if (!ok) return
+                    try {
+                      await restaurarBackup(arquivo)
+                    } catch (erro) {
+                      avisar((erro as Error).message, 'erro')
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              O backup inclui pedidos, clientes, vendedores, arquivos (links) e contas de acesso. Fotos e artes enviadas
+              ficam no Supabase Storage e continuam lá.
             </p>
           </Cartao>
         </div>

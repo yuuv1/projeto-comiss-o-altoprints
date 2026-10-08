@@ -65,8 +65,13 @@ interface Ctx {
   excluirArquivoDoPedido: (arquivo: Arquivo) => Promise<void>
   /* configurações */
   salvarConfig: (parcial: Partial<Configuracoes>) => Promise<void>
-  resetarDados: () => Promise<void>
+  /** apaga tudo; com `manterContaId`, o acesso do proprietário atual é preservado */
+  resetarDados: (manterContaId?: string) => Promise<void>
   carregarDemo: () => Promise<void>
+  /** baixa um arquivo .json com todo o banco */
+  baixarBackup: () => void
+  /** restaura um backup baixado antes (substitui tudo) */
+  restaurarBackup: (arquivo: File) => Promise<void>
   /* utilidades */
   vendedorPorId: (id: ID | '' | null | undefined) => Vendedor | undefined
   nomeVendedor: (id: ID | '' | null | undefined) => string
@@ -319,13 +324,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const resetarDados = useCallback(async () => {
-    await limparTudo()
-    const vazio = dbVazio()
-    localStorage.setItem(CHAVE_DEMO, '1')
-    setDb(vazio)
-    avisar('Todos os dados foram apagados.', 'info')
-  }, [avisar])
+  const resetarDados = useCallback(
+    async (manterContaId?: string) => {
+      // guarda o acesso de quem está apagando: sem isso, o proprietário perderia
+      // a própria conta e não conseguiria nem entrar no sistema de novo
+      const contaMantida = manterContaId ? db.usuarios.find((u) => u.id === manterContaId) : undefined
+      await limparTudo()
+      if (contaMantida) await salvarRegistro('usuarios', contaMantida)
+      const vazio = { ...dbVazio(), usuarios: contaMantida ? [contaMantida] : [] }
+      localStorage.setItem(CHAVE_DEMO, '1')
+      setDb(vazio)
+      avisar(
+        contaMantida
+          ? 'Todos os dados foram apagados (o seu acesso de proprietário foi mantido).'
+          : 'Todos os dados foram apagados.',
+        'info',
+      )
+    },
+    [avisar, db.usuarios],
+  )
+
+  /** baixa um arquivo com todo o banco (o plano grátis do Supabase não tem backup) */
+  const baixarBackup = useCallback(() => {
+    const conteudo = JSON.stringify(db, null, 2)
+    const arquivo = new Blob([conteudo], { type: 'application/json' })
+    const endereco = URL.createObjectURL(arquivo)
+    const link = document.createElement('a')
+    link.href = endereco
+    link.download = `altoprints-backup-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(endereco)
+    avisar('Backup baixado. Guarde o arquivo em um lugar seguro.')
+  }, [avisar, db])
+
+  /** restaura um backup baixado antes (substitui tudo o que está no sistema) */
+  const restaurarBackup = useCallback(
+    async (arquivo: File) => {
+      const texto = await arquivo.text()
+      const dados = JSON.parse(texto) as Partial<DB>
+      if (!Array.isArray(dados.pedidos) || !Array.isArray(dados.clientes))
+        throw new Error('Este arquivo não parece ser um backup do sistema.')
+      const restaurado: DB = {
+        vendedores: dados.vendedores ?? [],
+        clientes: dados.clientes ?? [],
+        pedidos: dados.pedidos ?? [],
+        arquivos: dados.arquivos ?? [],
+        usuarios: dados.usuarios ?? [],
+        configuracoes: { ...CONFIG_PADRAO, ...(dados.configuracoes ?? {}) },
+      }
+      await substituirTudo(restaurado)
+      setDb(restaurado)
+      avisar('Backup restaurado com sucesso!')
+    },
+    [avisar],
+  )
 
   const carregarDemo = useCallback(async () => {
     const demo = gerarDadosDemo()
@@ -370,6 +422,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       salvarConfig,
       resetarDados,
       carregarDemo,
+      baixarBackup,
+      restaurarBackup,
       vendedorPorId,
       nomeVendedor,
       proximoNumeroPedido: proximoNumero(db.pedidos.map((p) => p.numero)),
@@ -395,6 +449,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       salvarConfig,
       resetarDados,
       carregarDemo,
+      baixarBackup,
+      restaurarBackup,
       vendedorPorId,
       nomeVendedor,
       pedidoPorId,

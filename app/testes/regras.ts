@@ -11,6 +11,7 @@ import {
 } from '../src/lib/comissao'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
+import { conferirChave } from '../src/lib/supabase'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
 import { gerarDadosDemo } from '../src/lib/seed'
 import {
@@ -209,6 +210,14 @@ igual('tela liberada pelo dono é respeitada', podeVerTela(vendedorTeste, 'relat
 igual('tela não liberada fica bloqueada', podeVerTela(vendedorTeste, 'entregas'), false)
 igual('conta sem telas definidas fica no padrão', podeVerTela({ ...vendedorTeste, telas: undefined }, 'relatorio'), false)
 igual('proprietário nunca é bloqueado', podeVerTela(donoTeste, 'clienteEspecial'), true)
+
+/* ---------------------- chaves do Supabase ----------------------------- */
+igual('sem chave: modo local', conferirChave(''), 'faltando')
+igual('sem chave (undefined): modo local', conferirChave(undefined), 'faltando')
+igual('chave publishable (nova) é aceita', conferirChave('sb_publishable_abc123'), 'ok')
+igual('chave anon (antiga) é aceita', conferirChave('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc'), 'ok')
+igual('chave secret é recusada (não pode ir para o site)', conferirChave('sb_secret_abc123'), 'secreta')
+igual('chave com espaços em volta é tratada', conferirChave('  sb_publishable_x  '), 'ok')
 
 /* ------------------------------- senha -------------------------------- */
 async function testarSenha() {

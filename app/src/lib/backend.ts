@@ -78,6 +78,15 @@ const tratarErro = (contexto: string, erro: { message?: string } | null): never 
     throw new Error(
       `${contexto}: as tabelas ainda não foram criadas no Supabase. Rode o arquivo supabase/schema.sql no SQL Editor do seu projeto.`,
     )
+  // o projeto grátis do Supabase é pausado depois de uma semana sem uso
+  if (/failed to fetch|fetch failed|networkerror|load failed|err_/i.test(msg))
+    throw new Error(
+      `${contexto}: não foi possível falar com o banco na nuvem. Confira a internet e se o projeto do Supabase não está pausado (no plano grátis ele pausa depois de uma semana sem uso: abra o painel do Supabase e clique em Restore project).`,
+    )
+  if (/invalid api key|jwt|unauthorized|401/i.test(msg))
+    throw new Error(
+      `${contexto}: a chave do Supabase parece inválida. Confira VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no arquivo .env (use a chave publishable/anon, nunca a secret).`,
+    )
   throw new Error(`${contexto}: ${msg}`)
 }
 

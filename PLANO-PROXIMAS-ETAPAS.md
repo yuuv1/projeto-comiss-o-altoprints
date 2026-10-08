@@ -118,4 +118,5 @@ regenerada com `npm run publicar` depois de cada frente.
 2. **Catálogo de impressões:** registro completo (metros, quem imprimiu, quando, observação e motivo
    quando for reimpressão) — próxima frente a implementar.
 3. **Publicação:** primeiro a pasta `publicar/` no Netlify Drop, sem nuvem; o Supabase entra depois
-   para a equipe toda ver os mesmos pedidos.
+   para a equipe toda ver os mesmos pedidos — **guia pronto em `app/PASSO-A-PASSO-SUPABASE.md`**
+   (com a chave nova `sb_publishable`, aviso da pausa de 1 semana do plano grátis e backup manual).

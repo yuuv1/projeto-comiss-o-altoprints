@@ -97,7 +97,11 @@ Uma vez conectado, toda alteração enviada ao repositório publica o sistema au
      variáveis e faça um novo deploy.
 
 Pronto! Ao abrir o site, em ⚙️ **Configurações** aparece a mensagem
-"Banco na nuvem (Supabase) conectado". Se você já tinha contas criadas no modo local,
+"Banco na nuvem (Supabase) conectado".
+
+> ⚠️ Use sempre a chave **pública** do projeto: a nova `sb_publishable_...` ou a antiga
+> `anon` (a sequência longa que começa com `eyJ`). **Nunca** a `sb_secret_...` /
+> `service_role` — o sistema se recusa a conectar com ela (é de propósito). Se você já tinha contas criadas no modo local,
 elas ficam no navegador: recrie as contas pelo primeiro acesso ou cadastre em
 **Equipe** (só o proprietário entra nessa tela). A partir daí tudo o que for salvo aparece igual
 em todos os aparelhos.
