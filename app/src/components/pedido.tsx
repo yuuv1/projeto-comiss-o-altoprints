@@ -14,12 +14,15 @@ export function PedidoCartao({
   extras,
   mostrarVendedor = true,
   mostrarEntrega = true,
+  mostrarValor = true,
 }: {
   pedido: Pedido
   acoes?: ReactNode
   extras?: ReactNode
   mostrarVendedor?: boolean
   mostrarEntrega?: boolean
+  /** usado nas telas de produção/entrega liberadas para quem não é o proprietário */
+  mostrarValor?: boolean
 }) {
   const { nomeVendedor } = useStore()
   const pronto = isPedidoCompleto(pedido)
@@ -72,12 +75,14 @@ export function PedidoCartao({
         <EtiquetaPagamento status={pedido.status_pagamento} />
       </div>
 
-      <div className="w-[110px] text-right">
-        <p className="text-base font-extrabold text-slate-800">{moeda(pedido.valor)}</p>
-        <p className="text-[11px] text-slate-400">
-          {pedido.data_pagamento ? `Pago em ${dataBR(pedido.data_pagamento)}` : pedido.forma_pagamento || '—'}
-        </p>
-      </div>
+      {mostrarValor ? (
+        <div className="w-[110px] text-right">
+          <p className="text-base font-extrabold text-slate-800">{moeda(pedido.valor)}</p>
+          <p className="text-[11px] text-slate-400">
+            {pedido.data_pagamento ? `Pago em ${dataBR(pedido.data_pagamento)}` : pedido.forma_pagamento || '—'}
+          </p>
+        </div>
+      ) : null}
 
       {extras}
 

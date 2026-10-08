@@ -3,12 +3,16 @@ import { useMemo } from 'react'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, CartaoResumo, Etiqueta, TituloPagina, Vazio } from '../components/ui'
 import { dataBR, moeda } from '../lib/format'
+import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import { LABEL_PRODUCAO } from '../lib/types'
 
 export default function ParaImprimir() {
   const { db, nomeVendedor } = useStore()
+  const { ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
+  /** sem valores em dinheiro para quem não é o proprietário */
+  const verValores = ehProprietario
 
   const fila = useMemo(
     () =>
@@ -54,7 +58,16 @@ export default function ParaImprimir() {
           icone={Clock}
           gradiente="from-sky-500 to-blue-600"
         />
-        <CartaoResumo titulo="Valor na fila" valor={moeda(valorFila)} icone={Wallet} gradiente="from-violet-500 to-indigo-600" />
+        {verValores ? (
+          <CartaoResumo titulo="Valor na fila" valor={moeda(valorFila)} icone={Wallet} gradiente="from-violet-500 to-indigo-600" />
+        ) : (
+          <CartaoResumo
+            titulo="Fila do dia"
+            valor={fila.filter((p) => (p.data_pedido || '').slice(0, 10) === new Date().toISOString().slice(0, 10)).length}
+            icone={Clock}
+            gradiente="from-amber-500 to-orange-600"
+          />
+        )}
         <CartaoResumo
           titulo="Impressos hoje"
           valor={impressosHoje.length}
@@ -73,6 +86,7 @@ export default function ParaImprimir() {
         <div className="space-y-3">
           {fila.map((p) => (
             <PedidoCartao
+        mostrarValor={verValores}
               key={p.id}
               pedido={p}
               extras={
@@ -108,7 +122,8 @@ export default function ParaImprimir() {
                 <span className="font-semibold text-slate-600">{p.cliente_nome}</span>
                 <span className="text-xs">{nomeVendedor(p.vendedor_id)}</span>
                 <span className="ml-auto text-xs">
-                  impresso em {dataBR(p.impresso_em)} • {moeda(p.valor)}
+                  impresso em {dataBR(p.impresso_em)}
+                  {verValores ? ` • ${moeda(p.valor)}` : ''}
                 </span>
               </div>
             ))}

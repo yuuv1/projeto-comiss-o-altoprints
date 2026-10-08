@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { useAuth } from '../lib/auth'
+import { type TelasAcesso, telasDoUsuario } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useTema } from '../lib/tema'
 import { Logo } from './Logo'
@@ -34,12 +35,16 @@ interface ItemMenu {
   label: string
   icone: LucideIcon
   badge?: number
+  /** só o proprietário vê (Equipe, Configurações, Vendedores...) */
   soProprietario?: boolean
+  /** tela extra que o proprietário pode liberar para um vendedor */
+  tela?: keyof TelasAcesso
 }
 
 export function Layout() {
   const { db, nomeVendedor } = useStore()
   const { usuario, ehProprietario, vendedorNome, sair } = useAuth()
+  const telas = telasDoUsuario(usuario)
   const { escuro, alternar } = useTema()
   const navegar = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
@@ -66,17 +71,26 @@ export function Layout() {
     { to: '/', label: ehProprietario ? 'Painel' : 'Minha área', icone: ehProprietario ? LayoutDashboard : UserCheck },
     { to: '/pedidos', label: 'Pedidos', icone: ClipboardList },
     { to: '/clientes', label: 'Clientes', icone: Users },
-    { to: '/por-vendedor', label: ehProprietario ? 'Por vendedor' : 'Meu desempenho', icone: UserCheck, badge: avisos },
-    { to: '/para-imprimir', label: 'Para imprimir', icone: Printer, badge: paraImprimir, soProprietario: true },
-    { to: '/entregas', label: 'Entregas', icone: Truck, soProprietario: true },
-    { to: '/relatorio', label: 'Relatório', icone: BarChart3, soProprietario: true },
-    { to: '/relatorio-cliente-especial', label: 'Cliente especial', icone: Star, soProprietario: true },
+    {
+      to: '/por-vendedor',
+      label: ehProprietario ? 'Por vendedor' : 'Meu desempenho',
+      icone: UserCheck,
+      badge: avisos,
+    },
+    { to: '/para-imprimir', label: 'Para imprimir', icone: Printer, badge: paraImprimir, tela: 'paraImprimir' },
+    { to: '/entregas', label: 'Entregas', icone: Truck, tela: 'entregas' },
+    { to: '/relatorio', label: 'Relatório', icone: BarChart3, tela: 'relatorio' },
+    { to: '/relatorio-cliente-especial', label: 'Cliente especial', icone: Star, tela: 'clienteEspecial' },
     { to: '/vendedores', label: 'Vendedores', icone: UsersRound, soProprietario: true },
     { to: '/equipe', label: 'Equipe', icone: UserCog, soProprietario: true },
     { to: '/configuracoes', label: 'Configurações', icone: Settings, soProprietario: true },
   ]
 
-  const visiveis = menu.filter((m) => !m.soProprietario || ehProprietario)
+  const visiveis = menu.filter((m) => {
+    if (ehProprietario) return true
+    if (m.soProprietario) return false
+    return !m.tela || telas[m.tela]
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-16 transition-colors print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">

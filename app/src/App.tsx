@@ -5,6 +5,7 @@ import { Layout } from './components/Layout'
 import { Toaster, Vazio } from './components/ui'
 import { useAuth } from './lib/auth'
 import { useStore } from './lib/store'
+import { LABEL_TELA, telasDoUsuario, type TelasAcesso } from './lib/types'
 import Administracao from './pages/Administracao'
 import Clientes from './pages/Clientes'
 import Configuracoes from './pages/Configuracoes'
@@ -55,24 +56,45 @@ function Protegido({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-/** telas que só o proprietário acessa */
-function SoDono({ children }: { children: React.ReactNode }) {
-  const { ehProprietario } = useAuth()
+function Bloqueado({ titulo, descricao }: { titulo: string; descricao: string }) {
   const navegar = useNavigate()
-  if (ehProprietario) return <>{children}</>
   return (
     <Vazio
       icone={ShieldAlert}
-      titulo="Esta área é do proprietário"
-      descricao="Seus pedidos e a sua comissão ficam em Minha área."
+      titulo={titulo}
+      descricao={descricao}
       acao={
         <button
           onClick={() => navegar('/')}
           className="rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-soft"
         >
-          Ir para Minha área
+          Voltar para o início
         </button>
       }
+    />
+  )
+}
+
+/** telas que só o proprietário acessa */
+function SoDono({ children }: { children: React.ReactNode }) {
+  const { ehProprietario } = useAuth()
+  if (ehProprietario) return <>{children}</>
+  return (
+    <Bloqueado
+      titulo="Esta área é do proprietário"
+      descricao="Seus pedidos e a sua comissão ficam em Minha área."
+    />
+  )
+}
+
+/** telas que o proprietário pode liberar para um vendedor (Equipe → Opções de relatórios) */
+function Permitido({ tela, children }: { tela: keyof TelasAcesso; children: React.ReactNode }) {
+  const { ehProprietario, usuario } = useAuth()
+  if (ehProprietario || telasDoUsuario(usuario)[tela]) return <>{children}</>
+  return (
+    <Bloqueado
+      titulo="Esta tela não está liberada para o seu acesso"
+      descricao={`Peça ao proprietário para liberar "${LABEL_TELA[tela]}" na tela Equipe.`}
     />
   )
 }
@@ -111,33 +133,33 @@ export default function App() {
           <Route
             path="/para-imprimir"
             element={
-              <SoDono>
+              <Permitido tela="paraImprimir">
                 <ParaImprimir />
-              </SoDono>
+              </Permitido>
             }
           />
           <Route
             path="/entregas"
             element={
-              <SoDono>
+              <Permitido tela="entregas">
                 <Entregas />
-              </SoDono>
+              </Permitido>
             }
           />
           <Route
             path="/relatorio"
             element={
-              <SoDono>
+              <Permitido tela="relatorio">
                 <Relatorio />
-              </SoDono>
+              </Permitido>
             }
           />
           <Route
             path="/relatorio-cliente-especial"
             element={
-              <SoDono>
+              <Permitido tela="clienteEspecial">
                 <RelatorioClienteEspecial />
-              </SoDono>
+              </Permitido>
             }
           />
           <Route

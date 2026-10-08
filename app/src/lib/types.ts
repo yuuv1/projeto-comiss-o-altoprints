@@ -153,6 +153,49 @@ export const LABEL_PAPEL: Record<Papel, string> = {
   vendedor: 'Vendedor',
 }
 
+/** Telas extras que o proprietário pode liberar para um acesso de vendedor */
+export interface TelasAcesso {
+  /** Relatório de vendas — sempre filtrado pelos pedidos do próprio vendedor */
+  relatorio: boolean
+  /** Fila de impressão (sem valores em dinheiro) */
+  paraImprimir: boolean
+  /** Entregas: endereços, retiradas e código de rastreio (sem valores) */
+  entregas: boolean
+  /** Relatório de cliente especial — só os clientes dele */
+  clienteEspecial: boolean
+}
+
+export const TELAS_PADRAO: TelasAcesso = {
+  relatorio: false,
+  paraImprimir: false,
+  entregas: false,
+  clienteEspecial: false,
+}
+
+export const LABEL_TELA: Record<keyof TelasAcesso, string> = {
+  relatorio: 'Relatório de vendas (só os dados dele)',
+  paraImprimir: 'Para imprimir (fila de impressão, sem valores)',
+  entregas: 'Entregas (endereços, retiradas e rastreio, sem valores)',
+  clienteEspecial: 'Cliente especial (só os clientes dele)',
+}
+
+export const DESCRICAO_TELA: Record<keyof TelasAcesso, string> = {
+  relatorio: 'Vê a mesma tela de relatório, mas só com os pedidos, a metragem e a comissão dele.',
+  paraImprimir: 'Ajuda na produção: vê a fila do que falta imprimir, sem valores em dinheiro.',
+  entregas: 'Vê os endereços e códigos de rastreio para ajudar na entrega, sem valores.',
+  clienteEspecial: 'Vê os clientes especiais dele (valor especial do metro), sem os dos outros.',
+}
+
+/** Telas liberadas para um acesso — o proprietário vê tudo, sempre */
+export const telasDoUsuario = (u: Usuario | null | undefined): TelasAcesso => {
+  if (!u || u.papel === 'proprietario')
+    return { relatorio: true, paraImprimir: true, entregas: true, clienteEspecial: true }
+  return { ...TELAS_PADRAO, ...(u.telas ?? {}) }
+}
+
+export const podeVerTela = (u: Usuario | null | undefined, tela: keyof TelasAcesso) =>
+  telasDoUsuario(u)[tela]
+
 export interface Usuario {
   id: ID
   nome: string
@@ -166,6 +209,8 @@ export interface Usuario {
   ativo: boolean
   /** id da conta na nuvem (Supabase Auth), quando usarmos o login do Supabase */
   auth_id?: string
+  /** telas de relatório liberadas pelo proprietário (vendedores) */
+  telas?: Partial<TelasAcesso>
   criado_em: string
 }
 

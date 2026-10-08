@@ -1,7 +1,14 @@
 # Próximas etapas — logins com relatórios, área do chefe e catálogo de impressões
 ### você pediu: (1) logins com opções de relatórios, (2) melhor experiência do chefe no administrativo, (3) catalogar as impressões
 
-> Este é o plano. Nada foi implementado ainda — confira e responda as 3 perguntas do fim.
+## Situação
+
+- **Frente A (logins com opções de relatórios): IMPLEMENTADA** — as caixinhas por acesso estão
+  na tela **Equipe**, e as telas liberadas saem filtradas só com os dados do vendedor.
+- **Frente C (catalogar as impressões): decidida como registro completo** — próxima a fazer.
+- **Frente B (experiência do chefe):** depois da Frente C.
+- **Publicação:** decidido publicar primeiro a pasta `publicar/` no Netlify Drop (sem nuvem) e
+  conectar o Supabase depois, para a equipe toda compartilhar os mesmos dados.
 >
 > **Já feito nesta rodada:** tabela de comissão corrigida (50 a 100 m = 2%, acima de 100 m = 1,5%)
 > e o "sem metragem" agora começa em **0%** (editável). A pasta **`publicar/`** também já está
@@ -105,13 +112,10 @@ regenerada com `npm run publicar` depois de cada frente.
 
 ---
 
-## Só faltam 3 confirmações
+## Decisões tomadas
 
-1. **Opções de relatórios:** pode ser caixinha por acesso (como na tabela acima) ou você prefere
-   níveis prontos (ex.: "Básico", "Básico + impressão", "Completo")?
-2. **Catálogo de impressões:** registro completo (metros + quem + observação + motivo de
-   reimpressão) ou você quer algo mais simples (só "quem imprimiu" e quando)?
-3. **Publicar com dados compartilhados:** para a equipe toda ver os mesmos pedidos no site publicado,
-   preciso que você crie o **Supabase** (grátis) e me passe a *URL* e a *chave anon* — eu te dou o
-   passo a passo com prints na próxima mensagem. Pode ser agora, ou publicamos primeiro sem nuvem
-   (cada aparelho com os seus dados) e conecto depois?
+1. **Opções de relatórios:** caixinha por acesso (implementado na tela Equipe).
+2. **Catálogo de impressões:** registro completo (metros, quem imprimiu, quando, observação e motivo
+   quando for reimpressão) — próxima frente a implementar.
+3. **Publicação:** primeiro a pasta `publicar/` no Netlify Drop, sem nuvem; o Supabase entra depois
+   para a equipe toda ver os mesmos pedidos.

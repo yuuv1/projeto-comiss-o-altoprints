@@ -60,13 +60,14 @@ async function prepararAmbiente() {
     papel: 'vendedor' as const,
     vendedor_id: banco.vendedores[0].id,
     ativo: true,
+    telas: { relatorio: true, paraImprimir: true },
     criado_em: new Date().toISOString(),
   }
 
   banco.usuarios = [dono, vendedor]
   dom.window.localStorage.setItem('altoprints:db:v1', JSON.stringify(banco))
 
-  return { banco, dono, vendedor }
+  return { banco, dono, vendedor, nomeDoVinculo: banco.vendedores[0].nome, outroVendedor: banco.vendedores[1].nome }
 }
 
 function sessaoDe(id: string) {
@@ -81,7 +82,7 @@ function sessaoDe(id: string) {
 }
 
 async function main() {
-  const { dono, vendedor } = await prepararAmbiente()
+  const { dono, vendedor, nomeDoVinculo, outroVendedor } = await prepararAmbiente()
   sessaoDe(dono.id)
 
   const { createRoot } = await import('react-dom/client')
@@ -226,6 +227,7 @@ async function main() {
     ['vendedor vê "Minha área"', textoVendedor.includes('Minha área') || textoVendedor.includes('Sua área')],
     ['vendedor vê o nome dele na saudação', textoVendedor.toLowerCase().includes('vendedor teste')],
     ['vendedor NÃO vê o Painel do proprietário', !textoVendedor.includes('Painel do proprietário')],
+    ['vendedor não vê Equipe nem Configurações no menu', !textoVendedor.includes('Configurações')],
   ]
   console.log('\n  Vendedor (vê só o dele)')
   for (const [rotulo, ok] of checagens) {
@@ -233,17 +235,57 @@ async function main() {
     console.log(`  ${ok ? '✅' : '❌'} ${rotulo}`)
   }
 
-  for (const rota of ['/pedidos', '/clientes', '/por-vendedor', '/relatorio', '/equipe', '/configuracoes']) {
+  const rotasVendedor: { rota: string; esperado: 'liberada' | 'proprietario' | 'nao-liberada' }[] = [
+    { rota: '/pedidos', esperado: 'liberada' },
+    { rota: '/clientes', esperado: 'liberada' },
+    { rota: '/por-vendedor', esperado: 'liberada' },
+    { rota: '/relatorio', esperado: 'liberada' },
+    { rota: '/para-imprimir', esperado: 'liberada' },
+    { rota: '/entregas', esperado: 'nao-liberada' },
+    { rota: '/equipe', esperado: 'proprietario' },
+    { rota: '/configuracoes', esperado: 'proprietario' },
+  ]
+  for (const { rota, esperado } of rotasVendedor) {
     const antes = erros.length
     dom.window.location.hash = `#${rota}`
     await espera(600)
     const texto = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
     const novos = erros.slice(antes)
-    const bloqueada = rota === '/relatorio' || rota === '/equipe' || rota === '/configuracoes'
-    const ok = texto.length > 200 && !novos.length && (!bloqueada || texto.includes('do proprietário'))
+    const ok =
+      texto.length > 200 &&
+      !novos.length &&
+      (esperado === 'liberada' ||
+        (esperado === 'proprietario' && texto.includes('do proprietário')) ||
+        (esperado === 'nao-liberada' && texto.includes('não está liberada')))
     if (!ok) falhas++
-    console.log(`  ${ok ? '✅' : '❌'} ${rota.padEnd(20)} ${bloqueada ? 'bloqueada' : 'liberada'} corretamente`)
+    console.log(
+      `  ${ok ? '✅' : '❌'} ${rota.padEnd(28)} ${
+        esperado === 'liberada'
+          ? 'liberada'
+          : esperado === 'proprietario'
+            ? 'só do proprietário'
+            : 'bloqueada (não liberada)'
+      }`,
+    )
+    if (!ok) console.log('     TEXTO:', texto.slice(0, 160))
   }
+
+  // o relatório do vendedor só mostra os pedidos dele (sem citar o outro vendedor)
+  dom.window.location.hash = '#/relatorio'
+  await espera(700)
+  const textoRelatorioVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const relatorioSoDele =
+    textoRelatorioVendedor.includes(nomeDoVinculo) && !textoRelatorioVendedor.includes(outroVendedor)
+  if (!relatorioSoDele) falhas++
+  console.log(`  ${relatorioSoDele ? '✅' : '❌'} relatório do vendedor mostra só os dados de ${nomeDoVinculo}`)
+
+  // a tela de impressão liberada não mostra valores em dinheiro
+  dom.window.location.hash = '#/para-imprimir'
+  await espera(700)
+  const textoImpressao = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const semDinheiro = !textoImpressao.includes('Valor na fila') && !textoImpressao.includes('R$')
+  if (!semDinheiro) falhas++
+  console.log(`  ${semDinheiro ? '✅' : '❌'} fila de impressão liberada para o vendedor, sem valores em dinheiro`)
 
   // tela de login (sem sessão)
   dom.window.localStorage.removeItem('altoprints:sessao')

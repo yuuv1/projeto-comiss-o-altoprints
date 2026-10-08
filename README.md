@@ -180,6 +180,7 @@ app/
 - [x] Login com dois perfis (proprietário e vendedor) e permissões escolhidas pelo dono
 - [x] Porta administrativa escondida (endereço `#/administracao`, 5 toques no logo, Ctrl+Alt+D)
 - [x] Equipe → Nova conta (o dono registra a equipe já com o histórico antigo ligado)
+- [x] Opções de relatórios e telas liberadas acesso por acesso (Equipe)
 - [ ] Colocar no ar (Netlify conectado ao GitHub) e conectar o Supabase
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia

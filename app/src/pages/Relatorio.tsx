@@ -15,6 +15,7 @@ import {
 import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
 import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
+import { useAuth } from '../lib/auth'
 import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
@@ -42,12 +43,16 @@ const primeiroDiaDoMes = () => {
 
 export default function Relatorio() {
   const { db, nomeVendedor, avisar } = useStore()
+  const { usuario, ehProprietario } = useAuth()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
   const [campo, setCampo] = useState<Campo>('pagamento')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)
   const [vendedorId, setVendedorId] = useState('todos')
+  // vendedor com a tela liberada vê o relatório só com os dados dele
+  const meuVendedorId = usuario?.vendedor_id ?? ''
+  const semVinculo = !ehProprietario && !meuVendedorId
   const [excluidos, setExcluidos] = useState<string[]>([])
 
   const atalhos = useMemo(() => {
@@ -83,6 +88,7 @@ export default function Relatorio() {
   const filtrados = useMemo(() => {
     return pagos
       .filter((p) => {
+        if (!ehProprietario) return p.vendedor_id === meuVendedorId
         if (vendedorId === 'sem-vendedor') return !p.vendedor_id
         if (vendedorId !== 'todos') return p.vendedor_id === vendedorId
         return true
@@ -93,7 +99,7 @@ export default function Relatorio() {
         return d >= inicio && d <= fim
       })
       .sort((a, b) => dataRef(a, campo).localeCompare(dataRef(b, campo)) || a.numero - b.numero)
-  }, [campo, fim, inicio, pagos, vendedorId])
+  }, [campo, ehProprietario, fim, inicio, meuVendedorId, pagos, vendedorId])
 
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
 
@@ -182,15 +188,19 @@ export default function Relatorio() {
               <Entrada type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
             </Campo>
             <Campo label="Vendedor">
-              <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-                <option value="todos">Todos os vendedores</option>
-                {db.vendedores.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.nome}
-                  </option>
-                ))}
-                <option value="sem-vendedor">Sem vendedor</option>
-              </Selecao>
+              {ehProprietario ? (
+                <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+                  <option value="todos">Todos os vendedores</option>
+                  {db.vendedores.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome}
+                    </option>
+                  ))}
+                  <option value="sem-vendedor">Sem vendedor</option>
+                </Selecao>
+              ) : (
+                <Entrada value={nomeVendedor(meuVendedorId)} readOnly className="bg-slate-50 dark:bg-slate-800" />
+              )}
             </Campo>
           </div>
 

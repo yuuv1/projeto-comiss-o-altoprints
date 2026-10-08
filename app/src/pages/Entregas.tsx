@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Abas, Botao, Campo, CartaoResumo, Entrada, TituloPagina, Vazio } from '../components/ui'
 import { dataBR, moeda } from '../lib/format'
+import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import type { Pedido } from '../lib/types'
 
@@ -22,6 +23,9 @@ function CampoRetirada({ pedido, onSalvar }: { pedido: Pedido; onSalvar: (quem: 
 
 export default function Entregas() {
   const { db } = useStore()
+  const { ehProprietario } = useAuth()
+  /** sem valores em dinheiro para quem não é o proprietário */
+  const verValores = ehProprietario
   const acoes = useAcoesPedido()
   const [aba, setAba] = useState<'correios' | 'retirada'>('correios')
   const [rastreios, setRastreios] = useState<Record<string, string>>({})
@@ -64,12 +68,21 @@ export default function Entregas() {
               icone={Package}
               gradiente="from-amber-500 to-orange-600"
             />
-            <CartaoResumo
-              titulo="Valor em trânsito"
-              valor={moeda(emTransito.reduce((s, p) => s + Number(p.valor || 0), 0))}
-              icone={MapPin}
-              gradiente="from-violet-500 to-indigo-600"
-            />
+            {verValores ? (
+              <CartaoResumo
+                titulo="Valor em trânsito"
+                valor={moeda(emTransito.reduce((s, p) => s + Number(p.valor || 0), 0))}
+                icone={MapPin}
+                gradiente="from-violet-500 to-indigo-600"
+              />
+            ) : (
+              <CartaoResumo
+                titulo="Com rastreio"
+                valor={correios.filter((p) => p.codigo_rastreio).length}
+                icone={MapPin}
+                gradiente="from-violet-500 to-indigo-600"
+              />
+            )}
           </div>
 
           <p className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">Em trânsito</p>
@@ -79,6 +92,7 @@ export default function Entregas() {
             <div className="space-y-3">
               {emTransito.map((p) => (
                 <PedidoCartao
+                      mostrarValor={verValores}
                   key={p.id}
                   pedido={p}
                   extras={
@@ -145,7 +159,7 @@ export default function Entregas() {
                         <td className="px-4 py-2.5">{p.codigo_rastreio || '—'}</td>
                         <td className="px-4 py-2.5">{dataBR(p.data_envio)}</td>
                         <td className="px-4 py-2.5 font-semibold text-emerald-600">{dataBR(p.data_entrega)}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-slate-700">{moeda(p.valor)}</td>
+                        {verValores ? <td className="px-4 py-2.5 text-right font-bold text-slate-700">{moeda(p.valor)}</td> : null}
                       </tr>
                     ))}
                   </tbody>
@@ -165,12 +179,21 @@ export default function Entregas() {
               icone={Package}
               gradiente="from-fuchsia-500 to-pink-600"
             />
-            <CartaoResumo
-              titulo="Valor aguardando"
-              valor={moeda(aguardando.reduce((s, p) => s + Number(p.valor || 0), 0))}
-              icone={User}
-              gradiente="from-sky-500 to-blue-600"
-            />
+            {verValores ? (
+              <CartaoResumo
+                titulo="Valor aguardando"
+                valor={moeda(aguardando.reduce((s, p) => s + Number(p.valor || 0), 0))}
+                icone={User}
+                gradiente="from-sky-500 to-blue-600"
+              />
+            ) : (
+              <CartaoResumo
+                titulo="Retiradas hoje"
+                valor={retirados.filter((p) => (p.data_retirada || '').slice(0, 10) === new Date().toISOString().slice(0, 10)).length}
+                icone={Inbox}
+                gradiente="from-amber-500 to-orange-600"
+              />
+            )}
           </div>
 
           <p className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">Aguardando retirada na loja</p>
@@ -180,6 +203,7 @@ export default function Entregas() {
             <div className="space-y-3">
               {aguardando.map((p) => (
                 <PedidoCartao
+                      mostrarValor={verValores}
                   key={p.id}
                   pedido={p}
                   extras={<CampoRetirada pedido={p} onSalvar={(quem) => acoes.marcarRetirado(p, quem)} />}
@@ -220,7 +244,7 @@ export default function Entregas() {
                         <td className="px-4 py-2.5 font-semibold text-slate-700">{p.cliente_nome}</td>
                         <td className="px-4 py-2.5">{p.retirado_por || '—'}</td>
                         <td className="px-4 py-2.5 font-semibold text-emerald-600">{dataBR(p.data_retirada)}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-slate-700">{moeda(p.valor)}</td>
+                        {verValores ? <td className="px-4 py-2.5 text-right font-bold text-slate-700">{moeda(p.valor)}</td> : null}
                       </tr>
                     ))}
                   </tbody>

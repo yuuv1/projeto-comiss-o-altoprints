@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
 import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio } from '../components/ui'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
+import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import { LABEL_PAGAMENTO, LABEL_PRODUCAO, type Pedido } from '../lib/types'
 
@@ -13,7 +14,15 @@ const primeiroDiaDoMes = () => {
 
 export default function RelatorioClienteEspecial() {
   const { db, nomeVendedor } = useStore()
-  const especiais = useMemo(() => db.clientes.filter((c) => c.especial), [db.clientes])
+  const { usuario, ehProprietario } = useAuth()
+  // vendedor com a tela liberada vê só os clientes especiais dele
+  const especiais = useMemo(
+    () =>
+      db.clientes.filter(
+        (c) => c.especial && (ehProprietario || c.vendedor_id === (usuario?.vendedor_id ?? '')),
+      ),
+    [db.clientes, ehProprietario, usuario?.vendedor_id],
+  )
   const [clienteId, setClienteId] = useState('')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)

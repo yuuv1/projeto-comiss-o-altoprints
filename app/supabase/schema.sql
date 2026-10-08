@@ -97,6 +97,8 @@ create table if not exists public.usuarios (
   papel       text default 'vendedor',
   vendedor_id text default '',
   ativo       boolean default true,
+  -- telas de relatório liberadas pelo proprietário (ex.: {"relatorio": true})
+  telas       jsonb default '{}'::jsonb,
   criado_em   text not null default now()::text
 );
 create unique index if not exists usuarios_usuario_idx on public.usuarios (lower(usuario));

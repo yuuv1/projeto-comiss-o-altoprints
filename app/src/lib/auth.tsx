@@ -11,7 +11,7 @@ import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { supabase, CLOUD } from './supabase'
-import { type Usuario, type Vendedor } from './types'
+import { type TelasAcesso, type Usuario, type Vendedor } from './types'
 import { useStore } from './store'
 
 /* ------------------------------------------------------------------ */
@@ -109,6 +109,8 @@ export interface AuthContexto {
   trocarMeuUsuario: (novoUsuario: string) => Promise<void>
   redefinirSenha: (usuarioId: string, novaSenha: string) => Promise<void>
   atualizarVinculo: (usuarioId: string, vendedorId: string) => Promise<void>
+  /** libera/bloqueia as telas de relatório de um acesso de vendedor */
+  salvarTelas: (usuarioId: string, telas: Partial<TelasAcesso>) => Promise<void>
   alternarAtivo: (usuarioId: string, ativo: boolean) => Promise<void>
   excluirUsuario: (usuarioId: string) => Promise<void>
 }
@@ -433,6 +435,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avisar(nome ? `Acesso ligado ao vendedor ${nome}.` : 'Acesso desligado de qualquer vendedor.')
   }
 
+  const salvarTelas: AuthContexto['salvarTelas'] = async (usuarioId, telas) => {
+    const noBanco = await lerUsuarios()
+    const alvo = (noBanco.length ? noBanco : usuarios).find((u) => u.id === usuarioId)
+    if (!alvo) throw new Error('Conta não encontrada.')
+    await salvarRegistro('usuarios', { ...alvo, telas })
+    await recarregar()
+    avisar(`Telas de ${alvo.nome} atualizadas.`)
+  }
+
   const alternarAtivo: AuthContexto['alternarAtivo'] = async (usuarioId, ativo) => {
     const noBanco = await lerUsuarios()
     const lista = noBanco.length ? noBanco : usuarios
@@ -478,6 +489,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     trocarMeuUsuario,
     redefinirSenha,
     atualizarVinculo,
+    salvarTelas,
     alternarAtivo,
     excluirUsuario,
   }

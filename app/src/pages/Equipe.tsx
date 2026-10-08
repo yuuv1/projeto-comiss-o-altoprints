@@ -1,10 +1,19 @@
-import { Crown, KeyRound, Pencil, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
+import { Crown, KeyRound, Pencil, Save, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { dataBR, moeda } from '../lib/format'
 import { calcularComissao } from '../lib/comissao'
-import { FAIXAS_PADRAO, LABEL_PAPEL, type Usuario } from '../lib/types'
+import {
+  DESCRICAO_TELA,
+  FAIXAS_PADRAO,
+  LABEL_PAPEL,
+  LABEL_TELA,
+  TELAS_PADRAO,
+  telasDoUsuario,
+  type TelasAcesso,
+  type Usuario,
+} from '../lib/types'
 import {
   Botao,
   Campo,
@@ -20,8 +29,15 @@ import {
 
 export default function Equipe() {
   const { db, avisar } = useStore()
-  const { usuario: eu, redefinirSenha, atualizarVinculo, alternarAtivo, excluirUsuario, criarContaComoDono } =
-    useAuth()
+  const {
+    usuario: eu,
+    redefinirSenha,
+    atualizarVinculo,
+    salvarTelas,
+    alternarAtivo,
+    excluirUsuario,
+    criarContaComoDono,
+  } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
@@ -65,11 +81,26 @@ export default function Equipe() {
     }
   }
 
+  const [telas, setTelas] = useState<TelasAcesso>(TELAS_PADRAO)
+
   const abrirEdicao = (u: Usuario) => {
     setEditando(u)
     setVendedorId(u.vendedor_id || '')
     setNovaSenha('')
+    setTelas(telasDoUsuario(u))
   }
+
+  const salvarPermissoesTelas = async () => {
+    if (!editando) return
+    setSalvando(true)
+    try {
+      await salvarTelas(editando.id, telas)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const alternarTela = (tela: keyof TelasAcesso) => setTelas((t) => ({ ...t, [tela]: !t[tela] }))
 
   const salvarVinculo = async () => {
     if (!editando) return
@@ -210,6 +241,16 @@ export default function Equipe() {
                     <p className="font-bold text-emerald-600 dark:text-emerald-400">{moeda(comissao.total)} de comissão</p>
                     <p className="text-slate-400 dark:text-slate-500">
                       {pagos.length} pagos • {pedidos.length} pedidos
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-sky-600 dark:text-sky-400">
+                      {(() => {
+                        const liberadas = (Object.keys(LABEL_TELA) as (keyof TelasAcesso)[]).filter(
+                          (t) => telasDoUsuario(c)[t],
+                        )
+                        return liberadas.length
+                          ? `telas: ${liberadas.map((t) => LABEL_TELA[t].split(' (')[0]).join(' · ')}`
+                          : 'sem telas extras liberadas'
+                      })()}
                     </p>
                   </div>
                 ) : null}
@@ -401,6 +442,52 @@ export default function Equipe() {
               ))}
             </Selecao>
           </Campo>
+
+          {editando?.papel === 'vendedor' ? (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/40">
+              <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
+                <ShieldCheck className="h-4 w-4" /> Opções de relatórios e telas
+              </p>
+              <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
+                Marque o que este acesso pode abrir. Os relatórios saem sempre filtrados com os pedidos, a metragem e a
+                comissão <b>dele</b> — nunca os dados dos outros.
+              </p>
+              <div className="space-y-2">
+                {(Object.keys(LABEL_TELA) as (keyof TelasAcesso)[]).map((tela) => (
+                  <label
+                    key={tela}
+                    className="flex cursor-pointer items-start gap-2 rounded-xl border border-sky-100 bg-white p-2.5 text-xs text-slate-700 dark:border-sky-900/60 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(telas[tela])}
+                      onChange={() => alternarTela(tela)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-slate-600"
+                    />
+                    <span>
+                      <b>{LABEL_TELA[tela]}</b>
+                      <br />
+                      <span className="text-slate-500 dark:text-slate-400">{DESCRICAO_TELA[tela]}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <Botao
+                className="mt-3"
+                tamanho="sm"
+                variante="secundario"
+                icone={Save}
+                onClick={salvarPermissoesTelas}
+                carregando={salvando}
+              >
+                Salvar telas liberadas
+              </Botao>
+            </div>
+          ) : (
+            <p className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+              Contas de proprietário têm acesso a tudo — não há telas para liberar.
+            </p>
+          )}
 
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
             <p className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">

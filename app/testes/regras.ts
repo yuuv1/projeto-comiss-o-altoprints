@@ -18,6 +18,8 @@ import {
   FAIXAS_PADRAO,
   isPedidoCompleto,
   pedidoPendenteFinanceiro,
+  podeVerTela,
+  telasDoUsuario,
   type Pedido,
 } from '../src/lib/types'
 
@@ -182,6 +184,31 @@ igual('faixas sobrepostas são recusadas', validarFaixas([
   { id: 'a', de: 1, ate: 10, percentual: 5, rotulo: '1 a 10 m' },
   { id: 'b', de: 5, ate: 20, percentual: 4, rotulo: '5 a 20 m' },
 ]).length > 0, true)
+
+/* --------------------- telas liberadas por acesso ---------------------- */
+const vendedorTeste = {
+  id: 'u1',
+  nome: 'VENDEDOR',
+  usuario: 'vendedor',
+  senha_hash: 'x',
+  papel: 'vendedor' as const,
+  vendedor_id: 'v1',
+  ativo: true,
+  criado_em: '2026-01-01',
+  telas: { relatorio: true },
+}
+const donoTeste = { ...vendedorTeste, papel: 'proprietario' as const, vendedor_id: '' as const }
+igual('proprietário vê todas as telas', telasDoUsuario(donoTeste), {
+  relatorio: true,
+  paraImprimir: true,
+  entregas: true,
+  clienteEspecial: true,
+})
+igual('vendedor começa sem telas extras', telasDoUsuario(vendedorTeste).paraImprimir, false)
+igual('tela liberada pelo dono é respeitada', podeVerTela(vendedorTeste, 'relatorio'), true)
+igual('tela não liberada fica bloqueada', podeVerTela(vendedorTeste, 'entregas'), false)
+igual('conta sem telas definidas fica no padrão', podeVerTela({ ...vendedorTeste, telas: undefined }, 'relatorio'), false)
+igual('proprietário nunca é bloqueado', podeVerTela(donoTeste, 'clienteEspecial'), true)
 
 /* ------------------------------- senha -------------------------------- */
 async function testarSenha() {
