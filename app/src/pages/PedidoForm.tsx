@@ -762,9 +762,9 @@ export default function PedidoForm() {
         </div>
       </div>
 
-      <div className="sticky bottom-3 z-30 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/95 p-3 shadow-hover backdrop-blur">
+      <div className="sticky bottom-3 z-30 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white/95 p-3 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
         <div className="text-sm">
-          <span className="text-slate-500">Total do pedido: </span>
+          <span className="text-slate-500 dark:text-slate-400">Total do pedido: </span>
           <span className="text-xl font-black text-emerald-600">{moeda(valorFinal)}</span>
         </div>
         <div className="flex gap-2">

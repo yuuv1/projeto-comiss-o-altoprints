@@ -192,6 +192,17 @@
     background-color: #334155 !important;
   }
 
+
+  /* elementos com fundo branco translúcido que não têm versão escura no componente */
+  .dark .bg-white\/80,
+  .dark .bg-white\/95 {
+    background-color: rgba(15, 23, 42, 0.92) !important;
+  }
+
+  .dark .hover\:bg-white:hover {
+    background-color: #1e293b !important;
+  }
+
   .dark .hover\:bg-slate-50:hover,
   .dark .hover\:bg-slate-100:hover,
   .dark .hover\:bg-slate-50\/70:hover {
@@ -318,6 +329,83 @@
   .dark .bg-orange-100 {
     background-color: rgba(154, 52, 18, 0.5) !important;
     color: #fed7aa !important;
+  }
+
+
+  /* textos coloridos: no escuro precisam ser mais claros */
+  .dark .text-purple-700,
+  .dark .text-purple-600,
+  .dark .text-purple-500 {
+    color: #c084fc !important;
+  }
+
+  .dark .text-violet-800,
+  .dark .text-violet-700,
+  .dark .text-violet-600 {
+    color: #c4b5fd !important;
+  }
+
+  .dark .text-fuchsia-800,
+  .dark .text-fuchsia-700,
+  .dark .text-fuchsia-600 {
+    color: #e879f9 !important;
+  }
+
+  .dark .text-indigo-700,
+  .dark .text-indigo-600 {
+    color: #a5b4fc !important;
+  }
+
+  .dark .text-emerald-800,
+  .dark .text-emerald-700,
+  .dark .text-emerald-600 {
+    color: #34d399 !important;
+  }
+
+  .dark .text-green-700,
+  .dark .text-green-600 {
+    color: #86efac !important;
+  }
+
+  .dark .text-amber-900,
+  .dark .text-amber-800,
+  .dark .text-amber-700,
+  .dark .text-amber-600,
+  .dark .text-amber-500 {
+    color: #fbbf24 !important;
+  }
+
+  .dark .text-orange-800,
+  .dark .text-orange-700 {
+    color: #fdba74 !important;
+  }
+
+  .dark .text-rose-800,
+  .dark .text-rose-700,
+  .dark .text-rose-600,
+  .dark .text-rose-500 {
+    color: #fb7185 !important;
+  }
+
+  .dark .text-sky-900,
+  .dark .text-sky-800,
+  .dark .text-sky-700,
+  .dark .text-sky-600 {
+    color: #7dd3fc !important;
+  }
+
+  .dark .text-blue-700,
+  .dark .text-blue-600 {
+    color: #93c5fd !important;
+  }
+
+  /* caixas coloridas que ainda não têm versão escura */
+  .dark .bg-purple-50 {
+    background-color: rgba(88, 28, 135, 0.35) !important;
+  }
+
+  .dark .bg-white\/25 {
+    background-color: rgba(255, 255, 255, 0.22) !important;
   }
 
   /* sombras mais discretas no escuro */
