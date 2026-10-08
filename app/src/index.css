@@ -173,9 +173,7 @@
   /* fundos */
   .dark .bg-white,
   .dark .bg-white\/60,
-  .dark .bg-white\/70,
-  .dark .bg-white\/80,
-  .dark .bg-white\/95 {
+  .dark .bg-white\/70 {
     background-color: #0f172a !important;
   }
 

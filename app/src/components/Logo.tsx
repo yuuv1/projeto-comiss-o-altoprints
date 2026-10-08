@@ -53,7 +53,7 @@ export function Logo({ compacto = false, className }: { compacto?: boolean; clas
       {!compacto ? (
         <div className="leading-none">
           <p
-            className="bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 bg-clip-text text-xl font-black tracking-tight text-transparent"
+            className="bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 bg-clip-text text-xl font-black tracking-tight text-transparent dark:from-pink-400 dark:via-purple-400 dark:to-sky-400"
             style={{ WebkitTextFillColor: 'transparent' }}
           >
             {db.configuracoes.empresa_nome || 'Altoprints'}
