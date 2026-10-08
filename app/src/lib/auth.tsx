@@ -10,7 +10,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
 import { gerarHashSenha, senhaConfere } from './senha'
-import { supabase, CLOUD } from './supabase'
+import { clienteNuvem, emNuvem } from './supabase'
 import { type TelasAcesso, type Usuario, type Vendedor } from './types'
 import { useStore } from './store'
 
@@ -154,8 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       try {
         // se estiver no modo nuvem com Supabase Auth, usa a sessão do Supabase
-        if (CLOUD && supabase) {
-          const { data } = await supabase.auth.getSession()
+        const sb = clienteNuvem()
+        if (sb) {
+          const { data } = await sb.auth.getSession()
           const email = data.session?.user?.email
           if (email) {
             const login = email.split('@')[0]
@@ -220,11 +221,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!conta.ativo) throw new Error('Este acesso está desativado. Fale com o proprietário.')
 
       // 1) tenta pelo Supabase Auth quando configurado
-      if (CLOUD && supabase) {
-        const { error } = await supabase.auth.signInWithPassword({ email: emailInterno(conta.usuario), password: senha })
+      const sb = clienteNuvem()
+      if (sb) {
+        const { error } = await sb.auth.signInWithPassword({ email: emailInterno(conta.usuario), password: senha })
         if (error) {
           // se a conta ainda não existe na nuvem, cria agora (primeiro login)
-          const { error: erroCadastro } = await supabase.auth.signUp({
+          const { error: erroCadastro } = await sb.auth.signUp({
             email: emailInterno(conta.usuario),
             password: senha,
           })
@@ -247,7 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const sair = useCallback(async () => {
-    if (CLOUD && supabase) await supabase.auth.signOut()
+    const sb = clienteNuvem()
+    if (sb) await sb.auth.signOut()
     localStorage.removeItem(CHAVE_SESSAO)
     setUsuarioId(null)
   }, [])
@@ -343,8 +346,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const criarContaVendedor: AuthContexto['criarContaVendedor'] = async ({ nome, usuario, senha, vendedorId }) => {
     const conta = await prepararConta({ nome, usuario, senha, vendedorId }, 'vendedor')
 
-    if (CLOUD && supabase) {
-      const { error } = await supabase.auth.signUp({ email: emailInterno(conta.usuario), password: senha })
+    const sb = clienteNuvem()
+    if (sb) {
+      const { error } = await sb.auth.signUp({ email: emailInterno(conta.usuario), password: senha })
       if (error && !/already registered/i.test(error.message)) {
         throw new Error(`Não foi possível criar a conta na nuvem: ${error.message}`)
       }
@@ -383,7 +387,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const atualizado: Usuario = { ...alvo, senha_hash: await gerarHashSenha(nova) }
     await salvarRegistro('usuarios', atualizado)
-    if (CLOUD && supabase) await supabase.auth.updateUser({ password: nova })
+    const sb = clienteNuvem()
+    if (sb) await sb.auth.updateUser({ password: nova })
     await recarregar()
     avisar('Senha alterada com sucesso!')
   }
@@ -401,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!usuario) throw new Error('Sessão expirada.')
     const erro = validarUsuario(novo)
     if (erro) throw new Error(erro)
-    if (CLOUD && supabase)
+    if (emNuvem())
       throw new Error(
         'No modo nuvem o nome de usuário não pode ser trocado por aqui. Troque em Conexões → Nuvem antes de conectar o banco.',
       )
@@ -476,7 +481,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     usuario,
     vendedorNome,
     carregando: carregando || carregandoDados,
-    nuvem: CLOUD,
+    nuvem: emNuvem(),
     ehProprietario: usuario?.papel === 'proprietario',
     temProprietario,
     entrar,

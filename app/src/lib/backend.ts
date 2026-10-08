@@ -1,6 +1,6 @@
 // Camada de persistência: funciona com Supabase (nuvem) ou localStorage (modo local)
 import { migrarFaixas } from './comissao'
-import { CLOUD, supabase } from './supabase'
+import { clienteNuvem } from './supabase'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -94,18 +94,20 @@ const tratarErro = (contexto: string, erro: { message?: string } | null): never 
 /* API pública                                                         */
 /* ------------------------------------------------------------------ */
 
-export const MODO_NUVEM = CLOUD
+/** true quando a nuvem está conectada (usado pelas telas) */
+export const modoNuvem = () => Boolean(clienteNuvem())
 
 export async function carregarTudo(): Promise<DB> {
-  if (!CLOUD || !supabase) return lerLocal()
+  const sb = clienteNuvem()
+  if (!sb) return lerLocal()
 
   const [vendedores, clientes, pedidos, arquivos, usuarios, config] = await Promise.all([
-    supabase.from('vendedores').select('*').order('nome', { ascending: true }),
-    supabase.from('clientes').select('*').order('nome', { ascending: true }),
-    supabase.from('pedidos').select('*').order('numero', { ascending: false }),
-    supabase.from('arquivos').select('*').order('created_at', { ascending: false }),
-    supabase.from('usuarios').select('*').order('nome', { ascending: true }),
-    supabase.from('configuracoes').select('*').eq('id', 1).maybeSingle(),
+    sb.from('vendedores').select('*').order('nome', { ascending: true }),
+    sb.from('clientes').select('*').order('nome', { ascending: true }),
+    sb.from('pedidos').select('*').order('numero', { ascending: false }),
+    sb.from('arquivos').select('*').order('created_at', { ascending: false }),
+    sb.from('usuarios').select('*').order('nome', { ascending: true }),
+    sb.from('configuracoes').select('*').eq('id', 1).maybeSingle(),
   ])
 
   for (const res of [vendedores, clientes, pedidos, arquivos, usuarios, config]) {
@@ -125,7 +127,8 @@ export async function carregarTudo(): Promise<DB> {
 }
 
 export async function salvarRegistro(tabela: Tabela, registro: Registro): Promise<void> {
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     const db = lerLocal()
     const lista = db[tabela] as Registro[]
     const i = lista.findIndex((r) => r.id === registro.id)
@@ -134,13 +137,14 @@ export async function salvarRegistro(tabela: Tabela, registro: Registro): Promis
     gravarLocal(db)
     return
   }
-  const { error } = await supabase.from(tabela).upsert(registro as never)
+  const { error } = await sb.from(tabela).upsert(registro as never)
   if (error) tratarErro('Não foi possível salvar', error)
 }
 
 export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promise<void> {
   if (!registros.length) return
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     const db = lerLocal()
     const lista = db[tabela] as Registro[]
     for (const registro of registros) {
@@ -151,59 +155,63 @@ export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promi
     gravarLocal(db)
     return
   }
-  const { error } = await supabase.from(tabela).upsert(registros as never)
+  const { error } = await sb.from(tabela).upsert(registros as never)
   if (error) tratarErro('Não foi possível salvar', error)
 }
 
 export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     const db = lerLocal()
     db[tabela] = (db[tabela] as Registro[]).filter((r) => r.id !== id) as never
     gravarLocal(db)
     return
   }
-  const { error } = await supabase.from(tabela).delete().eq('id', id)
+  const { error } = await sb.from(tabela).delete().eq('id', id)
   if (error) tratarErro('Não foi possível excluir', error)
 }
 
 export async function removerArquivosDoPedido(pedidoId: ID): Promise<void> {
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     const db = lerLocal()
     db.arquivos = db.arquivos.filter((a) => a.pedido_id !== pedidoId)
     gravarLocal(db)
     return
   }
-  const { error } = await supabase.from('arquivos').delete().eq('pedido_id', pedidoId)
+  const { error } = await sb.from('arquivos').delete().eq('pedido_id', pedidoId)
   if (error) tratarErro('Não foi possível excluir os arquivos', error)
 }
 
 export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Promise<void> {
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     const db = lerLocal()
     db.configuracoes = { ...db.configuracoes, ...parcial }
     gravarLocal(db)
     return
   }
-  const atual = (await supabase.from('configuracoes').select('*').eq('id', 1).maybeSingle()).data
+  const atual = (await sb.from('configuracoes').select('*').eq('id', 1).maybeSingle()).data
   const valor = { ...((atual?.valor ?? {}) as Partial<Configuracoes>), ...parcial }
-  const { error } = await supabase.from('configuracoes').upsert({ id: 1, valor })
+  const { error } = await sb.from('configuracoes').upsert({ id: 1, valor })
   if (error) tratarErro('Não foi possível salvar as configurações', error)
 }
 
 /** Apaga tudo (usado pelo botão de limpar dados / recarregar demonstração) */
 export async function substituirTudo(db: DB): Promise<void> {
-  if (!CLOUD || !supabase) {
+  const sb = clienteNuvem()
+  if (!sb) {
     gravarLocal(db)
     return
   }
   for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
-    const { error } = await supabase.from(t).delete().not('id', 'is', null)
+    const { error } = await sb.from(t).delete().not('id', 'is', null)
     if (error) tratarErro('Não foi possível limpar os dados', error)
   }
   for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
     const linhas = db[t] as Registro[]
     if (!linhas.length) continue
-    const { error } = await supabase.from(t).insert(linhas as never)
+    const { error } = await sb.from(t).insert(linhas as never)
     if (error) tratarErro('Não foi possível gravar os dados', error)
   }
   await salvarConfiguracoes(db.configuracoes)

@@ -1,7 +1,19 @@
-import { ArrowRight, Eye, EyeOff, KeyRound, LogIn, ShieldCheck, Sparkles, UserPlus, Users } from 'lucide-react'
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Link2,
+  LogIn,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { JanelaConexao } from '../components/Nuvem'
 import { Botao, Campo, Entrada, Etiqueta, Selecao, cn } from '../components/ui'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { normalizarUsuario, useAuth } from '../lib/auth'
@@ -26,6 +38,7 @@ export default function Login() {
   const [vendedorId, setVendedorId] = useState('')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [conexaoAberta, setConexaoAberta] = useState(false)
 
   // o logo esconde a porta do proprietário: 5 toques seguidos
   const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
@@ -260,8 +273,19 @@ export default function Login() {
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
             <Sparkles className="h-3 w-3" /> Esqueceu a senha? Peça para redefinirem para você.
           </p>
+          {!nuvem ? (
+            <button
+              type="button"
+              onClick={() => setConexaoAberta(true)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-600 hover:underline dark:text-sky-400"
+            >
+              <Link2 className="h-3 w-3" /> Conectar este aparelho ao banco da empresa
+            </button>
+          ) : null}
         </div>
       </div>
+
+      <JanelaConexao aberto={conexaoAberta} onFechar={() => setConexaoAberta(false)} />
     </div>
   )
 }

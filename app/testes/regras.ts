@@ -11,7 +11,13 @@ import {
 } from '../src/lib/comissao'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
-import { conferirChave } from '../src/lib/supabase'
+import {
+  conferirChave,
+  lerCodigoConexao,
+  montarCodigoConexao,
+  normalizarUrl,
+  validarConexao,
+} from '../src/lib/supabase'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
 import { gerarDadosDemo } from '../src/lib/seed'
 import {
@@ -218,6 +224,30 @@ igual('chave publishable (nova) é aceita', conferirChave('sb_publishable_abc123
 igual('chave anon (antiga) é aceita', conferirChave('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc'), 'ok')
 igual('chave secret é recusada (não pode ir para o site)', conferirChave('sb_secret_abc123'), 'secreta')
 igual('chave com espaços em volta é tratada', conferirChave('  sb_publishable_x  '), 'ok')
+
+/* ------------------- código de conexão (link da equipe) ---------------- */
+const conexaoTeste = { url: 'https://abc.supabase.co', chave: 'sb_publishable_xyz' }
+const codigo = montarCodigoConexao(conexaoTeste)
+igual('código começa com ALT1.', codigo.startsWith('ALT1.'), true)
+igual('código não tem caracteres problemáticos para link', /^ALT1\.[A-Za-z0-9\-_]+$/.test(codigo), true)
+igual('código lido devolve a mesma conexão', lerCodigoConexao(codigo), conexaoTeste)
+igual(
+  'link inteiro também é aceito (pessoa cola o link em vez do código)',
+  lerCodigoConexao(`https://sistema.netlify.app/?nuvem=${encodeURIComponent(codigo)}`),
+  conexaoTeste,
+)
+igual('URL com barra no fim é limpa', normalizarUrl('https://abc.supabase.co/'), 'https://abc.supabase.co')
+igual('URL com /rest/v1 é limpa', normalizarUrl('https://abc.supabase.co/rest/v1'), 'https://abc.supabase.co')
+igual('URL vazia é recusada na validação', validarConexao('', 'sb_publishable_x').length > 0, true)
+igual('URL que não é do Supabase é recusada', validarConexao('https://meusite.com', 'sb_publishable_x').length > 0, true)
+igual('chave secret é recusada com aviso claro', validarConexao('https://abc.supabase.co', 'sb_secret_x').includes('SECRETA'), true)
+igual('conexão válida passa na validação', validarConexao('https://abc.supabase.co', 'eyJhbGciOiJIUzI1NiJ9.x'), '')
+try {
+  lerCodigoConexao('codigo-errado')
+  falhas.push('código inválido deveria ser recusado')
+} catch (e) {
+  igual('código inválido é recusado com explicação', (e as Error).message.includes('ALT1'), true)
+}
 
 /* ------------------------------- senha -------------------------------- */
 async function testarSenha() {

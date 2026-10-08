@@ -4,6 +4,7 @@
  */
 import { build } from 'esbuild'
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,8 +12,24 @@ import { fileURLToPath } from 'node:url'
 const aqui = dirname(fileURLToPath(import.meta.url))
 const raiz = resolve(aqui, '..')
 
+/** faz o esbuild entender as importações "?raw" do Vite (usadas para embutir o SQL) */
+const pluginBruto = {
+  name: 'texto-bruto',
+  setup(construir) {
+    construir.onResolve({ filter: /\?raw$/ }, (args) => ({
+      path: resolve(dirname(args.importer), args.path.replace(/\?raw$/, '')),
+      namespace: 'bruto',
+    }))
+    construir.onLoad({ filter: /.*/, namespace: 'bruto' }, async (args) => ({
+      contents: await readFile(args.path, 'utf8'),
+      loader: 'text',
+    }))
+  },
+}
+
 async function compilar(entrada, saida) {
   await build({
+    plugins: [pluginBruto],
     entryPoints: [resolve(aqui, entrada)],
     outfile: resolve(raiz, 'node_modules/.cache', saida),
     bundle: true,

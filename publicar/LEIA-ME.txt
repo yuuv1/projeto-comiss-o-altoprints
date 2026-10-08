@@ -10,11 +10,18 @@ COMO ATUALIZAR DEPOIS:
   - Rode de novo:  npm run publicar
   - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)
 
-ACESSO DO PROPRIETÁRIO:
+PRIMEIRO ACESSO (proprietário):
   - Endereço:   .../#/administracao   (salve na tela de início do celular)
   - Alternativa: 5 toques no logo, ou Ctrl + Alt + D no computador
-  - Na primeira vez, essa tela cria o acesso do proprietário.
+  - Essa tela cria o acesso do proprietário (na primeira vez).
+
+CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:
+  - Configurações → Nuvem → siga o assistente: cria o projeto do Supabase,
+    copia o SQL (1 clique), cola a URL e a chave, conecta.
+  - Depois clique em "Copiar link" e mande o link no grupo: quem abrir uma vez
+    fica conectado naquele aparelho.
+  - Guia completo: app/CONECTAR-NUVEM.md
 
 IMPORTANTE:
-  - Sem o Supabase configurado, os dados ficam salvos no navegador de cada aparelho.
-  - Para a equipe ver os mesmos pedidos, conecte o Supabase (veja app/DEPLOY.md).
+  - Sem a nuvem conectada, cada aparelho guarda a própria lista de pedidos.
+  - Faça backup de vez em quando (Configurações → Dados → Baixar backup).

@@ -182,7 +182,7 @@ app/
 - [x] Equipe → Nova conta (o dono registra a equipe já com o histórico antigo ligado)
 - [x] Opções de relatórios e telas liberadas acesso por acesso (Equipe)
 - [ ] Colocar no ar (pasta `publicar/` no Netlify) e conectar o Supabase
-      (guia: `app/PASSO-A-PASSO-SUPABASE.md`)
+      (guia curto: `app/CONECTAR-NUVEM.md`)
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
 

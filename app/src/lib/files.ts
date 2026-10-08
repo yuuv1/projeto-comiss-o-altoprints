@@ -1,6 +1,6 @@
 // Guarda os arquivos de arte: na nuvem (Supabase Storage) ou localmente (IndexedDB)
 import type { Arquivo, ID } from './types'
-import { supabase, CLOUD } from './supabase'
+import { clienteNuvem } from './supabase'
 
 const BUCKET = 'artes'
 
@@ -81,14 +81,15 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
     created_at: new Date().toISOString(),
   }
 
-  if (CLOUD && supabase) {
+  const sb = clienteNuvem()
+  if (sb) {
     const caminho = `${pedidoId}/${id}--${file.name.replace(/[^\w.\-]+/g, '_')}`
-    const { error } = await supabase.storage.from(BUCKET).upload(caminho, file, {
+    const { error } = await sb.storage.from(BUCKET).upload(caminho, file, {
       upsert: true,
       contentType: file.type || undefined,
     })
     if (error) throw new Error(`Falha ao enviar o arquivo: ${error.message}`)
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(caminho)
+    const { data } = sb.storage.from(BUCKET).getPublicUrl(caminho)
     base.url = data?.publicUrl ?? caminho
     return base
   }
@@ -100,12 +101,11 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
 
 /** URL para visualizar/baixar o arquivo (local: cria um object URL) */
 export async function urlDoArquivo(arquivo: Arquivo): Promise<string | null> {
+  const sb = clienteNuvem()
   if (arquivo.url) {
-    if (!CLOUD || /^https?:\/\//.test(arquivo.url)) return arquivo.url
-    if (supabase) {
-      const { data } = await supabase.storage.from(BUCKET).createSignedUrl(arquivo.url, 3600)
-      if (data?.signedUrl) return data.signedUrl
-    }
+    if (!sb || /^https?:\/\//.test(arquivo.url)) return arquivo.url
+    const { data } = await sb.storage.from(BUCKET).createSignedUrl(arquivo.url, 3600)
+    if (data?.signedUrl) return data.signedUrl
     return null
   }
   const blob = await idbGet(arquivo.id)
@@ -113,9 +113,10 @@ export async function urlDoArquivo(arquivo: Arquivo): Promise<string | null> {
 }
 
 export async function apagarArquivo(arquivo: Arquivo) {
-  if (CLOUD && supabase) {
+  const sb = clienteNuvem()
+  if (sb) {
     const caminho = arquivo.url ? extrairCaminho(arquivo.url) : null
-    if (caminho) await supabase.storage.from(BUCKET).remove([caminho])
+    if (caminho) await sb.storage.from(BUCKET).remove([caminho])
     return
   }
   await idbDel(arquivo.id)

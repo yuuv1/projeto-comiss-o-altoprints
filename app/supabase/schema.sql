@@ -136,6 +136,13 @@ begin
   end loop;
 end $$;
 
+-- ---------------------------- espaço das artes -----------------------------
+-- Cria o bucket "artes" (público) automaticamente: assim não é preciso criá-lo
+-- na mão em Storage. Se já existir, só garante que está público.
+insert into storage.buckets (id, name, public)
+values ('artes', 'artes', true)
+on conflict (id) do update set public = true;
+
 -- ------------------------- políticas do Storage ----------------------------
 -- Permite enviar/ler/excluir arquivos do bucket "artes" pela chave anon.
 drop policy if exists "artes_leitura" on storage.objects;

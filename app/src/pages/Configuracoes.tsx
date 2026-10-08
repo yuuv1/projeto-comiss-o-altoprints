@@ -31,9 +31,10 @@ import {
   type FaixaComissao,
   type PermissaoVendedor,
 } from '../lib/types'
+import { AbaNuvem } from '../components/Nuvem'
 import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmacao } from '../components/ui'
 
-type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso'
+type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso' | 'nuvem'
 
 export default function Configuracoes() {
   const { db, nuvem, salvarConfig, resetarDados, carregarDemo, baixarBackup, restaurarBackup, avisar } =
@@ -117,6 +118,7 @@ export default function Configuracoes() {
     { id: 'empresa', label: 'Empresa', icone: ImageIcon },
     { id: 'ia', label: 'Comprovantes (IA)', icone: Sparkles },
     { id: 'dados', label: 'Dados', icone: Database },
+    { id: 'nuvem', label: 'Nuvem', icone: Cloud },
     { id: 'acesso', label: 'Meu acesso', icone: KeyRound },
   ]
 
@@ -607,6 +609,9 @@ export default function Configuracoes() {
           </Cartao>
         </div>
       ) : null}
+      {/* -------------------------------- NUVEM ------------------------------- */}
+      {aba === 'nuvem' ? <AbaNuvem /> : null}
+
       {/* ------------------------------ MEU ACESSO ---------------------------- */}
       {aba === 'acesso' ? (
         <div className="space-y-4">

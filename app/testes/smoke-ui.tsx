@@ -191,6 +191,19 @@ async function main() {
   if (!acessoOk) falhas++
   console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” abre a troca de usuário e senha do dono`)
 
+  // a aba Nuvem mostra o assistente de conexão (3 passos) quando está no modo local
+  await clicar(raiz, 'Nuvem')
+  await espera(400)
+  const textoNuvem = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const nuvemOk =
+    textoNuvem.includes('Para que serve conectar a nuvem') &&
+    textoNuvem.includes('Copiar o SQL') &&
+    textoNuvem.includes('Conectar à nuvem') &&
+    textoNuvem.includes('Já tenho um código de conexão')
+  if (!nuvemOk) falhas++
+  console.log(`  ${nuvemOk ? '✅' : '❌'} Configurações → Nuvem mostra o assistente de conexão em 3 passos`)
+  if (!nuvemOk) console.log('     TEXTO:', textoNuvem.slice(0, 200))
+
   // a tabela oficial de comissão aparece na aba de comissões
   await clicar(raiz, 'Comissões')
   await espera(400)

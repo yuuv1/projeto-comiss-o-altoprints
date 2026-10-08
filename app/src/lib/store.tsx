@@ -11,7 +11,7 @@ import {
 import {
   carregarTudo,
   limparTudo,
-  MODO_NUVEM,
+  modoNuvem,
   removerArquivosDoPedido,
   removerRegistro,
   salvarConfiguracoes,
@@ -20,6 +20,14 @@ import {
   substituirTudo,
 } from './backend'
 import { apagarVariosArquivos, enviarArquivo, novoId } from './files'
+import {
+  clienteNuvem,
+  conectar as conectarSupabase,
+  conexaoRecebidaAgora,
+  desconectar as desconectarSupabase,
+  emNuvem,
+  limparAvisoDeConexao,
+} from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
 import { gerarDadosDemo } from './seed'
 import {
@@ -68,6 +76,12 @@ interface Ctx {
   /** apaga tudo; com `manterContaId`, o acesso do proprietário atual é preservado */
   resetarDados: (manterContaId?: string) => Promise<void>
   carregarDemo: () => Promise<void>
+  /** conecta o sistema ao banco na nuvem (Supabase) neste aparelho */
+  conectarNuvem: (url: string, chave: string) => Promise<void>
+  /** sai da nuvem neste aparelho (volta ao modo local) */
+  desconectarNuvem: () => void
+  /** envia os dados deste aparelho para a nuvem (usado logo depois de conectar) */
+  enviarDadosParaNuvem: () => Promise<void>
   /** baixa um arquivo .json com todo o banco */
   baixarBackup: () => void
   /** restaura um backup baixado antes (substitui tudo) */
@@ -97,6 +111,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [nuvem, setNuvem] = useState(emNuvem())
   const contadorToast = useRef(0)
 
   const avisar = useCallback((texto: string, tipo: Toast['tipo'] = 'sucesso') => {
@@ -123,6 +138,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const conectarNuvem = useCallback(
+    async (url: string, chave: string) => {
+      conectarSupabase({ url, chave })
+      setNuvem(true)
+      await recarregar()
+      avisar('Banco na nuvem conectado! Os dados agora são iguais em todos os aparelhos.')
+    },
+    [avisar, recarregar],
+  )
+
+  const desconectarNuvem = useCallback(() => {
+    desconectarSupabase()
+    setNuvem(false)
+    avisar('Este aparelho voltou ao modo local (os dados da nuvem continuam salvos).', 'info')
+  }, [avisar])
+
+  const enviarDadosParaNuvem = useCallback(async () => {
+    const sb = clienteNuvem()
+    if (!sb) throw new Error('A nuvem não está conectada.')
+    await substituirTudo(db)
+    await recarregar()
+    avisar('Os dados deste aparelho foram enviados para a nuvem.')
+  }, [avisar, db, recarregar])
+
+  // avisa quando o aparelho acabou de ser conectado por um link da equipe
+  useEffect(() => {
+    if (!conexaoRecebidaAgora()) return
+    limparAvisoDeConexao()
+    avisar('Este aparelho foi conectado ao banco da empresa!')
+  }, [avisar])
+
   // primeira carga
   useEffect(() => {
     ;(async () => {
@@ -130,7 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const dados = await carregarTudo()
         const vazio = !dados.pedidos.length && !dados.clientes.length && !dados.vendedores.length
         const jaCarregouDemo = localStorage.getItem(CHAVE_DEMO) === '1'
-        if (vazio && !jaCarregouDemo && !MODO_NUVEM) {
+        if (vazio && !jaCarregouDemo && !modoNuvem()) {
           const demo = gerarDadosDemo()
           await substituirTudo(demo)
           localStorage.setItem(CHAVE_DEMO, '1')
@@ -404,7 +450,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       db,
       carregando,
       erro,
-      nuvem: MODO_NUVEM,
+      nuvem,
       limparErro: () => setErro(null),
       recarregar,
       toasts,
@@ -422,6 +468,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       salvarConfig,
       resetarDados,
       carregarDemo,
+      conectarNuvem,
+      desconectarNuvem,
+      enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
       vendedorPorId,
@@ -449,6 +498,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       salvarConfig,
       resetarDados,
       carregarDemo,
+      conectarNuvem,
+      desconectarNuvem,
+      enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
       vendedorPorId,

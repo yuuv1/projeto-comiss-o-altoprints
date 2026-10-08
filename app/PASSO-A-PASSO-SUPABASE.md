@@ -1,4 +1,9 @@
-# Passo a passo do Supabase (banco na nuvem) — sem errar
+# Passo a passo do Supabase (versão detalhada) — sem errar
+
+> ⭐ **Antes de ler tudo isto, veja o guia curto: [`CONECTAR-NUVEM.md`](./CONECTAR-NUVEM.md).**
+> Hoje o sistema conecta **por dentro dele** (Configurações → Nuvem), com o SQL pronto em um
+> botão e um link automático para os aparelhos da equipe. Este arquivo aqui é a versão
+> detalhada/explicada, útil para entender cada parte ou resolver problemas.
 
 > **Para que serve:** hoje o sistema salva os dados **no navegador de cada aparelho**
 > (modo local). Com o Supabase, todos passam a ver **os mesmos pedidos**, de qualquer
