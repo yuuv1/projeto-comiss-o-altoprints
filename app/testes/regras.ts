@@ -13,6 +13,7 @@ import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import {
   conferirChave,
+  extrairConexaoDoTexto,
   lerCodigoConexao,
   montarCodigoConexao,
   normalizarUrl,
@@ -242,6 +243,37 @@ igual('URL vazia é recusada na validação', validarConexao('', 'sb_publishable
 igual('URL que não é do Supabase é recusada', validarConexao('https://meusite.com', 'sb_publishable_x').length > 0, true)
 igual('chave secret é recusada com aviso claro', validarConexao('https://abc.supabase.co', 'sb_secret_x').includes('SECRETA'), true)
 igual('conexão válida passa na validação', validarConexao('https://abc.supabase.co', 'eyJhbGciOiJIUzI1NiJ9.x'), '')
+igual(
+  'colando os dois valores juntos, o sistema separa',
+  extrairConexaoDoTexto('aqui ó: https://abc.supabase.co e a chave sb_publishable_xyz'),
+  { url: 'https://abc.supabase.co', chave: 'sb_publishable_xyz', encontrouSecreta: undefined },
+)
+igual(
+  'colando o trecho de código do painel, também funciona',
+  extrairConexaoDoTexto("const supabase = createClient('https://def.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.abc123')"),
+  {
+    url: 'https://def.supabase.co',
+    chave: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.abc123',
+    encontrouSecreta: undefined,
+  },
+)
+igual(
+  'só a chave colada já é encontrada',
+  extrairConexaoDoTexto('sb_publishable_sochave').chave,
+  'sb_publishable_sochave',
+)
+igual('texto sem nada devolve vazio', extrairConexaoDoTexto('bom dia, tudo bem?').url, undefined)
+igual(
+  'texto com chave secreta é sinalizado',
+  extrairConexaoDoTexto('https://abc.supabase.co sb_secret_naoPode').encontrouSecreta,
+  true,
+)
+igual(
+  'chave secreta junto da pública não bloqueia a pública',
+  extrairConexaoDoTexto('sb_secret_x sb_publishable_bom').chave,
+  'sb_publishable_bom',
+)
+
 try {
   lerCodigoConexao('codigo-errado')
   falhas.push('código inválido deveria ser recusado')

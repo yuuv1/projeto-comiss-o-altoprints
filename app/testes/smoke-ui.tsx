@@ -199,7 +199,9 @@ async function main() {
     textoNuvem.includes('Para que serve conectar a nuvem') &&
     textoNuvem.includes('Copiar o SQL') &&
     textoNuvem.includes('Conectar à nuvem') &&
-    textoNuvem.includes('Já tenho um código de conexão')
+    textoNuvem.includes('Já tenho um código de conexão') &&
+    textoNuvem.includes('cole tudo aqui e o sistema separa') &&
+    textoNuvem.includes('Prefere que alguém faça isso para você')
   if (!nuvemOk) falhas++
   console.log(`  ${nuvemOk ? '✅' : '❌'} Configurações → Nuvem mostra o assistente de conexão em 3 passos`)
   if (!nuvemOk) console.log('     TEXTO:', textoNuvem.slice(0, 200))

@@ -108,6 +108,25 @@ export function lerCodigoConexao(entrada: string): ConfigNuvem {
   return { url: normalizarUrl(dados.u ?? ''), chave: (dados.c ?? '').trim() }
 }
 
+/**
+ * Procura a URL e a chave em qualquer texto colado (mensagem, código do painel do
+ * Supabase, os dois valores separados ou tudo junto). Assim a pessoa não precisa
+ * saber o que é cada coisa: cola a bagunça e o sistema organiza.
+ */
+export function extrairConexaoDoTexto(texto: string): {
+  url?: string
+  chave?: string
+  encontrouSecreta?: boolean
+} {
+  const bruto = texto ?? ''
+  const url = bruto.match(/https:\/\/[a-z0-9-]+\.supabase\.(co|in)/i)?.[0]
+  const secreta = /sb_secret_[A-Za-z0-9_-]+/.test(bruto)
+  const publ =
+    bruto.match(/sb_publishable_[A-Za-z0-9_.-]{3,}/i)?.[0] ??
+    bruto.match(/eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}/)?.[0]
+  return { url, chave: publ, encontrouSecreta: secreta && !publ ? true : undefined }
+}
+
 /* ------------------------------------------------------------------ */
 /* Estado da conexão                                                   */
 /* ------------------------------------------------------------------ */

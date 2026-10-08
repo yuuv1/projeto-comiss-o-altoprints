@@ -6,6 +6,15 @@
 >
 > **Sem isso:** cada celular/PC guarda a própria lista de pedidos (modo local).
 > **Com isso:** todos veem os mesmos pedidos, de qualquer aparelho.
+>
+> **Não é "manter servidor":** você não instala nada, não usa terminal e não administra
+> máquina nenhuma. É como criar uma conta no Gmail — cria uma vez e pronto. Depois disso,
+> no máximo: se a loja ficar **1 semana inteira sem usar o sistema**, o banco "dorme" e
+> basta 1 clique em *Restore project* no painel do Supabase. Mais nada.
+>
+> **Se preferir, peça para alguém fazer (10 min):** em *Configurações → Nuvem* tem um
+> botão **"Copiar mensagem de ajuda"** com o passo a passo pronto para mandar no WhatsApp
+> para uma pessoa de confiança. Ela te devolve a URL e a chave, e você cola no sistema.
 
 ---
 
@@ -41,8 +50,10 @@
    - A chave se chama **publishable** (`sb_publishable_...`) nos projetos novos. Nos
      antigos ela aparece como **anon** (começa com `eyJ`). **As duas funcionam.**
    - 🚫 **Nunca** use a chave `secret` / `service_role`.
-2. Volte em **Configurações → Nuvem** no sistema, cole a **URL** e a **chave** e clique
-   em **Conectar à nuvem**.
+2. Volte em **Configurações → Nuvem** no sistema e use o atalho **"cole tudo aqui e o
+   sistema separa"**: pode colar os dois valores juntos, em qualquer ordem (ou até uma
+   mensagem inteira) — o sistema mostra *"Encontrei a URL e a chave!"*. Confira os dois
+   campos e clique em **Conectar à nuvem**.
 3. Deve aparecer “Banco na nuvem conectado” e um aviso de que o banco respondeu.
    - Em **Configurações → Empresa** também aparece a etiqueta verde
      **“Banco na nuvem (Supabase) conectado”**.

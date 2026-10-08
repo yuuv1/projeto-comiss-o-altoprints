@@ -18,7 +18,7 @@ import sqlSchema from '../../supabase/schema.sql?raw'
 import { useAuth } from '../lib/auth'
 import {
   codigoConexao,
-  emNuvem,
+  extrairConexaoDoTexto,
   linkDeConexao,
   nuvemTravadaPeloEnv,
   validarConexao,
@@ -131,10 +131,27 @@ export function AbaNuvem() {
   const [url, setUrl] = useState('')
   const [chave, setChave] = useState('')
   const [codigo, setCodigo] = useState('')
+  const [colado, setColado] = useState('')
+  const [achado, setAchado] = useState<'nada' | 'parcial' | 'tudo' | 'secreta'>('nada')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [testando, setTestando] = useState(false)
   const travada = nuvemTravadaPeloEnv()
+
+  /** a pessoa cola qualquer coisa (mensagem, os dois valores juntos) e o sistema separa */
+  const lerColar = (texto: string) => {
+    setColado(texto)
+    const { url: u, chave: c, encontrouSecreta } = extrairConexaoDoTexto(texto)
+    if (encontrouSecreta) {
+      setAchado('secreta')
+      setErro('Atenção: este texto tem a chave SECRETA (sb_secret_). Use a chave publishable (ou a anon antiga).')
+      return
+    }
+    if (u) setUrl(u)
+    if (c) setChave(c)
+    setErro('')
+    setAchado(u && c ? 'tudo' : u || c ? 'parcial' : texto.trim() ? 'nada' : 'nada')
+  }
 
   const conectar = async () => {
     setErro('')
@@ -379,11 +396,52 @@ export function AbaNuvem() {
       </Cartao>
 
       <Cartao hover={false}>
+        <p className="mb-1 flex items-center gap-2 text-sm font-extrabold text-slate-800 dark:text-slate-100">
+          <Sparkles className="h-4 w-4 text-amber-500" /> Atalho: cole tudo aqui e o sistema separa
+        </p>
+        <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">
+          Não precisa saber o que é URL e o que é chave. Copie do painel do Supabase (ou de uma mensagem) e cole aqui —
+          o sistema acha as duas informações sozinho. Se alguém te mandar só a chave ou só o endereço, também funciona.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Entrada
+            value={colado}
+            onChange={(e) => lerColar(e.target.value)}
+            placeholder="Cole aqui qualquer texto com o endereço https://....supabase.co e a chave"
+            className="min-w-[240px] flex-1"
+          />
+          {achado === 'tudo' ? (
+            <Etiqueta
+              className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+              icone={Check}
+            >
+              Encontrei a URL e a chave!
+            </Etiqueta>
+          ) : null}
+          {achado === 'parcial' ? (
+            <Etiqueta className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Encontrei só uma parte
+            </Etiqueta>
+          ) : null}
+          {achado === 'nada' && colado.trim() ? (
+            <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              Não encontrei nada nesse texto
+            </Etiqueta>
+          ) : null}
+        </div>
+        {achado === 'tudo' ? (
+          <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            Confira os dois campos abaixo e clique em <b>Conectar à nuvem</b>.
+          </p>
+        ) : null}
+      </Cartao>
+
+      <Cartao hover={false}>
         <p className="mb-2 flex items-center gap-2 text-sm font-extrabold text-slate-800 dark:text-slate-100">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-xs font-black text-white">
             3
           </span>
-          Cole aqui a URL e a chave do projeto
+          Confira e conecte
         </p>
         <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">
           No painel do Supabase, clique em <b>Connect</b> (topo do projeto) ou em <b>Settings → API Keys</b>. Copie a{' '}
@@ -443,6 +501,51 @@ export function AbaNuvem() {
           </Botao>
         </div>
       </Cartao>
+
+      <details className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 text-sm dark:border-violet-900 dark:bg-violet-950/30">
+        <summary className="cursor-pointer font-bold text-violet-900 dark:text-violet-200">
+          Prefere que alguém faça isso para você? (10 minutos, de graça)
+        </summary>
+        <p className="mt-2 text-xs text-violet-900/80 dark:text-violet-200/80">
+          Qualquer pessoa que mexa um pouquinho com internet consegue fazer. Copie a mensagem abaixo e mande para essa
+          pessoa (ou para quem cuida do seu site) — depois é só ela te devolver a URL e a chave, e você cola aqui em
+          cima.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Botao
+            tamanho="sm"
+            icone={Copy}
+            onClick={() =>
+              areaDeTransferencia(
+                [
+                  'Oi! Preciso de uma ajuda rápida (uns 10 minutos) com o sistema de pedidos da loja.',
+                  'É só criar um banco de dados grátis num site — não precisa programar nada.',
+                  '',
+                  '1) Abra https://supabase.com e clique em "Start your project" (crie a conta; é grátis e não pede cartão).',
+                  '2) Clique em "New project": nome "altoprints", região "South America (São Paulo)", clique em "Generate a password" e guarde essa senha. Depois "Create new project" e espere 2 minutos.',
+                  '3) No menu da esquerda, abra "SQL Editor" → "New query". Eu te mando o texto (SQL) para colar; depois clique em "Run" (tem que aparecer "Success. No rows returned").',
+                  '4) Clique em "Connect" (no topo) ou em "Settings → API Keys" e copie DUAS coisas: a "Project URL" e a chave "publishable" (em projetos antigos ela se chama "anon").',
+                  '5) Me mande essas duas coisas aqui no WhatsApp.',
+                  '',
+                  'Importante: NÃO me mande a chave "secret"/"service_role" (essa é a chave-mestra do banco).',
+                  'Depois disso eu mesmo colo no sistema e ele conecta sozinho. Valeu!',
+                ].join('\n'),
+                'Mensagem de pedido de ajuda',
+              )
+            }
+          >
+            Copiar mensagem de ajuda
+          </Botao>
+          <Botao
+            tamanho="sm"
+            variante="secundario"
+            icone={Copy}
+            onClick={() => areaDeTransferencia(sqlSchema, 'SQL')}
+          >
+            Copiar o SQL (para mandar junto)
+          </Botao>
+        </div>
+      </details>
 
       <p className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
         <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
