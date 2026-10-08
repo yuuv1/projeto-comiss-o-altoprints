@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   Calculator,
   Download,
@@ -35,6 +36,7 @@ import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '..
 import { calcularComissao } from '../lib/comissao'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
 import { FAIXAS, calcularValor, precoMetro } from '../lib/pricing'
+import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import {
   ESTADOS,
@@ -115,10 +117,17 @@ export default function PedidoForm() {
   const [params] = useSearchParams()
   const navegar = useNavigate()
   const { db, salvarPedido, excluirPedido, excluirArquivoDoPedido, avisar, nomeVendedor } = useStore()
+  const { usuario, ehProprietario, vendedorNome } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
-
   const novo = !id
   const existente = useMemo(() => db.pedidos.find((p) => p.id === id), [db.pedidos, id])
+
+  const permissao = db.configuracoes.permissao_vendedor
+  /** o vendedor só mexe no que é dele, e conforme a permissão definida pelo dono */
+  const pedidoDeOutro = Boolean(existente) && !ehProprietario && existente?.vendedor_id !== usuario?.vendedor_id
+  const somenteLeitura =
+    pedidoDeOutro || (!ehProprietario && Boolean(existente) && permissao === 'somente_criar')
+  const podeExcluir = ehProprietario || (!pedidoDeOutro && permissao === 'total')
 
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(() => ({ ...pedidoVazio() }))
   const [metragemTxt, setMetragemTxt] = useState('')
@@ -141,7 +150,10 @@ export default function PedidoForm() {
       setMetragemTxt(existente.metragem ? String(existente.metragem) : '')
       setValorTxt(String(existente.valor ?? ''))
     } else if (novo) {
-      setForm({ ...pedidoVazio(), vendedor_id: params.get('vendedor') ?? '' })
+      setForm({
+        ...pedidoVazio(),
+        vendedor_id: params.get('vendedor') ?? usuario?.vendedor_id ?? '',
+      })
       setMetragemTxt('')
       setValorTxt('')
     }
@@ -183,7 +195,7 @@ export default function PedidoForm() {
         arquivosNovos,
       )
       setArquivosNovos([])
-      navegar('/')
+      navegar('/pedidos')
     } catch (err) {
       avisar((err as Error).message, 'erro')
     } finally {
@@ -199,7 +211,7 @@ export default function PedidoForm() {
     })
     if (ok) {
       await excluirPedido(existente.id)
-      navegar('/')
+      navegar('/pedidos')
     }
   }
 
@@ -267,6 +279,7 @@ export default function PedidoForm() {
   }
 
   const statusProducaoAtual = form.status_producao
+  const bloquear = (conteudo: React.ReactNode) => (somenteLeitura ? <fieldset disabled>{conteudo}</fieldset> : conteudo)
 
   return (
     <form onSubmit={enviar}>
@@ -283,17 +296,30 @@ export default function PedidoForm() {
             <Botao variante="secundario" icone={ArrowLeft} onClick={() => navegar(-1)} type="button">
               Voltar
             </Botao>
-            {existente ? (
+            {existente && podeExcluir ? (
               <Botao variante="perigo" icone={Trash2} onClick={excluir} type="button">
                 Excluir
               </Botao>
             ) : null}
-            <Botao icone={Save} type="submit" carregando={salvando}>
-              {existente ? 'Salvar alterações' : 'Criar pedido'}
-            </Botao>
+            {!somenteLeitura ? (
+              <Botao icone={Save} type="submit" carregando={salvando}>
+                {existente ? 'Salvar alterações' : 'Criar pedido'}
+              </Botao>
+            ) : null}
           </>
         }
       />
+
+      {somenteLeitura ? (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p>
+            {pedidoDeOutro
+              ? 'Este pedido é de outro vendedor — você pode visualizar, mas não alterar.'
+              : 'O proprietário definiu que os vendedores podem apenas criar pedidos. Peça o ajuste ao proprietário.'}
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ------------------------- coluna principal ------------------------ */}
@@ -328,19 +354,27 @@ export default function PedidoForm() {
                 </datalist>
               </Campo>
 
-              <Campo label="Vendedor responsável" obrigatorio>
-                <Selecao
-                  value={form.vendedor_id}
-                  onChange={(e) => set({ vendedor_id: e.target.value })}
-                  required
-                >
-                  <option value="">Selecione o vendedor</option>
-                  {db.vendedores.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.nome}
-                    </option>
-                  ))}
-                </Selecao>
+              <Campo
+                label="Vendedor responsável"
+                obrigatorio
+                dica={ehProprietario ? undefined : 'Você só pode lançar pedidos no seu próprio nome.'}
+              >
+                {ehProprietario ? (
+                  <Selecao
+                    value={form.vendedor_id}
+                    onChange={(e) => set({ vendedor_id: e.target.value })}
+                    required
+                  >
+                    <option value="">Selecione o vendedor</option>
+                    {db.vendedores.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nome}
+                      </option>
+                    ))}
+                  </Selecao>
+                ) : (
+                  <Entrada value={vendedorNome} readOnly className="bg-slate-50 dark:bg-slate-800" />
+                )}
               </Campo>
 
               <Campo label="Data do pedido">
@@ -768,12 +802,14 @@ export default function PedidoForm() {
           <span className="text-xl font-black text-emerald-600">{moeda(valorFinal)}</span>
         </div>
         <div className="flex gap-2">
-          <Botao variante="secundario" type="button" onClick={() => navegar('/')}>
-            Cancelar
+          <Botao variante="secundario" type="button" onClick={() => navegar('/pedidos')}>
+            {somenteLeitura ? 'Voltar' : 'Cancelar'}
           </Botao>
-          <Botao icone={Save} type="submit" carregando={salvando}>
-            {existente ? 'Salvar alterações' : 'Criar pedido'}
-          </Botao>
+          {!somenteLeitura ? (
+            <Botao icone={Save} type="submit" carregando={salvando}>
+              {existente ? 'Salvar alterações' : 'Criar pedido'}
+            </Botao>
+          ) : null}
         </div>
       </div>
 

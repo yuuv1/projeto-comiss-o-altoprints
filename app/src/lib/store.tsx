@@ -81,6 +81,7 @@ const dbVazio = (): DB => ({
   clientes: [],
   pedidos: [],
   arquivos: [],
+  usuarios: [],
   configuracoes: { ...CONFIG_PADRAO },
 })
 

@@ -85,6 +85,22 @@ create table if not exists public.arquivos (
 );
 create index if not exists arquivos_pedido_idx on public.arquivos (pedido_id);
 
+-- -------------------------------- usuários ---------------------------------
+-- contas de acesso ao sistema: uma conta de proprietário (vê tudo) e as contas
+-- dos vendedores (veem apenas os pedidos/clientes ligados a eles).
+-- A senha nunca fica em texto puro: guardamos apenas um hash (impressão digital).
+create table if not exists public.usuarios (
+  id          text primary key,
+  nome        text not null,
+  usuario     text not null,
+  senha_hash  text default '',
+  papel       text default 'vendedor',
+  vendedor_id text default '',
+  ativo       boolean default true,
+  criado_em   text not null default now()::text
+);
+create unique index if not exists usuarios_usuario_idx on public.usuarios (lower(usuario));
+
 -- ----------------------------- configurações -------------------------------
 -- linha única (id = 1) com as preferências do sistema (logo, nome, etc.)
 create table if not exists public.configuracoes (
@@ -95,18 +111,21 @@ insert into public.configuracoes (id, valor) values (1, '{}'::jsonb)
   on conflict (id) do nothing;
 
 -- --------------------------- acesso (RLS) ----------------------------------
--- O sistema é de uso interno, sem login. Mantemos a leitura/escrita liberada
--- pela chave anon (não divulgue a chave nem torne o link público).
+-- O sistema é de uso interno e o login é o do próprio sistema (nome de usuário
+-- + senha). Mantemos a leitura/escrita liberada pela chave anon — não divulgue
+-- a chave, use uma senha forte para o proprietário e não torne o link público.
+-- Se quiser trancar mais, troque as políticas abaixo pelas do Supabase Auth.
 alter table public.vendedores    enable row level security;
 alter table public.clientes      enable row level security;
 alter table public.pedidos       enable row level security;
 alter table public.arquivos      enable row level security;
 alter table public.configuracoes enable row level security;
+alter table public.usuarios      enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['vendedores','clientes','pedidos','arquivos','configuracoes'] loop
+  foreach t in array array['vendedores','clientes','pedidos','arquivos','configuracoes','usuarios'] loop
     execute format('drop policy if exists "%1$s_acesso_total" on public.%1$I', t);
     execute format(
       'create policy "%1$s_acesso_total" on public.%1$I for all to anon, authenticated using (true) with check (true)',

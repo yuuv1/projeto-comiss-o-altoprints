@@ -3,20 +3,32 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { BarraBusca, Botao, CartaoResumo, TituloPagina, Vazio, cn } from '../components/ui'
+import { useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import { pedidoPendenteFinanceiro } from '../lib/types'
+import { pedidoPendenteFinanceiro, podeEditarPedidos, podeExcluirPedidos } from '../lib/types'
 
 export default function Pedidos() {
   const { db } = useStore()
+  const { usuario, ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
   const [busca, setBusca] = useState('')
 
-  const pedidos = useMemo(
-    () => [...db.pedidos].sort((a, b) => b.numero - a.numero),
-    [db.pedidos],
+  // o vendedor enxerga apenas os pedidos dele
+  const meus = useMemo(
+    () =>
+      ehProprietario
+        ? db.pedidos
+        : db.pedidos.filter((p) => p.vendedor_id === usuario?.vendedor_id),
+    [db.pedidos, ehProprietario, usuario?.vendedor_id],
   )
+
+  const permissao = db.configuracoes.permissao_vendedor
+  const podeEditar = ehProprietario || podeEditarPedidos(permissao)
+  const podeExcluir = ehProprietario || podeExcluirPedidos(permissao)
+
+  const pedidos = useMemo(() => [...meus].sort((a, b) => b.numero - a.numero), [meus])
 
   const resumo = useMemo(() => {
     const retirada = pedidos.filter((p) => p.tipo_entrega === 'retirada').length
@@ -40,8 +52,12 @@ export default function Pedidos() {
     <>
       <TituloPagina
         icone={ClipboardList}
-        titulo="Pedidos"
-        subtitulo="Gerencie a montagem da arte, impressão, envio e pagamento."
+        titulo={ehProprietario ? 'Pedidos' : 'Meus pedidos'}
+        subtitulo={
+          ehProprietario
+            ? 'Gerencie a montagem da arte, impressão, envio e pagamento.'
+            : 'Aqui aparecem somente os seus pedidos.'
+        }
         acoes={
           <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
             Novo pedido
@@ -88,7 +104,7 @@ export default function Pedidos() {
       {filtrados.length === 0 ? (
         <Vazio
           icone={Package}
-          titulo={busca ? 'Nenhum pedido encontrado' : 'Nenhum pedido cadastrado ainda'}
+          titulo={busca ? 'Nenhum pedido encontrado' : ehProprietario ? 'Nenhum pedido cadastrado ainda' : 'Você ainda não tem pedidos'}
           descricao={busca ? 'Tente buscar por outro termo.' : 'Comece criando o primeiro pedido.'}
           acao={
             !busca ? (
@@ -106,18 +122,25 @@ export default function Pedidos() {
               pedido={p}
               acoes={
                 <>
-                  <Botao tamanho="sm" variante="secundario" icone={Pencil} onClick={() => acoes.editar(p)}>
-                    Editar
-                  </Botao>
                   <Botao
                     tamanho="sm"
-                    variante="ghost"
-                    className="text-rose-500 hover:bg-rose-50"
-                    icone={Trash2}
-                    onClick={() => acoes.pedirExclusao(p)}
+                    variante="secundario"
+                    icone={Pencil}
+                    onClick={() => acoes.editar(p)}
                   >
-                    Excluir
+                    {podeEditar ? 'Editar' : 'Ver'}
                   </Botao>
+                  {podeExcluir ? (
+                    <Botao
+                      tamanho="sm"
+                      variante="ghost"
+                      className="text-rose-500 hover:bg-rose-50"
+                      icone={Trash2}
+                      onClick={() => acoes.pedirExclusao(p)}
+                    >
+                      Excluir
+                    </Botao>
+                  ) : null}
                 </>
               }
             />

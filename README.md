@@ -64,22 +64,41 @@ Faixas iniciais (todas editáveis):
 | acima de 50 m | 2% |
 | sem metragem informada | 3% |
 
-Onde alterar: **⚙️ (cadeado) → Comissões**. O painel tem uma **prévia ao vivo** que mostra,
-com os pedidos pagos do mês, quantos pedidos caem em cada faixa e quanto sai de comissão —
-antes mesmo de salvar.
+Onde alterar: **Configurações → Comissões** (só o proprietário entra lá). A tela tem uma
+**prévia ao vivo** que mostra, com os pedidos pagos do mês, quantos pedidos caem em cada
+faixa e quanto sai de comissão — antes mesmo de salvar.
 
 ---
 
-## Painel do administrador (protegido por senha)
+## Login e perfis de acesso
 
-O cadeado ⚙️ no cabeçalho abre o painel, que pede uma **senha** (na primeira vez, o
-responsável cria a senha). Dentro dele: regras de comissão, nome e logo da empresa,
-chave da IA e limpeza/carga de dados de teste. O painel volta a pedir a senha quando a
-página é recarregada.
+O sistema tem **login próprio** (nome de usuário + senha). Existem dois perfis:
 
-> A senha é um **cadeado de uso diário** (evita que os vendedores mexam nas regras por
-> engano), não um login: o sistema continua sem tela de login. Se quiser proteção forte
-> (contas por usuário, cada vendedor vendo só os pedidos dele), é o próximo passo natural.
+| Perfil | O que vê |
+| --- | --- |
+| **Proprietário** | Tudo: todos os pedidos, relatórios, comissões, equipe e configurações |
+| **Vendedor** | Só o que é dele: os próprios pedidos, clientes, metragem e comissão |
+
+**Primeiro acesso:** o sistema ainda não tem nenhum proprietário, então a tela inicial já
+abre em *"criar o acesso do proprietário"* — basta escolher nome, usuário e senha.
+
+**Funcionário:** na tela de entrada, toque em *"Criar meu acesso"* e escolha o vínculo
+(o próprio nome na lista de vendedores ou *"criar novo com o meu nome"*). A conta já
+entra em uso na hora, sem precisar de aprovação.
+
+- No menu do dono também aparecem **Equipe** (criar, ligar a um vendedor, redefinir
+  senha, desativar ou excluir contas), **Relatório**, **Para imprimir**, **Entregas** e
+  **Configurações** — nada disso aparece para os vendedores.
+- **Permissões dos vendedores** (`Configurações → Permissões`): podem ter acesso total,
+  mexer nos pedidos mas não excluir (padrão) ou só criar pedidos.
+- **Senhas** nunca ficam em texto puro: guardamos só um hash (impressão digital).
+  Depois de 5 tentativas erradas o acesso fica bloqueado por 5 minutos.
+- **Sessão**: a opção *"manter conectado"* guarda o acesso por 30 dias (senão, 1 hora).
+  Em *Meu perfil* (canto direito do cabeçalho) cada um troca a senha.
+
+> A segurança é a de um **sistema interno**: as contas ficam no próprio banco do sistema
+> (navegador/Supabase), não no Supabase Auth. Se um dia quiser trancar mais, é ligar o
+> *Supabase Auth* e trocar as políticas do banco — o resto do sistema não muda.
 
 ---
 
@@ -132,11 +151,12 @@ app/
 - [x] Recriar o sistema fielmente ao antigo
 - [x] Hospedagem gratuita documentada (`app/DEPLOY.md`) + robô de publicação no GitHub Pages
 - [x] Tema claro/escuro
-- [x] Comissão por faixas de metragem, configurável em painel com senha
+- [x] Comissão por faixas de metragem, configurável em Configurações → Comissões
+- [x] Login com dois perfis (proprietário e vendedor) e permissões escolhidas pelo dono
 - [ ] Colocar no ar (Netlify conectado ao GitHub) e conectar o Supabase
-- [ ] Enviar o logo oficial (upload no painel do administrador → Empresa)
+- [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
 
-> Observação: o sistema não tem tela de login. Como o link pode ser aberto por
-> qualquer pessoa que o tenha, o ideal é usar um endereço difícil de adivinhar e,
-> se quiser, adicionamos um login simples em uma próxima etapa.
+> Observação: cada vendedor só enxerga os pedidos dele e o proprietário vê tudo.
+> Ainda assim, use uma **senha forte** para o proprietário — o link do sistema pode
+> ser aberto por qualquer pessoa que o tenha.

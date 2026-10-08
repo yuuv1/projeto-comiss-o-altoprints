@@ -1,9 +1,19 @@
 // Camada de persistência: funciona com Supabase (nuvem) ou localStorage (modo local)
 import { CLOUD, supabase } from './supabase'
-import { CONFIG_PADRAO, type Arquivo, type Cliente, type Configuracoes, type DB, type ID, type Pedido, type Vendedor } from './types'
+import {
+  CONFIG_PADRAO,
+  type Arquivo,
+  type Cliente,
+  type Configuracoes,
+  type DB,
+  type ID,
+  type Pedido,
+  type Usuario,
+  type Vendedor,
+} from './types'
 
-export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos'
-export type Registro = Vendedor | Cliente | Pedido | Arquivo
+export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos' | 'usuarios'
+export type Registro = Vendedor | Cliente | Pedido | Arquivo | Usuario
 
 const LS_KEY = 'altoprints:db:v1'
 
@@ -12,6 +22,7 @@ const dbVazio = (): DB => ({
   clientes: [],
   pedidos: [],
   arquivos: [],
+  usuarios: [],
   configuracoes: { ...CONFIG_PADRAO },
 })
 
@@ -29,6 +40,7 @@ const lerLocal = (): DB => {
       clientes: parsed.clientes ?? [],
       pedidos: parsed.pedidos ?? [],
       arquivos: parsed.arquivos ?? [],
+      usuarios: parsed.usuarios ?? [],
       configuracoes: { ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) },
     }
   } catch {
@@ -62,15 +74,16 @@ export const MODO_NUVEM = CLOUD
 export async function carregarTudo(): Promise<DB> {
   if (!CLOUD || !supabase) return lerLocal()
 
-  const [vendedores, clientes, pedidos, arquivos, config] = await Promise.all([
+  const [vendedores, clientes, pedidos, arquivos, usuarios, config] = await Promise.all([
     supabase.from('vendedores').select('*').order('nome', { ascending: true }),
     supabase.from('clientes').select('*').order('nome', { ascending: true }),
     supabase.from('pedidos').select('*').order('numero', { ascending: false }),
     supabase.from('arquivos').select('*').order('created_at', { ascending: false }),
+    supabase.from('usuarios').select('*').order('nome', { ascending: true }),
     supabase.from('configuracoes').select('*').eq('id', 1).maybeSingle(),
   ])
 
-  for (const res of [vendedores, clientes, pedidos, arquivos, config]) {
+  for (const res of [vendedores, clientes, pedidos, arquivos, usuarios, config]) {
     if (res.error) tratarErro('Não foi possível carregar os dados', res.error)
   }
 
@@ -81,6 +94,7 @@ export async function carregarTudo(): Promise<DB> {
     clientes: (clientes.data ?? []) as Cliente[],
     pedidos: (pedidos.data ?? []) as Pedido[],
     arquivos: (arquivos.data ?? []) as Arquivo[],
+    usuarios: (usuarios.data ?? []) as Usuario[],
     configuracoes: { ...CONFIG_PADRAO, ...cfg },
   }
 }
@@ -157,11 +171,11 @@ export async function substituirTudo(db: DB): Promise<void> {
     gravarLocal(db)
     return
   }
-  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos'] as Tabela[]) {
+  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
     const { error } = await supabase.from(t).delete().not('id', 'is', null)
     if (error) tratarErro('Não foi possível limpar os dados', error)
   }
-  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos'] as Tabela[]) {
+  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
     const linhas = db[t] as Registro[]
     if (!linhas.length) continue
     const { error } = await supabase.from(t).insert(linhas as never)

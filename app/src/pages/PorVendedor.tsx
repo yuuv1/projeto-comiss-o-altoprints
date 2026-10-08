@@ -11,22 +11,27 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, Campo, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
+import { useAuth } from '../lib/auth'
 import { calcularComissao } from '../lib/comissao'
 import { dataBR, fimDoDia, hojeISO, inicioDoDia, moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import { FAIXAS_PADRAO, type Pedido } from '../lib/types'
+import { FAIXAS_PADRAO, podeEditarPedidos, type Pedido } from '../lib/types'
 
 type Periodo = '7' | '30' | '90' | 'personalizado'
 
 export default function PorVendedor() {
   const { db } = useStore()
+  const { usuario, ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
+  const [params] = useSearchParams()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
+  const podeEditar = ehProprietario || podeEditarPedidos(db.configuracoes.permissao_vendedor)
+  const permissaoExcluir = db.configuracoes.permissao_vendedor === 'total'
 
   const [vendedorId, setVendedorId] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('30')
@@ -34,8 +39,17 @@ export default function PorVendedor() {
   const [fim, setFim] = useState(hojeISO())
 
   useEffect(() => {
+    if (!ehProprietario) {
+      setVendedorId(usuario?.vendedor_id ?? '')
+      return
+    }
+    const daUrl = params.get('vendedor')
+    if (daUrl && db.vendedores.some((v) => v.id === daUrl)) {
+      setVendedorId(daUrl)
+      return
+    }
     if (!vendedorId && db.vendedores.length) setVendedorId(db.vendedores[0].id)
-  }, [db.vendedores, vendedorId])
+  }, [db.vendedores, ehProprietario, params, usuario?.vendedor_id, vendedorId])
 
   const [de, ate] = useMemo(() => {
     if (periodo === 'personalizado') {
@@ -95,8 +109,12 @@ export default function PorVendedor() {
     <>
       <TituloPagina
         icone={UserCheck}
-        titulo="Por vendedor"
-        subtitulo="Escolha o vendedor e acompanhe o desempenho dele no período."
+        titulo={ehProprietario ? 'Por vendedor' : 'Meu desempenho'}
+        subtitulo={
+          ehProprietario
+            ? 'Escolha o vendedor e acompanhe o desempenho dele no período.'
+            : 'Acompanhe os seus pedidos, a sua metragem e a sua comissão no período.'
+        }
         acoes={
           <Botao icone={Plus} onClick={() => navegar(`/pedido/novo?vendedor=${vendedorId}`)}>
             Novo pedido de {nome}
@@ -106,13 +124,17 @@ export default function PorVendedor() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Campo label="Vendedor">
-          <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-            {db.vendedores.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nome}
-              </option>
-            ))}
-          </Selecao>
+          {ehProprietario ? (
+            <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+              {db.vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nome}
+                </option>
+              ))}
+            </Selecao>
+          ) : (
+            <Entrada value={nome} readOnly className="bg-slate-50 dark:bg-slate-800" />
+          )}
         </Campo>
         <Campo label="Período">
           <Selecao value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo)}>
@@ -217,20 +239,22 @@ export default function PorVendedor() {
                   <Botao tamanho="sm" variante="secundario" icone={Pencil} onClick={() => acoes.editar(p)}>
                     Editar
                   </Botao>
-                  {p.status_pagamento !== 'pago' ? (
+                  {p.status_pagamento !== 'pago' && podeEditar ? (
                     <Botao tamanho="sm" variante="sucesso" icone={Wallet} onClick={() => acoes.marcarPago(p)}>
                       Marcar pago
                     </Botao>
                   ) : null}
-                  <Botao
-                    tamanho="sm"
-                    variante="ghost"
-                    className="text-rose-500 hover:bg-rose-50"
-                    icone={Trash2}
-                    onClick={() => acoes.pedirExclusao(p)}
-                  >
-                    Excluir
-                  </Botao>
+                  {ehProprietario || permissaoExcluir ? (
+                    <Botao
+                      tamanho="sm"
+                      variante="ghost"
+                      className="text-rose-500 hover:bg-rose-50"
+                      icone={Trash2}
+                      onClick={() => acoes.pedirExclusao(p)}
+                    >
+                      Excluir
+                    </Botao>
+                  ) : null}
                 </>
               }
             />

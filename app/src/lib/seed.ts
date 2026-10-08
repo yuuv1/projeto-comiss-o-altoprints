@@ -149,6 +149,7 @@ export function gerarDadosDemo(): DB {
     clientes,
     pedidos: pedidos.sort((a, b) => b.numero - a.numero),
     arquivos: [],
+    usuarios: [],
     configuracoes: { ...CONFIG_PADRAO, revisao_ultima_em: new Date().toISOString() },
   }
 }

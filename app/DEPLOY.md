@@ -97,26 +97,42 @@ Uma vez conectado, toda alteração enviada ao repositório publica o sistema au
      variáveis e faça um novo deploy.
 
 Pronto! Ao abrir o site, em ⚙️ **Configurações** aparece a mensagem
-"Banco na nuvem (Supabase) conectado". A partir daí tudo o que for salvo aparece igual
+"Banco na nuvem (Supabase) conectado". Se você já tinha contas criadas no modo local,
+elas ficam no navegador: recrie as contas pelo primeiro acesso ou cadastre em
+**Equipe** (só o proprietário entra nessa tela). A partir daí tudo o que for salvo aparece igual
 em todos os aparelhos.
 
 ---
 
-## Esqueci a senha do painel
+## Esqueci a senha (login)
 
-A senha protege só o painel de configurações (os vendedores não precisam dela).
+Cada pessoa entra com **nome de usuário + senha**. O proprietário resolve a senha de
+qualquer vendedor em **Equipe → Vínculo e senha → Redefinir senha** (não precisa de nada
+técnico).
 
-- **Modo nuvem (Supabase):** abra o **SQL Editor** e rode:
+Se a senha perdida for a **do proprietário**:
+
+- **Modo nuvem (Supabase):** abra o **SQL Editor** e rode (troque `SEU_USUARIO` e
+  `NOVA_SENHA`); a linha apaga a senha, então o próximo login com esse usuário aceita
+  qualquer senha e você já troca em *Meu perfil* → Trocar minha senha:
   ```sql
-  update public.configuracoes
-     set valor = jsonb_set(valor, '{senha_admin_hash}', '""')
-   where id = 1;
+  update public.usuarios set senha_hash = '' where lower(usuario) = lower('SEU_USUARIO');
   ```
-  Depois abra o sistema e crie uma senha nova em ⚙️ → Senha.
-- **Modo local:** no navegador do computador, abra o console (F12) e rode
-  `localStorage.clear()` e recarregue — isso apaga os dados locais, então use apenas se
-  você não tiver pedidos salvos ali (no modo local, prefira apagar somente a linha do
-  `JSON` do `altoprints:db:v1`, campo `configuracoes.senha_admin_hash`).
+- **Modo local:** no navegador do computador, abra o console (F12) e rode (troque
+  `SEU_USUARIO`):
+  ```js
+  const db = JSON.parse(localStorage.getItem('altoprints:db:v1'))
+  const u = db.usuarios.find((x) => x.usuario === 'SEU_USUARIO')
+  u.ativo = true
+  u.senha_hash = ''
+  localStorage.setItem('altoprints:db:v1', JSON.stringify(db))
+  localStorage.removeItem('altoprints:sessao')
+  ```
+  Depois recarregue e entre — troque a senha em seguida.
+
+> Se nem isso resolver (ou você ficou sem nenhum proprietário ativo), o caminho é limpar
+> o banco de contas em **Configurações → Dados** (ou recriar o projeto no Supabase) e
+> criar o proprietário de novo pelo primeiro acesso.
 
 ## Dicas importantes
 

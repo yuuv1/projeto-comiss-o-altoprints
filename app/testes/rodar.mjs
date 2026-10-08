@@ -35,6 +35,9 @@ console.log('\n➡️  Regras de negócio (preços, datas, formatação, dados d
 executar(await compilar('regras.ts', 'regras.cjs'))
 
 if (existsSync(resolve(raiz, 'node_modules/jsdom'))) {
+  console.log('\n➡️  Login, perfis e permissões\n')
+  executar(await compilar('login.tsx', 'login.cjs'))
+
   console.log('\n➡️  Interface (renderização de todas as telas)\n')
   executar(await compilar('smoke-ui.tsx', 'smoke-ui.cjs'))
 } else {

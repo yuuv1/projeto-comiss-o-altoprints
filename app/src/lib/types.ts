@@ -133,17 +133,59 @@ export const FAIXAS_PADRAO: FaixaComissao[] = [
   { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
 ]
 
+/* ------------------------------------------------------------------ */
+/* Contas de acesso                                                    */
+/* ------------------------------------------------------------------ */
+
+export type Papel = 'proprietario' | 'vendedor'
+
+export const LABEL_PAPEL: Record<Papel, string> = {
+  proprietario: 'Proprietário',
+  vendedor: 'Vendedor',
+}
+
+export interface Usuario {
+  id: ID
+  nome: string
+  /** nome de usuário do login (sem espaços, minúsculo) */
+  usuario: string
+  /** senha criptografada (SHA-256 + sal) — nunca guardamos a senha em texto puro */
+  senha_hash: string
+  papel: Papel
+  /** vendedor vinculado (usado para saber quais pedidos são "dele") */
+  vendedor_id: ID | ''
+  ativo: boolean
+  /** id da conta na nuvem (Supabase Auth), quando usarmos o login do Supabase */
+  auth_id?: string
+  criado_em: string
+}
+
+/** O que o vendedor pode fazer com os próprios pedidos (definido pelo proprietário) */
+export type PermissaoVendedor = 'total' | 'sem_excluir' | 'somente_criar'
+
+export const LABEL_PERMISSAO: Record<PermissaoVendedor, string> = {
+  total: 'Pode criar, editar e excluir os próprios pedidos',
+  sem_excluir: 'Pode criar e editar, mas não excluir',
+  somente_criar: 'Pode apenas criar (ajustes ficam com o proprietário)',
+}
+
+export const DESCRICAO_PERMISSAO: Record<PermissaoVendedor, string> = {
+  total: 'Total autonomia — excluir sempre pede confirmação.',
+  sem_excluir: 'Evita perda de histórico: ninguém exclui pedido pelo celular.',
+  somente_criar: 'O vendedor lança o pedido e o escritório ajusta valor e status.',
+}
+
 export interface Configuracoes {
   empresa_nome: string
   logo_url: string
   revisao_ultima_em: string | null
   openai_key: string
-  /** senha (criptografada) que protege o painel de configurações e comissões */
-  senha_admin_hash: string
   /** faixas de metragem x percentual de comissão */
   faixas_comissao: FaixaComissao[]
   /** percentual aplicado em pedidos sem metragem informada */
   comissao_sem_metragem: number
+  /** o que o vendedor pode fazer com os próprios pedidos */
+  permissao_vendedor: PermissaoVendedor
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -151,9 +193,9 @@ export const CONFIG_PADRAO: Configuracoes = {
   logo_url: '',
   revisao_ultima_em: null,
   openai_key: '',
-  senha_admin_hash: '',
   faixas_comissao: FAIXAS_PADRAO,
   comissao_sem_metragem: 3,
+  permissao_vendedor: 'sem_excluir',
 }
 
 /** Resumo de uma faixa de comissão (usado nos relatórios) */
@@ -172,6 +214,7 @@ export interface DB {
   clientes: Cliente[]
   pedidos: Pedido[]
   arquivos: Arquivo[]
+  usuarios: Usuario[]
   configuracoes: Configuracoes
 }
 
@@ -215,3 +258,10 @@ export const pedidoPendenteFinanceiro = (p: Pedido) =>
 
 /** Data usada no relatório: data do pagamento e, se não houver, a data do pedido. */
 export const dataReferencia = (p: Pedido) => p.data_pagamento || (p.data_pedido || '').slice(0, 10)
+
+/* ------------------------------------------------------------------ */
+/* Ajuda de permissões                                                 */
+/* ------------------------------------------------------------------ */
+
+export const podeEditarPedidos = (permissao: PermissaoVendedor) => permissao !== 'somente_criar'
+export const podeExcluirPedidos = (permissao: PermissaoVendedor) => permissao === 'total'

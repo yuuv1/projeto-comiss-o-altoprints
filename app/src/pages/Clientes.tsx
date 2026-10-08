@@ -1,6 +1,7 @@
 import { Mail, Pencil, Phone, Plus, Star, Trash2, UserPlus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { AreaTexto, BarraBusca, Botao, Campo, CartaoResumo, Entrada, Interruptor, Modal, Selecao, TituloPagina, Vazio, useConfirmacao } from '../components/ui'
+import { useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
 import type { Cliente } from '../lib/types'
@@ -17,6 +18,7 @@ const clienteEmBranco = (): Omit<Cliente, 'id' | 'created_at'> => ({
 
 export default function Clientes() {
   const { db, salvarCliente, excluirCliente, nomeVendedor } = useStore()
+  const { usuario, ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const [busca, setBusca] = useState('')
   const [aberto, setAberto] = useState(false)
@@ -28,7 +30,7 @@ export default function Clientes() {
 
   const abrirNovo = () => {
     setEditando(null)
-    setForm(clienteEmBranco())
+    setForm({ ...clienteEmBranco(), vendedor_id: ehProprietario ? '' : usuario?.vendedor_id ?? '' })
     setValorEspecialTxt('')
     setPreenchido(false)
     setAberto(true)
@@ -45,12 +47,15 @@ export default function Clientes() {
 
   const clientes = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    const lista = [...db.clientes].sort((a, b) => a.nome.localeCompare(b.nome))
+    const todos = ehProprietario
+      ? db.clientes
+      : db.clientes.filter((c) => c.vendedor_id === usuario?.vendedor_id)
+    const lista = [...todos].sort((a, b) => a.nome.localeCompare(b.nome))
     if (!t) return lista
     return lista.filter((c) =>
       [c.nome, c.telefone, c.email, nomeVendedor(c.vendedor_id)].join(' ').toLowerCase().includes(t),
     )
-  }, [busca, db.clientes, nomeVendedor])
+  }, [busca, db.clientes, ehProprietario, nomeVendedor, usuario?.vendedor_id])
 
   const especiais = db.clientes.filter((c) => c.especial).length
 
@@ -75,8 +80,12 @@ export default function Clientes() {
     <>
       <TituloPagina
         icone={Users}
-        titulo="Clientes"
-        subtitulo="Cadastro de clientes com vendedor responsável e valor especial do metro."
+        titulo={ehProprietario ? 'Clientes' : 'Meus clientes'}
+        subtitulo={
+          ehProprietario
+            ? 'Cadastro de clientes com vendedor responsável e valor especial do metro.'
+            : 'Aqui aparecem somente os clientes ligados a você.'
+        }
         acoes={
           <Botao icone={Plus} onClick={abrirNovo}>
             Novo cliente
@@ -233,18 +242,22 @@ export default function Clientes() {
             />
           </Campo>
           <Campo label="Vendedor responsável" obrigatorio>
-            <Selecao
-              value={form.vendedor_id}
-              onChange={(e) => setForm({ ...form, vendedor_id: e.target.value })}
-              required
-            >
-              <option value="">Selecione</option>
-              {db.vendedores.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nome}
-                </option>
-              ))}
-            </Selecao>
+            {ehProprietario ? (
+              <Selecao
+                value={form.vendedor_id}
+                onChange={(e) => setForm({ ...form, vendedor_id: e.target.value })}
+                required
+              >
+                <option value="">Selecione</option>
+                {db.vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                  </option>
+                ))}
+              </Selecao>
+            ) : (
+              <Entrada value={nomeVendedor(usuario?.vendedor_id)} readOnly className="bg-slate-50 dark:bg-slate-800" />
+            )}
           </Campo>
           <Campo
             label="Valor especial do metro (opcional)"
