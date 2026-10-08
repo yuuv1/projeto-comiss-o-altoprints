@@ -286,8 +286,16 @@ export function AbaNuvem() {
               • <b>Pausa do plano grátis:</b> depois de 1 semana sem uso o banco dorme. Basta entrar em
               supabase.com/dashboard → projeto → <b>Restore project</b>. Nada é perdido.
             </li>
+            <li>
+              • <b>Atualizações do sistema:</b> este texto do SQL também evolui junto. Quando eu avisar que o
+              banco mudou, clique em <b>Copiar o SQL</b>, cole no <b>SQL Editor</b> do Supabase e clique em{' '}
+              <b>Run</b>. É seguro: ele só cria o que falta, nunca apaga pedidos.
+            </li>
           </ul>
           <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" icone={Copy} onClick={() => areaDeTransferencia(sqlSchema, 'SQL')}>
+              Copiar o SQL
+            </Botao>
             <Botao
               variante="secundario"
               icone={Send}

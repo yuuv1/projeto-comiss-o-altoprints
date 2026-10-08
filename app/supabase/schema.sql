@@ -6,12 +6,14 @@
 --   1. Crie um projeto gratuito em https://supabase.com
 --   2. Abra "SQL Editor" > "New query"
 --   3. Cole TODO este arquivo e clique em "Run"
---   4. Em "Storage" crie um bucket chamado  artes  e marque como PUBLIC
---      (Storage > New bucket > nome: artes > Public bucket: ON)
---   5. Em Project Settings > API copie a URL e a chave "anon public"
---      e coloque no arquivo .env do sistema:
---         VITE_SUPABASE_URL=...
---         VITE_SUPABASE_ANON_KEY=...
+--   4. No sistema (Configurações > Nuvem) cole a URL e a chave pública e conecte
+--
+-- PODE RODAR ESTE ARQUIVO QUANTAS VEZES QUISER: ele só cria o que ainda não
+-- existe (nunca apaga nem sobrescreve dados). Quando o sistema ganha um recurso
+-- novo que precisa de banco, copie o SQL atualizado pelo próprio sistema
+-- (Configurações > Nuvem > Copiar o SQL) e rode de novo.
+--
+-- O bucket das ARTES é criado aqui embaixo, automaticamente.
 -- ============================================================================
 
 -- ------------------------------- vendedores --------------------------------
@@ -112,10 +114,17 @@ create table if not exists public.configuracoes (
 insert into public.configuracoes (id, valor) values (1, '{}'::jsonb)
   on conflict (id) do nothing;
 
+-- -------------------- atualizações de bancos já criados --------------------
+-- Estas linhas dão colunas novas a bancos criados numa versão anterior do
+-- sistema. É seguro rodar sempre: só adiciona o que estiver faltando.
+alter table public.usuarios add column if not exists telas   jsonb default '{}'::jsonb;
+alter table public.usuarios add column if not exists auth_id text;
+alter table public.pedidos  add column if not exists aviso_visto boolean default true;
+
 -- --------------------------- acesso (RLS) ----------------------------------
 -- O sistema é de uso interno e o login é o do próprio sistema (nome de usuário
--- + senha). Mantemos a leitura/escrita liberada pela chave anon — não divulgue
--- a chave, use uma senha forte para o proprietário e não torne o link público.
+-- + senha). Mantemos a leitura/escrita liberada pela chave pública (publishable
+-- ou anon) — use uma senha forte para o proprietário e não torne o link público.
 -- Se quiser trancar mais, troque as políticas abaixo pelas do Supabase Auth.
 alter table public.vendedores    enable row level security;
 alter table public.clientes      enable row level security;

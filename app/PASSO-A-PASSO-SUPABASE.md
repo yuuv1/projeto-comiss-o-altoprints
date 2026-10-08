@@ -81,6 +81,11 @@ ver as tabelas: `vendedores`, `clientes`, `pedidos`, `arquivos`, `usuarios` e
 > 🔁 Se der algum erro, **não tem problema rodar de novo**: o script é feito para ser
 > executado quantas vezes você quiser (ele não apaga dados existentes, só garante que
 > tudo exista). Se aparecer erro vermelho, me mande o texto do erro.
+>
+> 🧩 **O SQL muda quando o sistema é atualizado?** Sim: ele é o "molde" das tabelas e
+> acompanha os recursos novos. Sempre que uma atualização precisar mexer no banco, basta
+> repetir este passo (Configurações → Nuvem → Copiar o SQL → colar → Run). Rodar de novo
+> nunca apaga nem sobrescreve nada — só completa o que estiver faltando.
 
 > ℹ️ O script também cria as **regras de acesso (RLS)** e as **permissões das artes**.
 > É tudo automático nesse mesmo arquivo.

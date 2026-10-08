@@ -103,6 +103,27 @@ Alternativas, se o link não abrir em algum aparelho:
 
 ---
 
+## “O SQL muda quando o sistema é atualizado?”
+
+**Muda, sim — e é só isso que você precisa saber:**
+
+- O SQL é o "molde" das tabelas. Quando eu adiciono um recurso novo que precisa de uma
+  tabela ou coluna nova (por exemplo, o registro de impressões), o SQL que está dentro do
+  sistema é atualizado junto.
+- **Você não precisa acompanhar nem decorar nada.** Sempre que uma atualização precisar
+  mexer no banco, eu aviso na hora: *“rode o Passo 2 de novo”*.
+- Rodar de novo é **sempre seguro**: o texto só **cria o que estiver faltando**. Ele nunca
+  apaga pedidos, clientes, contas nem configurações.
+- Como funciona na prática: **Configurações → Nuvem → “Copiar o SQL”** → colar no **SQL
+  Editor** do Supabase → **Run**. Leva 1 minuto.
+- **Ordem certa numa atualização:** primeiro você arrasta a pasta nova no Netlify, depois
+  roda o SQL (se eu avisar que mudou). Se rodar o SQL antes do site novo, também não tem
+  problema — nada se perde.
+
+> Resumo: **SQL = molde do banco. Rodar de novo = completar o molde. Nunca apaga nada.**
+
+---
+
 ## Se algo der errado
 
 | O que aparece | Como resolver |
