@@ -54,19 +54,26 @@ A comissão de cada pedido é calculada pela **metragem do pedido**: o percentua
 em que ele cai é aplicado sobre o valor do pedido. Vale apenas para pedidos com
 pagamento confirmado.
 
-Faixas iniciais (todas editáveis):
+Tabela oficial (toda editável pelo proprietário):
 
 | Metragem | Comissão |
 | --- | --- |
-| 1 a 5 m | 5% |
-| 6 a 20 m | 4% |
-| 21 a 50 m | 3% |
-| acima de 50 m | 2% |
-| sem metragem informada | 3% |
+| 1 a 5 m | 4% |
+| 5 a 10 m | 3,5% |
+| 10 a 20 m | 3% |
+| 20 a 50 m | 2,5% |
+| acima de 50 m | 1,5% |
+| sem metragem informada | 3% (editável) |
+
+> Cada faixa vale de `de` até **antes** de `ate` — ou seja, um pedido de 5 m entra na faixa
+> "5 a 10 m".
 
 Onde alterar: **Configurações → Comissões** (só o proprietário entra lá). A tela tem uma
 **prévia ao vivo** que mostra, com os pedidos pagos do mês, quantos pedidos caem em cada
-faixa e quanto sai de comissão — antes mesmo de salvar.
+faixa e quanto sai de comissão — antes mesmo de salvar — e um botão **"Usar tabela oficial"**
+para restaurar os valores acima.
+
+Em **Configurações → Meu acesso** o proprietário troca o próprio usuário e a própria senha.
 
 ---
 

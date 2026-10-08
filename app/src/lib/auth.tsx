@@ -105,6 +105,8 @@ export interface AuthContexto {
   }) => Promise<void>
   trocarMinhaSenha: (senhaAtual: string, nova: string) => Promise<void>
   atualizarMeuPerfil: (dados: { nome: string }) => Promise<void>
+  /** troca o próprio nome de usuário (login) — no modo nuvem fica bloqueado */
+  trocarMeuUsuario: (novoUsuario: string) => Promise<void>
   redefinirSenha: (usuarioId: string, novaSenha: string) => Promise<void>
   atualizarVinculo: (usuarioId: string, vendedorId: string) => Promise<void>
   alternarAtivo: (usuarioId: string, ativo: boolean) => Promise<void>
@@ -393,6 +395,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avisar('Perfil atualizado!')
   }
 
+  const trocarMeuUsuario: AuthContexto['trocarMeuUsuario'] = async (novo) => {
+    if (!usuario) throw new Error('Sessão expirada.')
+    const erro = validarUsuario(novo)
+    if (erro) throw new Error(erro)
+    if (CLOUD && supabase)
+      throw new Error(
+        'No modo nuvem o nome de usuário não pode ser trocado por aqui. Troque em Conexões → Nuvem antes de conectar o banco.',
+      )
+    const normalizado = normalizarUsuario(novo)
+    const noBanco = await lerUsuarios()
+    if (noBanco.some((u) => u.id !== usuario.id && u.usuario === normalizado))
+      throw new Error('Este nome de usuário já está em uso.')
+    const alvo = noBanco.find((u) => u.id === usuario.id) ?? usuario
+    await salvarRegistro('usuarios', { ...alvo, usuario: normalizado })
+    await recarregar()
+    avisar(`Agora o seu usuário é "${normalizado}".`)
+  }
+
   const redefinirSenha: AuthContexto['redefinirSenha'] = async (usuarioId, novaSenha) => {
     const noBanco = await lerUsuarios()
     const alvo = (noBanco.length ? noBanco : usuarios).find((u) => u.id === usuarioId)
@@ -455,6 +475,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     criarContaComoDono,
     trocarMinhaSenha,
     atualizarMeuPerfil,
+    trocarMeuUsuario,
     redefinirSenha,
     atualizarVinculo,
     alternarAtivo,

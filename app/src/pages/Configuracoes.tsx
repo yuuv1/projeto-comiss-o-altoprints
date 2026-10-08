@@ -5,6 +5,7 @@ import {
   Cloud,
   Database,
   Image as ImageIcon,
+  KeyRound,
   Percent,
   Plus,
   RefreshCw,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
+import { useAuth } from '../lib/auth'
 import { dataBR, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import {
@@ -28,15 +30,23 @@ import {
   type FaixaComissao,
   type PermissaoVendedor,
 } from '../lib/types'
-import { Botao, Campo, Cartao, Entrada, TituloPagina, cn, useConfirmacao } from '../components/ui'
+import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmacao } from '../components/ui'
 
-type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados'
+type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso'
 
 export default function Configuracoes() {
   const { db, nuvem, salvarConfig, resetarDados, carregarDemo, avisar } = useStore()
+  const { usuario, trocarMinhaSenha, trocarMeuUsuario, atualizarMeuPerfil } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const [aba, setAba] = useState<Aba>('comissoes')
   const [salvando, setSalvando] = useState(false)
+
+  /* ------------------------------ meu acesso ----------------------------- */
+  const [meuUsuario, setMeuUsuario] = useState(usuario?.usuario ?? '')
+  const [meuNome, setMeuNome] = useState(usuario?.nome ?? '')
+  const [senhaAtual, setSenhaAtual] = useState('')
+  const [senhaNova, setSenhaNova] = useState('')
+  const [senhaRepetida, setSenhaRepetida] = useState('')
 
   /* ------------------------------ comissões ------------------------------ */
   const [faixas, setFaixas] = useState<FaixaComissao[]>(db.configuracoes.faixas_comissao ?? FAIXAS_PADRAO)
@@ -105,6 +115,7 @@ export default function Configuracoes() {
     { id: 'empresa', label: 'Empresa', icone: ImageIcon },
     { id: 'ia', label: 'Comprovantes (IA)', icone: Sparkles },
     { id: 'dados', label: 'Dados', icone: Database },
+    { id: 'acesso', label: 'Meu acesso', icone: KeyRound },
   ]
 
   return (
@@ -159,10 +170,26 @@ export default function Configuracoes() {
           <Cartao hover={false}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">Faixas de metragem</p>
-              <Botao
-                tamanho="sm"
-                variante="secundario"
-                icone={Plus}
+              <div className="flex flex-wrap gap-2">
+                <Botao
+                  tamanho="sm"
+                  variante="secundario"
+                  icone={RefreshCw}
+                  onClick={async () => {
+                    const ok = await confirmar({
+                      titulo: 'Usar a tabela oficial de comissão?',
+                      mensagem: 'As faixas atuais serão substituídas por 1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · acima de 50 m 1,5%.',
+                      textoBotao: 'Usar tabela oficial',
+                    })
+                    if (ok) setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
+                  }}
+                >
+                  Usar tabela oficial
+                </Botao>
+                <Botao
+                  tamanho="sm"
+                  variante="secundario"
+                  icone={Plus}
                 onClick={() => {
                   const ordenadas = [...faixas].sort((a, b) => a.de - b.de)
                   const ultima = ordenadas[ordenadas.length - 1]
@@ -172,9 +199,10 @@ export default function Configuracoes() {
                     { id: `faixa-${Date.now()}`, de, ate: de + 9, percentual: 2, rotulo: rotuloFaixa(de, de + 9) },
                   ])
                 }}
-              >
-                Adicionar faixa
-              </Botao>
+                >
+                  Adicionar faixa
+                </Botao>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -529,6 +557,128 @@ export default function Configuracoes() {
               As senhas nunca são guardadas em texto puro: fica só uma “impressão digital” (hash) de cada uma.
             </p>
           </Cartao>
+        </div>
+      ) : null}
+      {/* ------------------------------ MEU ACESSO ---------------------------- */}
+      {aba === 'acesso' ? (
+        <div className="space-y-4">
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <UserCog className="h-4 w-4 text-violet-600 dark:text-violet-400" /> Meus dados
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Estes são os dados com que você entra no sistema. Use <b>Meu perfil</b> (no topo do canto direito) para
+              trocar o seu nome de exibição.
+            </p>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Etiqueta
+                className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300"
+                icone={ShieldCheck}
+              >
+                Proprietário
+              </Etiqueta>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                quem tem este acesso vê tudo e é o único que muda as comissões
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Campo label="Meu nome de usuário (login)" dica={nuvem ? 'No modo nuvem, para trocar o usuário é preciso refazer a conexão do Supabase.' : 'Só letras, números, ponto, traço e underline.'}>
+                <Entrada value={meuUsuario} onChange={(e) => setMeuUsuario(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="ex.: altoprints" />
+              </Campo>
+              <Botao
+                variante="secundario"
+                icone={Save}
+                carregando={salvando}
+                disabled={!meuUsuario.trim() || meuUsuario === usuario?.usuario}
+                onClick={async () => {
+                  setSalvando(true)
+                  try {
+                    await trocarMeuUsuario(meuUsuario)
+                  } catch (e) {
+                    avisar((e as Error).message, 'erro')
+                  } finally {
+                    setSalvando(false)
+                  }
+                }}
+              >
+                Salvar usuário
+              </Botao>
+            </div>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Trocar a minha senha
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              A senha fica guardada apenas como hash. Para a senha de outras pessoas, use <b>Equipe → Vínculo e senha</b>.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Campo label="Senha atual">
+                <Entrada type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} placeholder="••••••" />
+              </Campo>
+              <Campo label="Nova senha">
+                <Entrada type="password" value={senhaNova} onChange={(e) => setSenhaNova(e.target.value)} placeholder="••••••" />
+              </Campo>
+              <Campo label="Repita a nova">
+                <Entrada type="password" value={senhaRepetida} onChange={(e) => setSenhaRepetida(e.target.value)} placeholder="••••••" />
+              </Campo>
+            </div>
+            <Botao
+              className="mt-3"
+              icone={KeyRound}
+              carregando={salvando}
+              disabled={!senhaAtual || senhaNova.length < 4}
+              onClick={async () => {
+                if (senhaNova !== senhaRepetida) return avisar('As duas senhas novas precisam ser iguais.', 'erro')
+                setSalvando(true)
+                try {
+                  await trocarMinhaSenha(senhaAtual, senhaNova)
+                  setSenhaAtual('')
+                  setSenhaNova('')
+                  setSenhaRepetida('')
+                } catch (e) {
+                  avisar((e as Error).message, 'erro')
+                } finally {
+                  setSalvando(false)
+                }
+              }}
+            >
+              Trocar minha senha
+            </Botao>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <UserCog className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Meu nome de exibição
+            </p>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Campo label="Como o meu nome aparece no sistema">
+                <Entrada value={meuNome} onChange={(e) => setMeuNome(e.target.value)} />
+              </Campo>
+              <Botao
+                variante="secundario"
+                icone={Save}
+                carregando={salvando}
+                disabled={!meuNome.trim() || meuNome === usuario?.nome}
+                onClick={async () => {
+                  setSalvando(true)
+                  try {
+                    await atualizarMeuPerfil({ nome: meuNome })
+                  } finally {
+                    setSalvando(false)
+                  }
+                }}
+              >
+                Salvar nome
+              </Botao>
+            </div>
+          </Cartao>
+
+          <p className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+            <b>Quem pode mudar o quê:</b> as comissões e as permissões da equipe só aparecem aqui, para o proprietário.
+            Os vendedores não têm acesso a esta tela — nem pelo menu, nem digitando o endereço.
+          </p>
         </div>
       ) : null}
       {dialog}

@@ -1,4 +1,5 @@
 // Camada de persistência: funciona com Supabase (nuvem) ou localStorage (modo local)
+import { migrarFaixas } from './comissao'
 import { CLOUD, supabase } from './supabase'
 import {
   CONFIG_PADRAO,
@@ -16,6 +17,12 @@ export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos' | 'usuar
 export type Registro = Vendedor | Cliente | Pedido | Arquivo | Usuario
 
 const LS_KEY = 'altoprints:db:v1'
+
+/** mantém as faixas de comissão no formato/valores atuais do sistema */
+const comFaixasAtuais = (c: Configuracoes): Configuracoes => ({
+  ...c,
+  faixas_comissao: migrarFaixas(c.faixas_comissao),
+})
 
 const dbVazio = (): DB => ({
   vendedores: [],
@@ -41,7 +48,7 @@ const lerLocal = (): DB => {
       pedidos: parsed.pedidos ?? [],
       arquivos: parsed.arquivos ?? [],
       usuarios: parsed.usuarios ?? [],
-      configuracoes: { ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) },
+      configuracoes: comFaixasAtuais({ ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) }),
     }
   } catch {
     return dbVazio()
@@ -95,7 +102,7 @@ export async function carregarTudo(): Promise<DB> {
     pedidos: (pedidos.data ?? []) as Pedido[],
     arquivos: (arquivos.data ?? []) as Arquivo[],
     usuarios: (usuarios.data ?? []) as Usuario[],
-    configuracoes: { ...CONFIG_PADRAO, ...cfg },
+    configuracoes: comFaixasAtuais({ ...CONFIG_PADRAO, ...cfg }),
   }
 }
 

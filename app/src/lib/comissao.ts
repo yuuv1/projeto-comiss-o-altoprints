@@ -34,7 +34,7 @@ export function faixaDoPedido(
   if (!metragem || Number.isNaN(m) || m <= 0) {
     return { percentual: percentualSemMetragem, rotulo: 'Sem metragem', id: '__sem_metragem__' }
   }
-  const faixa = faixas.find((f) => m >= f.de && (f.ate === null || m <= f.ate))
+  const faixa = faixas.find((f) => m >= f.de && (f.ate === null || m < f.ate))
   if (faixa) return { percentual: faixa.percentual, rotulo: faixa.rotulo, id: faixa.id }
   // metragem fora de qualquer faixa: usa a faixa mais próxima (maior início abaixo do valor)
   const ordenadas = [...faixas].sort((a, b) => a.de - b.de)
@@ -141,7 +141,7 @@ export function validarFaixas(faixas: FaixaComissao[]): string[] {
     if (f.ate !== null && f.ate < f.de) problemas.push(`A faixa "${f.rotulo}" termina antes de começar.`)
     if (f.percentual < 0 || f.percentual > 100) problemas.push(`O percentual da faixa "${f.rotulo}" deve ficar entre 0 e 100.`)
     const proxima = ordenadas[i + 1]
-    if (proxima && f.ate !== null && proxima.de <= f.ate) {
+    if (proxima && f.ate !== null && proxima.de < f.ate) {
       problemas.push(`As faixas "${f.rotulo}" e "${proxima.rotulo}" estão sobrepostas.`)
     }
     if (proxima && f.ate === null) {
@@ -149,6 +149,34 @@ export function validarFaixas(faixas: FaixaComissao[]): string[] {
     }
   })
   return problemas
+}
+
+/* ------------------------------------------------------------------ */
+/* Compatibilidade                                                     */
+/* ------------------------------------------------------------------ */
+
+/** Faixas que o sistema usava antes (5% / 4% / 3% / 2%) — só para migrar quem nunca mexeu */
+const FAIXAS_ANTIGAS: FaixaComissao[] = [
+  { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
+  { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
+  { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
+  { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+]
+
+/**
+ * Traz as faixas salvas para os valores atuais quando elas ainda são exatamente
+ * as antigas (ou seja: o proprietário nunca editou). Faixas editadas são mantidas.
+ */
+export function migrarFaixas(faixas?: FaixaComissao[] | null): FaixaComissao[] {
+  if (!faixas || !faixas.length) return FAIXAS_PADRAO
+  const iguaisAsAntigas =
+    faixas.length === FAIXAS_ANTIGAS.length &&
+    faixas.every((f, i) => {
+      const antiga = FAIXAS_ANTIGAS[i]
+      return f.de === antiga.de && f.ate === antiga.ate && Number(f.percentual) === antiga.percentual
+    })
+  if (iguaisAsAntigas) return FAIXAS_PADRAO.map((f) => ({ ...f }))
+  return faixas
 }
 
 /** Devolve as faixas prontas para salvar (com rótulo recalculado e ordenadas) */

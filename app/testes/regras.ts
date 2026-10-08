@@ -2,7 +2,13 @@
  * Testes das regras de negócio (preço por metragem, datas, formatação).
  * Rode com:  npm run testar
  */
-import { calcularComissao, comissaoDoPedido, faixaDoPedido, validarFaixas } from '../src/lib/comissao'
+import {
+  calcularComissao,
+  comissaoDoPedido,
+  faixaDoPedido,
+  migrarFaixas,
+  validarFaixas,
+} from '../src/lib/comissao'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
@@ -95,26 +101,59 @@ igual(
 const pedidoCom = (metragem: number | null, valor: number): Pedido =>
   ({ ...base, metragem, valor })
 
-igual('faixa 3 m -> 5%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 5)
-igual('faixa 5 m -> 5% (limite da faixa)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 5)
-igual('faixa 6 m -> 4%', faixaDoPedido(6, FAIXAS_PADRAO, 3).percentual, 4)
-igual('faixa 20 m -> 4% (limite da faixa)', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 4)
-igual('faixa 21 m -> 3%', faixaDoPedido(21, FAIXAS_PADRAO, 3).percentual, 3)
-igual('faixa 80,25 m -> 2%', faixaDoPedido(80.25, FAIXAS_PADRAO, 3).percentual, 2)
+igual('tabela oficial tem 5 faixas', FAIXAS_PADRAO.length, 5)
+igual('faixa 3 m -> 4%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 4)
+igual('faixa 4,99 m -> 4%', faixaDoPedido(4.99, FAIXAS_PADRAO, 3).percentual, 4)
+igual('faixa 5 m -> 3,5% (já é a faixa seguinte)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 3.5)
+igual('faixa 9,99 m -> 3,5%', faixaDoPedido(9.99, FAIXAS_PADRAO, 3).percentual, 3.5)
+igual('faixa 10 m -> 3%', faixaDoPedido(10, FAIXAS_PADRAO, 3).percentual, 3)
+igual('faixa 19,99 m -> 3%', faixaDoPedido(19.99, FAIXAS_PADRAO, 3).percentual, 3)
+igual('faixa 20 m -> 2,5%', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 2.5)
+igual('faixa 49,99 m -> 2,5%', faixaDoPedido(49.99, FAIXAS_PADRAO, 3).percentual, 2.5)
+igual('faixa 50 m -> 1,5%', faixaDoPedido(50, FAIXAS_PADRAO, 3).percentual, 1.5)
+igual('faixa 80,25 m -> 1,5%', faixaDoPedido(80.25, FAIXAS_PADRAO, 3).percentual, 1.5)
 igual('sem metragem -> percentual configurado', faixaDoPedido(null, FAIXAS_PADRAO, 3).percentual, 3)
-igual('comissão de 2 m (R$ 119,80) a 5%', comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO), 5.99)
-igual('comissão de 10 m (R$ 549,00) a 4%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 21.96)
+igual('comissão de 2 m (R$ 119,80) a 4%', Number(comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO).toFixed(3)), 4.792)
+igual('comissão de 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 16.47)
 
 const resultado = calcularComissao(
   [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],
   FAIXAS_PADRAO,
   3,
 )
-igual('comissão total das 4 faixas', Number(resultado.total.toFixed(2)), Number((5.99 + 21.96 + 72.06 + 6).toFixed(2)))
+igual(
+  'comissão total das 4 faixas',
+  Number(resultado.total.toFixed(2)),
+  Number((4.79 + 16.47 + 54.04 + 6).toFixed(2)),
+)
 igual('base de cálculo = faturamento', Number(resultado.base.toFixed(2)), Number((119.8 + 549 + 3602.77 + 200).toFixed(2)))
 igual('percentual médio entre 0 e 5', resultado.percentualMedio > 0 && resultado.percentualMedio < 5, true)
-igual('resumo por faixa tem 4 linhas com pedidos', resultado.porFaixa.filter((l) => l.pedidos > 0).length + (resultado.semMetragem.pedidos > 0 ? 1 : 0), 4)
+igual('resumo por faixa agrupa os pedidos certos', resultado.porFaixa.filter((l) => l.pedidos > 0).length + (resultado.semMetragem.pedidos > 0 ? 1 : 0), 4)
+igual('as 5 faixas aparecem no resumo', resultado.porFaixa.length, 5)
 igual('faixas válidas (padrão)', validarFaixas(FAIXAS_PADRAO), [])
+igual(
+  'faixas encostadas (1 a 5 e 5 a 10) são aceitas',
+  validarFaixas([
+    { id: 'a', de: 1, ate: 5, percentual: 4, rotulo: '1 a 5 m' },
+    { id: 'b', de: 5, ate: 10, percentual: 3.5, rotulo: '5 a 10 m' },
+  ]),
+  [],
+)
+igual(
+  'quem nunca mexeu nas faixas ganha a tabela nova',
+  migrarFaixas([
+    { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
+    { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
+    { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
+    { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+  ])[2].percentual,
+  3,
+)
+igual(
+  'faixas editadas pelo proprietário são preservadas',
+  migrarFaixas([{ id: 'x', de: 1, ate: null, percentual: 7, rotulo: 'tudo' }])[0].percentual,
+  7,
+)
 igual('faixas sobrepostas são recusadas', validarFaixas([
   { id: 'a', de: 1, ate: 10, percentual: 5, rotulo: '1 a 10 m' },
   { id: 'b', de: 5, ate: 20, percentual: 4, rotulo: '5 a 20 m' },

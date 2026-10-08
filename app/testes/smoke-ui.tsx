@@ -179,6 +179,28 @@ async function main() {
   if (!novaContaOk) falhas++
   console.log(`\n  ${novaContaOk ? '✅' : '❌'} Equipe abre a janela “Nova conta” com o vínculo e o histórico`)
 
+  // a aba "Meu acesso" das configurações (só o proprietário) precisa abrir
+  dom.window.location.hash = '#/configuracoes'
+  await espera(700)
+  const abriuAcesso = clicar(raiz, 'Meu acesso')
+  await espera(400)
+  const textoAcesso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const acessoOk =
+    abriuAcesso && textoAcesso.includes('Trocar a minha senha') && textoAcesso.includes('Meu nome de usuário')
+  if (!acessoOk) falhas++
+  console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” abre a troca de usuário e senha do dono`)
+
+  // a tabela oficial de comissão aparece na aba de comissões
+  await clicar(raiz, 'Comissões')
+  await espera(400)
+  const textoComissoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const tabelaOk =
+    textoComissoes.includes('1 a 5 m') &&
+    textoComissoes.includes('acima de 50 m') &&
+    textoComissoes.includes('Usar tabela oficial')
+  if (!tabelaOk) falhas++
+  console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela oficial e o botão de restaurar`)
+
   // agora entra como vendedor
   sessaoDe(vendedor.id)
   dom.window.location.reload?.()

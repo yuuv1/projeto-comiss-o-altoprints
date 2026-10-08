@@ -77,7 +77,7 @@ async function main() {
   igual('permissão sem excluir não exclui', podeExcluirPedidos('sem_excluir'), false)
   igual('permissão sem excluir edita', podeEditarPedidos('sem_excluir'), true)
   igual('permissão somente criar não edita', podeEditarPedidos('somente_criar'), false)
-  igual('faixas padrão têm 4 intervalos', FAIXAS_PADRAO.length, 4)
+  igual('faixas padrão têm 5 intervalos', FAIXAS_PADRAO.length, 5)
 
   /* --------------------------- contexto real -------------------------- */
   type Auth = {

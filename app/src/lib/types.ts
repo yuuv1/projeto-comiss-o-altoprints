@@ -118,19 +118,27 @@ export interface FaixaComissao {
   id: string
   /** metragem inicial da faixa (inclusive) */
   de: number
-  /** metragem final da faixa (inclusive) — null = sem limite */
+  /**
+   * metragem final da faixa (a última metragem fica para a faixa seguinte,
+   * ex.: "1 a 5" pega de 1 até 4,99 m) — null = sem limite
+   */
   ate: number | null
   /** percentual de comissão sobre o faturamento do pedido */
   percentual: number
   rotulo: string
 }
 
-/** Valores iniciais das faixas — podem ser trocados no painel de comissões (⚙️ com senha) */
+/**
+ * Faixas de comissão definidas pelo proprietário.
+ * Cada faixa vale de `de` até antes de `ate` (o valor de `ate` já entra na
+ * faixa seguinte) — só podem ser mudadas por ele, em Configurações.
+ */
 export const FAIXAS_PADRAO: FaixaComissao[] = [
-  { id: 'faixa-1', de: 1, ate: 5, percentual: 5, rotulo: '1 a 5 m' },
-  { id: 'faixa-2', de: 6, ate: 20, percentual: 4, rotulo: '6 a 20 m' },
-  { id: 'faixa-3', de: 21, ate: 50, percentual: 3, rotulo: '21 a 50 m' },
-  { id: 'faixa-4', de: 51, ate: null, percentual: 2, rotulo: 'acima de 50 m' },
+  { id: 'faixa-1', de: 1, ate: 5, percentual: 4, rotulo: '1 a 5 m' },
+  { id: 'faixa-2', de: 5, ate: 10, percentual: 3.5, rotulo: '5 a 10 m' },
+  { id: 'faixa-3', de: 10, ate: 20, percentual: 3, rotulo: '10 a 20 m' },
+  { id: 'faixa-4', de: 20, ate: 50, percentual: 2.5, rotulo: '20 a 50 m' },
+  { id: 'faixa-5', de: 50, ate: null, percentual: 1.5, rotulo: 'acima de 50 m' },
 ]
 
 /* ------------------------------------------------------------------ */
