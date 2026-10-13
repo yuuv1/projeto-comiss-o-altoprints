@@ -33,6 +33,7 @@ import { rotuloVisualizacao } from '../lib/visualizacao'
 import { type TelasAcesso, telasDoUsuario } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useTema } from '../lib/tema'
+import { naFilaDeImpressao } from '../lib/types'
 import { VERSAO } from '../lib/versao'
 import { Logo } from './Logo'
 import { PerfilDialog } from './PerfilDialog'
@@ -73,26 +74,24 @@ export function Layout() {
     [db.pedidos, ehProprietario, usuario?.vendedor_id],
   )
 
-  const { paraImprimir, avisos } = useMemo(() => {
-    const base = ehProprietario ? db.pedidos : meusPedidos
-    return {
-      paraImprimir: base.filter((p) => p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto')
-        .length,
-      avisos: meusPedidos.filter((p) => p.impresso && !p.aviso_visto).length,
-    }
-  }, [db.pedidos, ehProprietario, meusPedidos])
+  /** filas em andamento — é o número que aparece no atalho Pedidos */
+  const emAndamento = useMemo(() => meusPedidos.filter(naFilaDeImpressao).length, [meusPedidos])
 
   /*
-   * A barra de cima tem só os atalhos do dia a dia. O resto do sistema mora
-   * dentro deles: Entregas é uma aba de Pedidos, Cliente especial é uma aba de
-   * Clientes, Filas/Impressões e o resumo de comissões são abas de Relatório,
-   * e Equipe/Vendedores/Configurações ficam na engrenagem do canto.
+   * A barra de cima tem só o dia a dia: Painel, Pedidos (as filas), Clientes e
+   * Relatório. Cliente especial é uma aba de Clientes e Vendedores, Equipe e
+   * Configurações ficam na engrenagem do canto.
    */
   const menu: ItemMenu[] = [
     { to: '/', label: ehProprietario ? 'Painel' : 'Minha área', icone: ehProprietario ? LayoutDashboard : UserCheck },
-    { to: '/pedidos', label: ehProprietario ? 'Pedidos' : 'Meus pedidos', icone: ClipboardList },
+    {
+      to: '/pedidos',
+      label: ehProprietario ? 'Pedidos' : 'Meus pedidos',
+      icone: ClipboardList,
+      badge: emAndamento,
+    },
     { to: '/clientes', label: ehProprietario ? 'Clientes' : 'Meus clientes', icone: Users },
-    { to: '/relatorio', label: 'Relatório', icone: BarChart3, badge: paraImprimir || avisos, tela: 'relatorio' },
+    { to: '/relatorio', label: ehProprietario ? 'Relatório' : 'Meu desempenho', icone: BarChart3, tela: 'relatorio' },
   ]
 
   const visiveis = menu.filter((m) => {

@@ -41,9 +41,13 @@ import {
 } from '../src/lib/visualizacao'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
 import {
+  combinaFiltro,
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
   isPedidoCompleto,
+  naFilaDeImpressao,
+  PASSOS_FILA,
+  passoFeito,
   pedidoPendenteFinanceiro,
   podeVerTela,
   telasDoUsuario,
@@ -107,14 +111,38 @@ igual('data vazia', dataBR(null), '—')
 igual('data e hora tem vírgula', dataHoraBR('2026-10-08T14:30:00').includes(', '), true)
 igual('hoje no formato ISO', /^\d{4}-\d{2}-\d{2}$/.test(hojeISO()), true)
 
-/* -------------------------------- status ------------------------------ */
+/* --------------------------------- fila ------------------------------- */
 const base = gerarDadosDemo().pedidos[0]
-const completo: Pedido = { ...base, status_producao: 'dtf_pronto', status_pagamento: 'pago' }
-const pendente: Pedido = { ...base, status_producao: 'dtf_pronto', status_pagamento: 'pendente' }
-igual('pedido completo', isPedidoCompleto(completo), true)
-igual('pedido incompleto', isPedidoCompleto(pendente), false)
-igual('pendente financeiro', pedidoPendenteFinanceiro(pendente), true)
-igual('pago não é pendente financeiro', pedidoPendenteFinanceiro(completo), false)
+const naFila: Pedido = { ...base, estagio: 'em_andamento', iniciado_em: null, entregue: false, pago: false }
+const imprimindo: Pedido = { ...naFila, iniciado_em: new Date().toISOString(), pago: true }
+const concluida: Pedido = { ...imprimindo, estagio: 'concluido' }
+const entregue: Pedido = { ...concluida, entregue: true }
+
+igual('fila em andamento não está completa', isPedidoCompleto(naFila), false)
+igual('fila concluída está completa', isPedidoCompleto(concluida), true)
+igual('fila em andamento está na fila de impressão', naFilaDeImpressao(naFila), true)
+igual('fila concluída sai da fila de impressão', naFilaDeImpressao(concluida), false)
+igual('fila sem pagamento é pendente financeiro', pedidoPendenteFinanceiro(naFila), true)
+igual('fila paga não é pendente financeiro', pedidoPendenteFinanceiro(concluida), false)
+
+/* ------------------------------ passos da fila ------------------------ */
+igual('fila nova: nada feito', PASSOS_FILA.map((p) => passoFeito(naFila, p.id)), [false, false, false, false])
+igual('fila paga: só o pagamento', passoFeito(imprimindo, 'pago'), true)
+igual('fila imprimindo: deu início', passoFeito(imprimindo, 'imprimindo'), true)
+igual('fila imprimindo ainda não concluiu', passoFeito(imprimindo, 'concluida'), false)
+igual('fila concluída marca o passo', passoFeito(concluida, 'concluida'), true)
+igual('fila entregue marca o passo', passoFeito(entregue, 'entregue'), true)
+
+/* ---------------------------- filtros da tela -------------------------- */
+igual('filtro "a pagar" pega a fila sem pagamento', combinaFiltro(naFila, 'a_pagar'), true)
+igual('filtro "a pagar" ignora a paga', combinaFiltro(imprimindo, 'a_pagar'), false)
+igual('filtro "a imprimir" pega a que não começou', combinaFiltro(naFila, 'a_imprimir'), true)
+igual('filtro "a imprimir" ignora a que já começou', combinaFiltro(imprimindo, 'a_imprimir'), false)
+igual('filtro "imprimindo" pega a que começou', combinaFiltro(imprimindo, 'imprimindo'), true)
+igual('filtro "imprimindo" ignora a concluída', combinaFiltro(concluida, 'imprimindo'), false)
+igual('filtro "concluída" pega a pronta', combinaFiltro(concluida, 'concluida'), true)
+igual('filtro "entregue" pega a entregue', combinaFiltro(entregue, 'entregue'), true)
+igual('filtro "todas" mostra tudo', combinaFiltro(entregue, 'todas'), true)
 
 /* ------------------------------- semente ------------------------------ */
 const demo = gerarDadosDemo()
@@ -151,8 +179,8 @@ igual(
   true,
 )
 igual(
-  'demo: pedidos impressos batem com o histórico',
-  demo.pedidos.every((p) => (p.impresso ? demo.impressoes.some((i) => i.pedido_id === p.id) : true)),
+  'demo: filas concluídas batem com o histórico',
+  demo.pedidos.every((p) => (p.estagio === 'concluido' ? demo.impressoes.some((i) => i.pedido_id === p.id) : true)),
   true,
 )
 
@@ -400,15 +428,13 @@ const donoTeste = { ...vendedorTeste, papel: 'proprietario' as const, vendedor_i
 igual('proprietário vê todas as telas', telasDoUsuario(donoTeste), {
   relatorio: true,
   paraImprimir: true,
-  impressoes: true,
-  entregas: true,
   clienteEspecial: true,
 })
 igual('vendedor começa sem telas extras', telasDoUsuario(vendedorTeste).paraImprimir, false)
 igual('tela liberada pelo dono é respeitada', podeVerTela(vendedorTeste, 'relatorio'), true)
-igual('tela não liberada fica bloqueada', podeVerTela(vendedorTeste, 'entregas'), false)
-igual('impressões não vêm liberadas por padrão', podeVerTela(vendedorTeste, 'impressoes'), false)
-igual('dono libera as impressões para quem produz', podeVerTela({ ...vendedorTeste, telas: { impressoes: true } }, 'impressoes'), true)
+igual('tela não liberada fica bloqueada', podeVerTela(vendedorTeste, 'clienteEspecial'), false)
+igual('cliente especial não vem liberado por padrão', podeVerTela(vendedorTeste, 'clienteEspecial'), false)
+igual('dono libera a fila de impressão para quem produz', podeVerTela({ ...vendedorTeste, telas: { paraImprimir: true } }, 'paraImprimir'), true)
 igual('conta sem telas definidas fica no padrão', podeVerTela({ ...vendedorTeste, telas: undefined }, 'relatorio'), false)
 igual('proprietário nunca é bloqueado', podeVerTela(donoTeste, 'clienteEspecial'), true)
 

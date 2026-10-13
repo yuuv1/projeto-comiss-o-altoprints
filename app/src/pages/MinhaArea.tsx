@@ -21,7 +21,6 @@ import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, Cartao, CartaoResumo, TituloPagina, Vazio, cn } from '../components/ui'
 import { calcularComissao } from '../lib/comissao'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
-import { doDia, resumirImpressoes } from '../lib/impressoes'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro, telasDoUsuario } from '../lib/types'
@@ -55,28 +54,25 @@ export default function MinhaArea() {
     [mesAtual, meusPedidos],
   )
 
-  const pagosDoMes = doMes.filter((p) => p.status_pagamento === 'pago')
+  const pagosDoMes = doMes.filter((p) => p.pago)
   const comissao = calcularComissao(pagosDoMes, faixas, semMetragem)
   const aReceber = meusPedidos.filter(pedidoPendenteFinanceiro).reduce((s, p) => s + Number(p.valor || 0), 0)
-  const avisos = meusPedidos.filter((p) => p.impresso && !p.aviso_visto)
-  const aguardandoImpressao = meusPedidos.filter(
-    (p) => p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto',
-  ).length
+  /** filas que já saíram da máquina e ainda não foram entregues: é hora de avisar o cliente */
+  const avisos = meusPedidos.filter((p) => p.estagio === 'concluido' && !p.entregue).slice(0, 6)
+  const aguardandoImpressao = meusPedidos.filter((p) => p.estagio !== 'concluido').length
 
   const recentes = meusPedidos.slice(0, 6)
 
-  /** o que esta pessoa imprimiu hoje (pelo id do acesso ou pelo nome) */
+  /** as filas que saíram da máquina hoje */
   const meuDia = useMemo(() => {
-    const meuId = usuario?.id ?? ''
-    const meuNome = (usuario?.nome ?? '').trim().toLowerCase()
-    return resumirImpressoes(
-      doDia(
-        db.impressoes.filter(
-          (i) => (meuId && i.usuario_id === meuId) || (i.quem || '').trim().toLowerCase() === meuNome,
-        ),
-      ),
-    )
-  }, [db.impressoes, usuario?.id, usuario?.nome])
+    const hoje = hojeISO()
+    const filas = meusPedidos.filter((p) => p.estagio === 'concluido' && (p.iniciado_em || '').slice(0, 10) === hoje)
+    return {
+      total: filas.length,
+      metros: filas.reduce((s, p) => s + Number(p.metragem || 0), 0),
+      valor: filas.reduce((s, p) => s + Number(p.valor || 0), 0),
+    }
+  }, [meusPedidos])
 
   return (
     <>
@@ -94,7 +90,7 @@ export default function MinhaArea() {
         <div className="mb-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-soft dark:border-amber-900 dark:from-amber-950/50 dark:to-orange-950/40">
           <p className="mb-2 flex items-center gap-2 text-sm font-extrabold text-amber-900 dark:text-amber-200">
             <BellRing className="h-4 w-4" />
-            {avisos.length} pedido(s) seu(s) já {avisos.length === 1 ? 'foi impresso' : 'foram impressos'}!
+            {avisos.length} fila(s) sua(s) já {avisos.length === 1 ? 'saiu' : 'saíram'} da máquina — pode entregar!
           </p>
           <div className="flex flex-wrap gap-2">
             {avisos.map((p) => (
@@ -104,10 +100,12 @@ export default function MinhaArea() {
               >
                 #{p.numero} {p.cliente_nome} • {moeda(p.valor)}
                 <button
-                  onClick={() => acoes.marcarVisto(p)}
+                  onClick={() => {
+                    void acoes.alternarPasso(p, 'entregue').catch(() => {})
+                  }}
                   className="rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase text-white"
                 >
-                  ok, vi
+                  entreguei
                 </button>
               </span>
             ))}
@@ -185,30 +183,29 @@ export default function MinhaArea() {
         </Cartao>
 
         <div className="space-y-4">
-          {telas.paraImprimir || telas.impressoes || meuDia.total > 0 ? (
+          {meuDia.total > 0 || telas.paraImprimir || telas.relatorio ? (
             <Cartao hover={false}>
               <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Meu dia na produção
+                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Minhas filas de hoje
               </h2>
               {meuDia.total ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800">
-                    <span className="text-slate-600 dark:text-slate-300">Impressões hoje</span>
+                    <span className="text-slate-600 dark:text-slate-300">Filas concluídas hoje</span>
                     <span className="font-bold text-slate-800 dark:text-slate-100">{meuDia.total}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800">
-                    <span className="text-slate-600 dark:text-slate-300">Metros impressos</span>
+                    <span className="text-slate-600 dark:text-slate-300">Metros concluídos</span>
                     <span className="font-bold text-slate-800 dark:text-slate-100">{numeroBR(meuDia.metros)} m</span>
                   </div>
-                  {meuDia.reimpressoes ? (
-                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                      {meuDia.reimpressoes} reimpressão(ões) · {numeroBR(meuDia.metrosPerdidos)} m refeitos
-                    </p>
-                  ) : null}
+                  <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <span className="text-slate-600 dark:text-slate-300">Valor das filas</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">{moeda(meuDia.valor)}</span>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-slate-400 dark:text-slate-500">
-                  Você ainda não registrou impressões hoje.
+                  Nenhuma fila sua foi concluída hoje ainda.
                 </p>
               )}
               {telas.paraImprimir ? (
@@ -216,21 +213,19 @@ export default function MinhaArea() {
                   className="mt-3 justify-start"
                   variante="secundario"
                   icone={Printer}
-                  onClick={() => navegar('/relatorio')}
+                  onClick={() => navegar('/pedidos')}
                 >
                   Abrir a fila de impressão
                 </Botao>
               ) : null}
-              {telas.impressoes ? (
-                <Botao
-                  className="mt-2 justify-start"
-                  variante="secundario"
-                  icone={History}
-                  onClick={() => navegar('/relatorio')}
-                >
-                  Ver as impressões registradas
-                </Botao>
-              ) : null}
+              <Botao
+                className="mt-2 justify-start"
+                variante="secundario"
+                icone={ClipboardList}
+                onClick={() => navegar('/pedidos?filtro=concluida')}
+              >
+                Ver as filas concluídas
+              </Botao>
             </Cartao>
           ) : null}
 

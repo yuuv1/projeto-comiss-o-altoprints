@@ -5,7 +5,7 @@ import { BarraAcoes, Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, Titul
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
-import { LABEL_PAGAMENTO, LABEL_PRODUCAO, type Pedido } from '../lib/types'
+import { LABEL_ESTAGIO, type Pedido } from '../lib/types'
 
 const primeiroDiaDoMes = () => {
   const d = new Date()
@@ -48,8 +48,8 @@ export default function RelatorioClienteEspecial({ embutido = false }: { embutid
       .sort((a, b) => a.numero - b.numero)
   }, [cliente, db.pedidos, fim, inicio])
 
-  const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
-  const pendentes = pedidos.filter((p) => p.status_pagamento === 'pendente' || p.status_pagamento === 'parcial')
+  const pagos = pedidos.filter((p) => p.pago)
+  const pendentes = pedidos.filter((p) => !p.pago)
 
   const somar = (lista: Pedido[]) => ({
     metragem: lista.reduce((s, p) => s + Number(p.metragem || 0), 0),
@@ -106,8 +106,10 @@ export default function RelatorioClienteEspecial({ embutido = false }: { embutid
                   <td className="border border-slate-200 px-3 py-2 text-xs text-slate-500">
                     {p.descricao || 'Sem descrição'}
                   </td>
-                  <td className="border border-slate-200 px-3 py-2 text-xs">{LABEL_PRODUCAO[p.status_producao]}</td>
-                  <td className="border border-slate-200 px-3 py-2 text-xs">{LABEL_PAGAMENTO[p.status_pagamento]}</td>
+                  <td className="border border-slate-200 px-3 py-2 text-xs">
+                    {p.estagio === 'concluido' ? 'Impresso' : p.iniciado_em ? 'Imprimindo' : 'A imprimir'}
+                  </td>
+                  <td className="border border-slate-200 px-3 py-2 text-xs">{p.pago ? 'Pago' : 'A pagar'}</td>
                   <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
                     {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
                   </td>
@@ -353,7 +355,7 @@ export default function RelatorioClienteEspecial({ embutido = false }: { embutid
                     <td>#{p.numero}</td>
                     <td>{dataBR(p.data_pedido)}</td>
                     <td>{p.descricao || 'Sem descrição'}</td>
-                    <td>{LABEL_PRODUCAO[p.status_producao]}</td>
+                    <td>{LABEL_ESTAGIO[p.estagio]}</td>
                     <td className="num">{p.metragem ? `${numeroBR(p.metragem)} m` : '—'}</td>
                     <td className="num">{moeda(p.valor)}</td>
                   </tr>

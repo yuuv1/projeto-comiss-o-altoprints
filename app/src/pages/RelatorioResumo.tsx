@@ -20,7 +20,7 @@ import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido 
 import { baixarCSV } from '../lib/csv'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
-import { FAIXAS_PADRAO, type Pedido, type Vendedor } from '../lib/types'
+import { FAIXAS_PADRAO, filasDaComissao, type Pedido, type Vendedor } from '../lib/types'
 
 type Campo = 'pagamento' | 'pedido' | 'envio'
 
@@ -50,7 +50,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const { usuario, ehProprietario } = useAuth()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
-  const [campo, setCampo] = useState<Campo>('pagamento')
+  const [campo, setCampo] = useState<Campo>('pedido')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)
   const [vendedorId, setVendedorId] = useState('todos')
@@ -86,11 +86,17 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
     ]
   }, [])
 
-  /** somente pedidos pagos */
-  const pagos = useMemo(() => db.pedidos.filter((p) => p.status_pagamento === 'pago'), [db.pedidos])
+  /**
+   * Filas que entram na conta: todas as do período ou só as marcadas como pagas,
+   * conforme a escolha do proprietário em Configurações → Comissões.
+   */
+  const base = useMemo(
+    () => filasDaComissao(db.pedidos, db.configuracoes.comissao_base),
+    [db.configuracoes.comissao_base, db.pedidos],
+  )
 
   const filtrados = useMemo(() => {
-    return pagos
+    return base
       .filter((p) => {
         if (!ehProprietario) return p.vendedor_id === meuVendedorId
         if (vendedorId === 'sem-vendedor') return !p.vendedor_id
@@ -103,7 +109,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         return d >= inicio && d <= fim
       })
       .sort((a, b) => dataRef(a, campo).localeCompare(dataRef(b, campo)) || a.numero - b.numero)
-  }, [campo, ehProprietario, fim, inicio, meuVendedorId, pagos, vendedorId])
+  }, [base, campo, ehProprietario, fim, inicio, meuVendedorId, vendedorId])
 
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
 
@@ -173,7 +179,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <TituloPagina
             icone={BarChart3}
             titulo="Relatório de vendas"
-            subtitulo="Apenas pedidos pagos no período — pronto para a contabilidade."
+            subtitulo="Filas do período com a comissão de cada vendedor — pronto para a contabilidade."
             acoes={
               <>
                 <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
@@ -191,7 +197,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <div className="grid gap-3 lg:grid-cols-4">
             <Campo label="Filtrar por">
               <Selecao value={campo} onChange={(e) => setCampo(e.target.value as Campo)}>
-                <option value="pagamento">Data do pagamento (recomendado)</option>
+                <option value="pagamento">Data do pagamento</option>
                 <option value="pedido">Data do pedido</option>
                 <option value="envio">Data do envio</option>
               </Selecao>

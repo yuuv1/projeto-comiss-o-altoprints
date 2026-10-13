@@ -1,78 +1,121 @@
+import { CheckCircle2, Clock, PackageCheck, Printer, Wallet, type LucideIcon } from 'lucide-react'
 import {
-  BadgeCheck,
-  Ban,
-  Brush,
-  CheckCircle2,
-  CircleDollarSign,
-  Clock,
-  Hourglass,
-  ListOrdered,
-  Printer,
-  Split,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react'
-import { LABEL_PAGAMENTO, LABEL_PRODUCAO, type StatusPagamento, type StatusProducao } from '../lib/types'
-import { Etiqueta } from './ui'
+  LABEL_ESTAGIO,
+  PASSOS_FILA,
+  passoFeito,
+  type EstagioFila,
+  type PassoFila,
+  type Pedido,
+} from '../lib/types'
+import { cn, Etiqueta } from './ui'
 
-export const COR_PRODUCAO: Record<StatusProducao, string> = {
-  editar_arte: 'bg-amber-100 text-amber-800 border-amber-200',
-  fila_impressao: 'bg-sky-100 text-sky-800 border-sky-200',
-  pagamento: 'bg-violet-100 text-violet-800 border-violet-200',
-  imprimir: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
-  dtf_pronto: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+/** Cores e ícones do estágio da fila (só existem dois: em andamento e concluído) */
+export const COR_ESTAGIO: Record<EstagioFila, string> = {
+  em_andamento: 'bg-sky-100 text-sky-800 border-sky-200',
+  concluido: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 }
 
-export const COR_PAGAMENTO: Record<StatusPagamento, string> = {
-  pendente: 'bg-amber-100 text-amber-800 border-amber-200',
-  pago: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  parcial: 'bg-orange-100 text-orange-800 border-orange-200',
-  cancelado: 'bg-rose-100 text-rose-700 border-rose-200',
+export const ICONE_ESTAGIO: Record<EstagioFila, LucideIcon> = {
+  em_andamento: Clock,
+  concluido: CheckCircle2,
 }
 
-export const ICONE_PRODUCAO: Record<StatusProducao, LucideIcon> = {
-  editar_arte: Brush,
-  fila_impressao: ListOrdered,
-  pagamento: Wallet,
-  imprimir: Printer,
-  dtf_pronto: CheckCircle2,
-}
-
-export const ICONE_PAGAMENTO: Record<StatusPagamento, LucideIcon> = {
-  pendente: Hourglass,
-  pago: BadgeCheck,
-  parcial: Split,
-  cancelado: Ban,
-}
-
-export function EtiquetaProducao({ status }: { status: StatusProducao }) {
+export function EtiquetaEstagio({ status }: { status: EstagioFila }) {
   return (
-    <Etiqueta className={COR_PRODUCAO[status]} icone={ICONE_PRODUCAO[status]}>
-      {LABEL_PRODUCAO[status]}
+    <Etiqueta className={COR_ESTAGIO[status]} icone={ICONE_ESTAGIO[status]}>
+      {LABEL_ESTAGIO[status]}
     </Etiqueta>
   )
 }
 
-export function EtiquetaPagamento({ status }: { status: StatusPagamento }) {
+/** Marcação opcional: a fila já foi entregue ao cliente */
+export function EtiquetaEntrega({ entregue }: { entregue: boolean }) {
+  if (!entregue) return null
   return (
-    <Etiqueta className={COR_PAGAMENTO[status]} icone={ICONE_PAGAMENTO[status]}>
-      {LABEL_PAGAMENTO[status]}
+    <Etiqueta className="border-emerald-200 bg-emerald-50 text-emerald-700" icone={PackageCheck}>
+      Entregue
     </Etiqueta>
   )
 }
 
-export function PassoStatus({ status, ativo }: { status: StatusProducao; ativo: boolean }) {
-  const Icone = ICONE_PRODUCAO[status]
+/** Marcação opcional de pagamento (controle do proprietário) */
+export function EtiquetaPago({ pago }: { pago: boolean }) {
+  if (!pago) return null
+  return (
+    <Etiqueta className="border-teal-200 bg-teal-50 text-teal-700" icone={Wallet}>
+      Pago
+    </Etiqueta>
+  )
+}
+
+/** Passo do fluxo mostrado na tela do pedido (em andamento → concluído → entregue) */
+export function PassoEstagio({ ativo, children, icone: Icone }: { ativo: boolean; children: string; icone: LucideIcon }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition ${
-        ativo ? COR_PRODUCAO[status] : 'border-slate-200 bg-white text-slate-400'
+        ativo ? 'border-purple-200 bg-purple-50 text-purple-700' : 'border-slate-200 bg-white text-slate-400'
       }`}
     >
       <Icone className="h-3.5 w-3.5" />
-      {LABEL_PRODUCAO[status]}
+      {children}
     </span>
   )
 }
 
-export { CircleDollarSign, Clock }
+/** Cor de cada passo quando ele já foi feito */
+const COR_PASSO: Record<PassoFila, string> = {
+  pago: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
+  imprimindo: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100',
+  concluida: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+  entregue: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',
+}
+
+const ICONE_PASSO: Record<PassoFila, LucideIcon> = {
+  pago: Wallet,
+  imprimindo: Printer,
+  concluida: CheckCircle2,
+  entregue: PackageCheck,
+}
+
+/**
+ * Os quatro passos da fila, clicáveis: pago → imprimindo → concluída → entregue.
+ * Clicar num passo que já foi feito desfaz (volta atrás).
+ */
+export function PassosFila({
+  pedido,
+  onPasso,
+  compacto = false,
+}: {
+  pedido: Pedido
+  onPasso: (passo: PassoFila) => void
+  compacto?: boolean
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {PASSOS_FILA.map((passo) => {
+        const feito = passoFeito(pedido, passo.id)
+        const Icone = ICONE_PASSO[passo.id]
+        return (
+          <button
+            key={passo.id}
+            type="button"
+            title={feito ? `${passo.label} — clicar desfaz` : passo.label}
+            onClick={() => onPasso(passo.id)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border font-bold transition print:hidden',
+              compacto ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]',
+              feito
+                ? COR_PASSO[passo.id]
+                : 'border-slate-200 bg-white text-slate-400 hover:border-purple-200 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500',
+            )}
+          >
+            <Icone className={compacto ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
+            {passo.curto}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export { CheckCircle2, Clock, PackageCheck, Printer, Wallet }

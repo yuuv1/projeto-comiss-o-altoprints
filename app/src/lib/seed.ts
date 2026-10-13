@@ -6,11 +6,10 @@ import {
   CONFIG_PADRAO,
   type Cliente,
   type DB,
+  type EstagioFila,
   type Impressao,
   MOTIVOS_REIMPRESSAO,
   type Pedido,
-  type StatusPagamento,
-  type StatusProducao,
   type Usuario,
   type Vendedor,
 } from './types'
@@ -121,21 +120,17 @@ export function gerarDadosDemo(): DB {
     const metragem = Number((0.5 + rnd() * 12).toFixed(2))
     const valor = calcularValor(metragem, cliente.valor_especial_metro)
 
-    const recente = diasAtras <= 2
-    let status_producao: StatusProducao = 'dtf_pronto'
-    let status_pagamento: StatusPagamento = 'pago'
-    if (recente && rnd() < 0.45) {
-      const roleta = rnd()
-      status_producao = roleta < 0.3 ? 'editar_arte' : roleta < 0.55 ? 'fila_impressao' : roleta < 0.8 ? 'pagamento' : 'imprimir'
-      status_pagamento = rnd() < 0.7 ? 'pendente' : 'pago'
-    } else if (rnd() < 0.06) {
-      status_pagamento = 'parcial'
-    }
+    /**
+     * As filas mais novas (as últimas registradas) ficam em andamento — as duas
+     * primeiras ainda não começaram a imprimir. As antigas já saíram da máquina.
+     */
+    const estagio: EstagioFila = i < 5 ? 'em_andamento' : 'concluido'
+    const iniciado_em = i < 2 ? null : data.toISOString()
+    const entregue = estagio === 'concluido' && diasAtras > 4 ? rnd() > 0.15 : false
+    const pago = i === 7 ? false : rnd() < (diasAtras > 3 ? 0.92 : 0.6)
 
     const tipo_entrega = rnd() < 0.1 ? 'correios' : 'retirada'
     const [cidade, estado] = CIDADES[Math.floor(rnd() * CIDADES.length)]
-    const pago = status_pagamento === 'pago'
-    const impresso = status_producao === 'dtf_pronto' || status_producao === 'imprimir'
 
     pedidos.push({
       id: novoId(),
@@ -147,8 +142,10 @@ export function gerarDadosDemo(): DB {
       metragem,
       valor,
       valor_modo: 'auto',
-      status_producao,
-      status_pagamento,
+      estagio,
+      iniciado_em,
+      entregue,
+      pago,
       forma_pagamento: pago ? (rnd() < 0.7 ? 'Pix' : 'Dinheiro') : '',
       data_pagamento: pago ? data.toISOString().slice(0, 10) : null,
       data_pedido: data.toISOString(),
@@ -158,37 +155,35 @@ export function gerarDadosDemo(): DB {
       cidade: tipo_entrega === 'correios' ? cidade : '',
       estado: tipo_entrega === 'correios' ? estado : '',
       cep: tipo_entrega === 'correios' ? `759${String(1000 + Math.floor(rnd() * 8999))}` : '',
-      codigo_rastreio: tipo_entrega === 'correios' && diasAtras > 2 ? `AA${String(100000000 + Math.floor(rnd() * 899999999))}BR` : '',
-      data_envio: tipo_entrega === 'correios' && diasAtras > 3 ? new Date(data.getTime() + 86400000).toISOString().slice(0, 10) : null,
-      data_entrega:
-        tipo_entrega === 'correios' && diasAtras > 8
-          ? new Date(data.getTime() + 4 * 86400000).toISOString().slice(0, 10)
+      codigo_rastreio:
+        tipo_entrega === 'correios' && diasAtras > 2 ? `AA${String(100000000 + Math.floor(rnd() * 899999999))}BR` : '',
+      data_envio:
+        entregue && tipo_entrega === 'correios'
+          ? new Date(data.getTime() + 86400000).toISOString().slice(0, 10)
           : null,
-      retirado_por: tipo_entrega === 'retirada' && diasAtras > 2 ? cliente.nome : '',
-      data_retirada: tipo_entrega === 'retirada' && diasAtras > 2 ? data.toISOString().slice(0, 10) : null,
-      impresso,
-      impresso_em: impresso ? data.toISOString() : null,
-      aviso_visto: !(impresso && diasAtras <= 2 && rnd() < 0.35),
+      data_entrega: entregue ? new Date(data.getTime() + 2 * 86400000).toISOString().slice(0, 10) : null,
+      retirado_por: entregue && tipo_entrega === 'retirada' ? cliente.nome : '',
+      data_retirada: entregue && tipo_entrega === 'retirada' ? data.toISOString().slice(0, 10) : null,
       created_at: data.toISOString(),
       updated_at: data.toISOString(),
     })
   }
 
-  /* ------------------------- impressões de exemplo ------------------------ */
-  // Todo pedido já impresso ganha o registro de produção (metros, quem imprimiu)
-  // e alguns levam reimpressão com motivo — assim a tela já nasce com dados.
+  /* ---------------------- filas impressas de exemplo --------------------- */
+  // Toda fila já concluída ganha o registro de produção (metros e quem imprimiu)
+  // e algumas levam reimpressão com motivo — assim a tela abre com dados.
   const impressoes: Impressao[] = []
-  const impressos = pedidos.filter((p) => p.impresso && p.impresso_em).sort((a, b) => b.numero - a.numero)
+  const concluidas = pedidos.filter((p) => p.estagio === 'concluido').sort((a, b) => b.numero - a.numero)
 
-  impressos.forEach((p, indice) => {
+  concluidas.forEach((p, indice) => {
     const quem = vendedores[indice % vendedores.length].nome
     const metrosPedido = Number(p.metragem || 0)
-    // as primeiras impressões ficam com data de hoje (a tela abre com movimento)
+    // as primeiras ficam com data de hoje (a tela abre com movimento)
     const quando =
       indice < 4
         ? new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 8 + indice * 2, 15 + indice * 7, 0).toISOString()
-        : String(p.impresso_em)
-    if (indice < 4) p.impresso_em = quando
+        : String(p.iniciado_em || p.data_pedido)
+    if (indice < 4) p.iniciado_em = quando
 
     impressoes.push({
       id: novoId(),
@@ -207,7 +202,7 @@ export function gerarDadosDemo(): DB {
       created_at: quando,
     })
 
-    if (rnd() < 0.12) {
+    if (rnd() < 0.14) {
       const quandoReimpressao = new Date(new Date(quando).getTime() + 3600000 * (1 + Math.floor(rnd() * 5))).toISOString()
       impressoes.push({
         id: novoId(),

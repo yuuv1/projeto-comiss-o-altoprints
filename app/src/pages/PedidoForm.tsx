@@ -4,14 +4,12 @@ import {
   Calculator,
   Download,
   FileText,
-  History,
   Image as ImageIcon,
   Package,
+  PackageCheck,
   Paperclip,
   Pencil,
   Plus,
-  PrinterCheck,
-  RotateCcw,
   Save,
   ScanLine,
   SlidersHorizontal,
@@ -36,30 +34,24 @@ import {
   cn,
   useConfirmacao,
 } from '../components/ui'
-import { useRegistrarImpressao } from '../components/impressao'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
-import { dataBR, dataHoraBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
-import { doPedido, resumirImpressoes } from '../lib/impressoes'
-import { FAIXAS, calcularValor, precoMetro } from '../lib/pricing'
+import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
+import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import {
   ESTADOS,
+  ESTAGIOS_FILA,
   FORMAS_PAGAMENTO,
   LABEL_ENTREGA,
-  LABEL_PAGAMENTO,
-  LABEL_PRODUCAO,
-  STATUS_PAGAMENTO,
-  STATUS_PRODUCAO,
+  LABEL_ESTAGIO,
   pedidoVazio,
   telasDoUsuario,
   type Arquivo,
   type Pedido,
-  type StatusPagamento,
-  type StatusProducao,
 } from '../lib/types'
-import { EtiquetaPagamento, EtiquetaProducao, ICONE_PRODUCAO } from '../components/StatusBadges'
+import { EtiquetaEntrega, EtiquetaEstagio, EtiquetaPago } from '../components/StatusBadges'
 
 /* ------------------------------ arquivos ------------------------------ */
 
@@ -126,11 +118,8 @@ export default function PedidoForm() {
   const { db, salvarPedido, excluirPedido, excluirArquivoDoPedido, avisar, nomeVendedor } = useStore()
   const { usuario, ehProprietario, vendedorNome } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
-  const impressao = useRegistrarImpressao()
   const novo = !id
   const existente = useMemo(() => db.pedidos.find((p) => p.id === id), [db.pedidos, id])
-  /** quem registra impressão é quem tem a fila de impressão liberada (ou o dono) */
-  const podeRegistrarImpressao = ehProprietario || telasDoUsuario(usuario).paraImprimir
 
   const permissao = db.configuracoes.permissao_vendedor
   /** o vendedor só mexe no que é dele, e conforme a permissão definida pelo dono */
@@ -183,9 +172,11 @@ export default function PedidoForm() {
   )
   const valorEspecial = clienteVinculado?.valor_especial_metro ?? null
   const metrosNum = Number(String(metragemTxt).replace(',', '.')) || 0
-  const valorAuto = calcularValor(metrosNum, valorEspecial)
+  /** tabela de preços do proprietário (Configurações → Preços) */
+  const faixasPreco = db.configuracoes.faixas_preco
+  const valorAuto = calcularValor(metrosNum, valorEspecial, faixasPreco)
   const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
-  const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum)
+  const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
   const faixasComissao = db.configuracoes.faixas_comissao ?? []
   const percentualComissao = useMemo(() => {
     const exemplo = calcularComissao(
@@ -212,12 +203,6 @@ export default function PedidoForm() {
         existente.data_entrega),
   )
   const mostrarExtras = extrasAberto || temDadosExtras
-
-  const historicoImpressoes = useMemo(
-    () => (existente ? doPedido(db.impressoes, existente.id) : []),
-    [db.impressoes, existente],
-  )
-  const resumoImpressoes = resumirImpressoes(historicoImpressoes)
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -296,7 +281,7 @@ export default function PedidoForm() {
 
       set({
         cliente_nome: info.cliente?.trim() || form.cliente_nome,
-        status_pagamento: 'pago',
+        pago: true,
         data_pagamento: info.data || hojeISO(),
         forma_pagamento: info.forma_pagamento || form.forma_pagamento,
       })
@@ -312,7 +297,6 @@ export default function PedidoForm() {
     }
   }
 
-  const statusProducaoAtual = form.status_producao
   const bloquear = (conteudo: React.ReactNode) => (somenteLeitura ? <fieldset disabled>{conteudo}</fieldset> : conteudo)
 
   return (
@@ -381,7 +365,9 @@ export default function PedidoForm() {
                 dica={
                   clienteVinculado
                     ? `Cliente cadastrado${valorEspecial ? ` • valor especial de ${moeda(valorEspecial)}/m` : ''}`
-                    : 'Digite o nome do cliente (novo ou já cadastrado).'
+                    : form.cliente_nome.trim()
+                      ? 'Nome novo: o cliente será cadastrado junto com a fila.'
+                      : 'Escolha um cliente da lista ou escreva um nome novo.'
                 }
                 className="sm:col-span-2"
               >
@@ -422,17 +408,15 @@ export default function PedidoForm() {
                 )}
               </Campo>
 
-              {mostrarExtras ? (
-                <Campo label="Data do pedido" dica="Em branco = agora.">
-                  <Entrada
-                    type="datetime-local"
-                    value={paraInputDateTime(form.data_pedido)}
-                    onChange={(e) =>
-                      set({ data_pedido: e.target.value ? new Date(e.target.value).toISOString() : form.data_pedido })
-                    }
-                  />
-                </Campo>
-              ) : null}
+              <Campo label="Data da fila" dica="Já vem com o dia de hoje.">
+                <Entrada
+                  type="date"
+                  value={paraInputDate(form.data_pedido)}
+                  onChange={(e) =>
+                    set({ data_pedido: e.target.value ? new Date(`${e.target.value}T12:00:00`).toISOString() : form.data_pedido })
+                  }
+                />
+              </Campo>
 
               <Campo label="Descrição" className="sm:col-span-2">
                 <AreaTexto
@@ -442,7 +426,18 @@ export default function PedidoForm() {
                 />
               </Campo>
 
-              <Campo label="Metragem (metros)" dica={metrosNum > 0 ? `Faixa: ${precoAtual === valorEspecial ? 'valor especial do cliente' : FAIXAS.find((f) => metrosNum >= f.de && metrosNum <= f.ate)?.rotulo}` : 'Fator da tabela: 1-4 m R$ 59,90 • 5-19 m R$ 54,90 • 20+ m R$ 44,90'}>
+              <Campo
+                label="Metragem (metros)"
+                dica={
+                  metrosNum > 0
+                    ? `Faixa: ${
+                        precoAtual === valorEspecial
+                          ? 'valor especial do cliente'
+                          : faixaRotulo(metrosNum, faixasPreco)
+                      } (${moeda(precoAtual)}/m)`
+                    : `Tabela do proprietário: ${(faixasPreco ?? []).map((f) => `${f.rotulo} ${moeda(f.valor)}`).join(' • ')}`
+                }
+              >
                 <Entrada
                   value={metragemTxt}
                   onChange={(e) => setMetragemTxt(e.target.value.replace(/[^\d.,]/g, ''))}
@@ -485,43 +480,61 @@ export default function PedidoForm() {
                 </p>
               </Campo>
 
-              <Campo label="Status de produção">
-                <Selecao
-                  value={statusProducaoAtual}
-                  onChange={(e) => {
-                    const s = e.target.value as StatusProducao
-                    set({ status_producao: s, impresso: s === 'dtf_pronto' ? true : form.impresso })
-                  }}
-                >
-                  {STATUS_PRODUCAO.map((s) => (
-                    <option key={s} value={s}>
-                      {LABEL_PRODUCAO[s]}
-                    </option>
+              <Campo
+                label="Estágio da fila"
+                dica="Em andamento enquanto está na máquina; concluído quando já saiu."
+              >
+                <div className="flex gap-2">
+                  {ESTAGIOS_FILA.map((e) => (
+                    <button
+                      type="button"
+                      key={e}
+                      onClick={() => set({ estagio: e })}
+                      className={cn(
+                        'h-10 flex-1 rounded-xl border text-sm font-bold transition',
+                        form.estagio === e
+                          ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                      )}
+                    >
+                      {LABEL_ESTAGIO[e]}
+                    </button>
                   ))}
-                </Selecao>
+                </div>
               </Campo>
 
-              <Campo label="Status de pagamento">
-                <Selecao
-                  value={form.status_pagamento}
-                  onChange={(e) => {
-                    const s = e.target.value as StatusPagamento
-                    set({
-                      status_pagamento: s,
-                      data_pagamento: s === 'pago' ? form.data_pagamento || hojeISO() : form.data_pagamento,
-                    })
-                  }}
+              <Campo label="Entregue ao cliente?" dica="Opcional — não entra no relatório.">
+                <button
+                  type="button"
+                  onClick={() => set({ entregue: !form.entregue })}
+                  className={cn(
+                    'h-10 w-full rounded-xl border text-sm font-bold transition',
+                    form.entregue
+                      ? 'border-transparent bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-soft'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                  )}
                 >
-                  {STATUS_PAGAMENTO.map((s) => (
-                    <option key={s} value={s}>
-                      {LABEL_PAGAMENTO[s]}
-                    </option>
-                  ))}
-                </Selecao>
+                  {form.entregue ? 'Entregue' : 'Ainda não entregue'}
+                </button>
               </Campo>
 
               {mostrarExtras ? (
                 <>
+                  <Campo label="Pagamento" dica="Opcional — não é etapa da fila.">
+                    <button
+                      type="button"
+                      onClick={() => set({ pago: !form.pago, data_pagamento: !form.pago ? hojeISO() : null })}
+                      className={cn(
+                        'h-10 w-full rounded-xl border text-sm font-bold transition',
+                        form.pago
+                          ? 'border-transparent bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-soft'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                      )}
+                    >
+                      {form.pago ? 'Já foi pago' : 'Ainda não pago'}
+                    </button>
+                  </Campo>
+
                   <Campo label="Forma de pagamento">
                     <Selecao value={form.forma_pagamento} onChange={(e) => set({ forma_pagamento: e.target.value })}>
                       <option value="">Não informada</option>
@@ -535,7 +548,7 @@ export default function PedidoForm() {
 
                   <Campo
                     label="Data do pagamento"
-                    dica={form.status_pagamento === 'pago' ? 'Preenchida com hoje ao marcar como pago.' : undefined}
+                    dica={form.pago ? 'Preenchida com hoje ao marcar como pago.' : undefined}
                   >
                     <Entrada
                       type="date"
@@ -644,90 +657,6 @@ export default function PedidoForm() {
             ) : null}
           </Cartao>
 
-          {/* --------------------------- impressões --------------------------- */}
-          <Cartao>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Impressões (produção)
-              </h3>
-              {existente && podeRegistrarImpressao ? (
-                <div className="flex flex-wrap gap-2">
-                  <Botao
-                    type="button"
-                    tamanho="sm"
-                    variante="sucesso"
-                    icone={PrinterCheck}
-                    onClick={() => impressao.imprimir(existente)}
-                  >
-                    Registrar impressão
-                  </Botao>
-                  <Botao
-                    type="button"
-                    tamanho="sm"
-                    variante="secundario"
-                    icone={RotateCcw}
-                    onClick={() => impressao.reimprimir(existente)}
-                  >
-                    Reimpressão
-                  </Botao>
-                </div>
-              ) : null}
-            </div>
-
-            {!existente ? (
-              <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400 dark:border-slate-700">
-                Salve o pedido para registrar as impressões dele.
-              </p>
-            ) : historicoImpressoes.length ? (
-              <>
-                <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">
-                  {historicoImpressoes.length}× impresso · {numeroBR(resumoImpressoes.metros)} m no total
-                  {resumoImpressoes.reimpressoes
-                    ? ` · ${numeroBR(resumoImpressoes.metrosPerdidos)} m em reimpressão`
-                    : ''}
-                </p>
-                <div className="space-y-2">
-                  {historicoImpressoes.map((i) => (
-                    <div
-                      key={i.id}
-                      className={cn(
-                        'rounded-xl border p-3 text-sm',
-                        i.tipo === 'reimpressao'
-                          ? 'border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30'
-                          : 'border-slate-100 dark:border-slate-800',
-                      )}
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        {i.tipo === 'reimpressao' ? (
-                          <Etiqueta className="border-amber-200 bg-amber-100 text-amber-800" icone={RotateCcw}>
-                            Reimpressão{i.motivo ? ` — ${i.motivo}` : ''}
-                          </Etiqueta>
-                        ) : (
-                          <Etiqueta className="border-emerald-200 bg-emerald-50 text-emerald-700" icone={PrinterCheck}>
-                            Impressão
-                          </Etiqueta>
-                        )}
-                        <span className="font-bold text-slate-700 dark:text-slate-200">{numeroBR(i.metros)} m</span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {dataHoraBR(i.quando)} · {i.quem || '—'}
-                        </span>
-                      </div>
-                      {i.arquivo_nome ? (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Arte: {i.arquivo_nome}</p>
-                      ) : null}
-                      {i.observacao ? (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{i.observacao}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400 dark:border-slate-700">
-                Este pedido ainda não tem impressão registrada.
-              </p>
-            )}
-          </Cartao>
         </div>
 
         {/* --------------------------- coluna lateral ------------------------- */}
@@ -764,39 +693,52 @@ export default function PedidoForm() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                <EtiquetaProducao status={statusProducaoAtual} />
-                <EtiquetaPagamento status={form.status_pagamento} />
+                <EtiquetaEstagio status={form.estagio} />
+                <EtiquetaEntrega entregue={form.entregue} />
+                <EtiquetaPago pago={form.pago} />
               </div>
             </div>
           </Cartao>
 
-          {/* etapas da produção */}
+          {/* etapas da fila */}
           <Cartao>
-            <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800">
-              <Wand2 className="h-4 w-4 text-purple-600" /> Etapas da produção
+            <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
+              <Wand2 className="h-4 w-4 text-purple-600" /> Etapas da fila
             </h3>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_PRODUCAO.map((s) => {
-                const Icone = ICONE_PRODUCAO[s]
-                const ativo = s === statusProducaoAtual
-                return (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => set({ status_producao: s, impresso: s === 'dtf_pronto' ? true : form.impresso })}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide transition',
-                      ativo
-                        ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                        : 'border-slate-200 bg-white text-slate-500 hover:border-purple-200 hover:text-purple-700',
-                    )}
-                  >
-                    <Icone className="h-3.5 w-3.5" />
-                    {LABEL_PRODUCAO[s]}
-                  </button>
-                )
-              })}
+              {ESTAGIOS_FILA.map((e) => (
+                <button
+                  type="button"
+                  key={e}
+                  onClick={() => set({ estagio: e })}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide transition',
+                    form.estagio === e
+                      ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                  )}
+                >
+                  {LABEL_ESTAGIO[e]}
+                </button>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={() => set({ entregue: !form.entregue })}
+              className={cn(
+                'mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide transition',
+                form.entregue
+                  ? 'border-transparent bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-soft'
+                  : 'border-slate-200 bg-white text-slate-400 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-800',
+              )}
+            >
+              <PackageCheck className="h-3.5 w-3.5" />
+              {form.entregue ? 'Entregue' : 'Marcar entregue'}
+            </button>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              A fila nasce <b>em andamento</b> e sai da fila de impressão quando você marcar <b>concluído</b>.
+              “Entregue” é só um aviso de que o cliente já recebeu.
+            </p>
           </Cartao>
 
           {mostrarExtras ? (
@@ -930,7 +872,7 @@ export default function PedidoForm() {
             </h3>
             <div className="space-y-1.5 text-xs text-slate-500">
               <p>Ao marcar como <b>Pago</b>, a data é preenchida com hoje automaticamente.</p>
-              <p>Status: pendente, pago, parcial ou cancelado.</p>
+              <p>É só uma marcação de controle — não muda o estágio da fila.</p>
               <div className="pt-1">
                 <Etiqueta className="border-slate-200 bg-slate-50 text-slate-600">
                   {form.forma_pagamento || 'forma não informada'}
@@ -959,7 +901,6 @@ export default function PedidoForm() {
       </div>
 
       {dialog}
-      {impressao.janela}
     </form>
   )
 }

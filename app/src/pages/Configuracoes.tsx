@@ -20,6 +20,7 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  Tags,
   TriangleAlert,
   Upload,
   UserCog,
@@ -37,10 +38,13 @@ import { VERSAO } from '../lib/versao'
 import {
   DESCRICAO_PERMISSAO,
   FAIXAS_PADRAO,
+  FAIXAS_PRECO_PADRAO,
   LABEL_PERMISSAO,
   type FaixaComissao,
+  type FaixaPreco,
   type PermissaoVendedor,
 } from '../lib/types'
+import { faixaDePreco } from '../lib/pricing'
 import { AbaNuvem } from '../components/Nuvem'
 import Equipe from './Equipe'
 import Vendedores from './Vendedores'
@@ -48,6 +52,7 @@ import { Abas, Botao, Campo, Cartao, Entrada, Etiqueta, cn, useConfirmacao } fro
 
 type Aba =
   | 'comissoes'
+  | 'precos'
   | 'permissoes'
   | 'equipe'
   | 'vendedores'
@@ -100,7 +105,7 @@ export default function Configuracoes() {
   const pagosDoMes = useMemo(() => {
     const prefixo = new Date().toISOString().slice(0, 7)
     return db.pedidos.filter((p) => {
-      if (p.status_pagamento !== 'pago') return false
+      if (!p.pago) return false
       return (p.data_pagamento || (p.data_pedido || '').slice(0, 10)).startsWith(prefixo)
     })
   }, [db.pedidos])
@@ -112,6 +117,45 @@ export default function Configuracoes() {
 
   const atualizarFaixa = (id: string, patch: Partial<FaixaComissao>) =>
     setFaixas((f) => f.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
+
+  /* ------------------------------- preços -------------------------------- */
+  const [precos, setPrecos] = useState<FaixaPreco[]>(
+    db.configuracoes.faixas_preco?.length ? db.configuracoes.faixas_preco : FAIXAS_PRECO_PADRAO,
+  )
+
+  const atualizarPreco = (id: string, patch: Partial<FaixaPreco>) =>
+    setPrecos((lista) => lista.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
+
+  const problemasPreco = useMemo(() => {
+    const ordenadas = [...precos].sort((a, b) => a.de - b.de)
+    const erros: string[] = []
+    if (!ordenadas.length) erros.push('Deixe pelo menos uma faixa de preço.')
+    ordenadas.forEach((f) => {
+      if (f.de < 0) erros.push('A metragem inicial não pode ser negativa.')
+      if (f.valor <= 0) erros.push(`Informe o valor do metro da faixa ${f.rotulo || f.de}.`)
+      if (f.ate !== null && f.ate <= f.de) erros.push('O fim da faixa precisa ser maior que o início.')
+    })
+    ordenadas.forEach((f, i) => {
+      const anterior = ordenadas[i - 1]
+      if (anterior && anterior.ate !== null && f.de < anterior.ate) erros.push('As faixas de preço não podem se sobrepor.')
+    })
+    return [...new Set(erros)]
+  }, [precos])
+
+  const salvarPrecos = async () => {
+    if (problemasPreco.length) return avisar(problemasPreco[0], 'erro')
+    setSalvando(true)
+    try {
+      await salvarConfig({
+        faixas_preco: [...precos]
+          .sort((a, b) => a.de - b.de)
+          .map((f) => ({ ...f, rotulo: rotuloFaixa(f.de, f.ate) })),
+      })
+      avisar('Tabela de preços salva!')
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   const salvarComissoes = async () => {
     if (problemas.length) return avisar(problemas[0], 'erro')
@@ -155,6 +199,7 @@ export default function Configuracoes() {
 
   const abas: { id: Aba; label: string; icone: typeof Percent }[] = [
     { id: 'comissoes', label: 'Comissões', icone: Percent },
+    { id: 'precos', label: 'Preços', icone: Tags },
     { id: 'permissoes', label: 'Permissões', icone: UserCog },
     { id: 'equipe', label: 'Equipe', icone: UsersRound },
     { id: 'vendedores', label: 'Vendedores', icone: UsersRound },
@@ -192,10 +237,49 @@ export default function Configuracoes() {
       {aba === 'comissoes' ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-            <b>Como funciona:</b> a comissão de cada pedido é calculada pela <b>metragem do pedido</b> — o percentual
-            da faixa em que ele cai é aplicado sobre o valor do pedido. Vale somente para pedidos com pagamento
-            confirmado.
+            <b>Como funciona:</b> a comissão de cada fila é calculada pela <b>metragem</b> — o percentual da faixa em
+            que ela cai é aplicado sobre o valor da fila. O vendedor vê só a comissão dele; o proprietário vê a de
+            todos, com o total.
           </div>
+
+          <Cartao hover={false}>
+            <p className="mb-1 text-sm font-extrabold text-slate-700 dark:text-slate-200">Comissão conta quais filas?</p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Escolha se a comissão do período sai de todas as filas registradas ou só das que você marcou como pagas na
+              tela Pedidos.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { id: 'todos' as const, label: 'Todas as filas registradas', dica: 'Mais simples: vale o que foi lançado no período.' },
+                  { id: 'pagos' as const, label: 'Só as filas marcadas como pagas', dica: 'A comissão só entra depois do cliente pagar.' },
+                ]
+              ).map((opcao) => {
+                const ativa = db.configuracoes.comissao_base === opcao.id
+                return (
+                  <button
+                    key={opcao.id}
+                    onClick={async () => {
+                      await salvarConfig({ comissao_base: opcao.id })
+                      avisar(`Comissão agora conta ${opcao.label.toLowerCase()}.`)
+                    }}
+                    className={cn(
+                      'flex-1 rounded-xl border p-3 text-left transition',
+                      ativa
+                        ? 'border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950/40'
+                        : 'border-slate-200 bg-white hover:border-purple-200 dark:border-slate-700 dark:bg-slate-900',
+                    )}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                      {ativa ? <Check className="h-4 w-4 text-purple-600 dark:text-purple-400" /> : null}
+                      {opcao.label}
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{opcao.dica}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Cartao>
 
           <Cartao hover={false}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -369,6 +453,122 @@ export default function Configuracoes() {
                   ) : null}
                 </tbody>
               </table>
+            </div>
+          </Cartao>
+        </div>
+      ) : null}
+
+      {/* ------------------------------- PREÇOS ------------------------------- */}
+      {aba === 'precos' ? (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+            <b>Como funciona:</b> quando o vendedor digita a metragem da fila, o sistema pega o <b>valor do metro</b> da
+            faixa em que ela cai e calcula o valor automaticamente. Cliente com <b>valor especial</b> continua usando o
+            valor dele.
+          </div>
+
+          <Cartao hover={false}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">Tabela de preço por metro</p>
+              <div className="flex flex-wrap gap-2">
+                <Botao
+                  tamanho="sm"
+                  variante="secundario"
+                  icone={Plus}
+                  onClick={() =>
+                    setPrecos((lista) => {
+                      const ordenadas = [...lista].sort((a, b) => a.de - b.de)
+                      const ultima = ordenadas[ordenadas.length - 1]
+                      const de = ultima ? (ultima.ate ?? ultima.de) + 1 : 1
+                      return [...lista, { id: `preco-${Date.now()}`, de, ate: de + 9, valor: 49.9, rotulo: rotuloFaixa(de, de + 9) }]
+                    })
+                  }
+                >
+                  Adicionar faixa
+                </Botao>
+                <Botao tamanho="sm" variante="secundario" icone={RefreshCw} onClick={() => setPrecos(FAIXAS_PRECO_PADRAO.map((f) => ({ ...f })))}>
+                  Restaurar padrão
+                </Botao>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {[...precos]
+                .sort((a, b) => a.de - b.de)
+                .map((f) => (
+                  <div
+                    key={f.id}
+                    className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <Campo label="De (m)" className="w-24">
+                      <Entrada
+                        type="number"
+                        min={0}
+                        value={f.de}
+                        onChange={(e) => atualizarPreco(f.id, { de: Number(e.target.value) })}
+                      />
+                    </Campo>
+                    <Campo label="Até (m)" className="w-24">
+                      <Entrada
+                        type="number"
+                        min={1}
+                        value={f.ate ?? ''}
+                        placeholder="sem limite"
+                        onChange={(e) => atualizarPreco(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })}
+                      />
+                    </Campo>
+                    <Campo label="Valor do metro (R$)" className="w-36">
+                      <Entrada
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={f.valor}
+                        onChange={(e) => atualizarPreco(f.id, { valor: Number(e.target.value) })}
+                      />
+                    </Campo>
+                    <div className="flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {rotuloFaixa(f.de, f.ate)} → {moeda(f.valor)} por metro
+                      <span className="ml-2 text-slate-400 dark:text-slate-500">
+                        ex.: 3 m = {moeda(f.valor * 3)}
+                      </span>
+                    </div>
+                    <Botao
+                      tamanho="sm"
+                      variante="ghost"
+                      className="text-rose-500 hover:bg-rose-50"
+                      icone={Trash2}
+                      onClick={() => setPrecos((lista) => lista.filter((x) => x.id !== f.id))}
+                    >
+                      Remover
+                    </Botao>
+                  </div>
+                ))}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+              <b>Conferência:</b> 3 m caem na faixa de {faixaDePreco(3, precos)?.rotulo || '—'} (
+              {moeda(faixaDePreco(3, precos)?.valor ?? 0)}/m) • 12 m em {faixaDePreco(12, precos)?.rotulo || '—'} (
+              {moeda(faixaDePreco(12, precos)?.valor ?? 0)}/m)
+            </div>
+
+            {problemasPreco.length ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                {problemasPreco.map((p) => (
+                  <p key={p} className="flex items-start gap-1.5">
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {p}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <Check className="h-3.5 w-3.5" /> Tabela válida
+              </p>
+            )}
+
+            <div className="mt-3 flex justify-end">
+              <Botao icone={Save} onClick={salvarPrecos} carregando={salvando}>
+                Salvar tabela de preços
+              </Botao>
             </div>
           </Cartao>
         </div>

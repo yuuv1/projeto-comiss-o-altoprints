@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { diasEntre, dataHoraBR, moeda, metros } from '../lib/format'
 import { useStore } from '../lib/store'
 import { isPedidoCompleto, type Pedido } from '../lib/types'
-import { EtiquetaPagamento, EtiquetaProducao } from './StatusBadges'
+import { EtiquetaEstagio } from './StatusBadges'
 import { Botao, Modal, cn, useConfirmacao } from './ui'
 
 const DIAS_REVISAO = 3
@@ -20,7 +20,7 @@ export function ReviewModal() {
   const pendentes = useMemo(
     () =>
       db.pedidos
-        .filter((p) => !isPedidoCompleto(p) && p.status_pagamento !== 'cancelado' && !mantidos.includes(p.id))
+        .filter((p) => !isPedidoCompleto(p) && !mantidos.includes(p.id))
         .sort((a, b) => a.data_pedido.localeCompare(b.data_pedido)),
     [db.pedidos, mantidos],
   )
@@ -57,7 +57,7 @@ export function ReviewModal() {
 
   const marcarPago = async (p: Pedido) => {
     await atualizarPedido(p.id, {
-      status_pagamento: 'pago',
+      pago: true,
       data_pagamento: p.data_pagamento || new Date().toISOString().slice(0, 10),
     })
   }
@@ -107,8 +107,7 @@ export function ReviewModal() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <EtiquetaProducao status={p.status_producao} />
-                  <EtiquetaPagamento status={p.status_pagamento} />
+                  <EtiquetaEstagio status={p.estagio} />
                 </div>
 
                 <p className="w-24 text-right text-sm font-extrabold text-slate-800">{moeda(p.valor)}</p>

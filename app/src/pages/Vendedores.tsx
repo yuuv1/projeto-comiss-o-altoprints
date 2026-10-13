@@ -4,7 +4,7 @@ import { BarraAcoes, Botao, Campo, CartaoResumo, Entrada, Modal, TituloPagina, V
 import { calcularComissao } from '../lib/comissao'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import { FAIXAS_PADRAO, type Vendedor } from '../lib/types'
+import { FAIXAS_PADRAO, filasDaComissao, type Vendedor } from '../lib/types'
 
 /** Vendedores também pode aparecer como aba dentro de Configurações */
 export default function Vendedores({ embutido = false }: { embutido?: boolean } = {}) {
@@ -24,7 +24,7 @@ export default function Vendedores({ embutido = false }: { embutido?: boolean } 
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
           const total = pedidos.reduce((s, p) => s + Number(p.valor || 0), 0)
-          const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
           return {
             vendedor: v,
             pedidos: pedidos.length,

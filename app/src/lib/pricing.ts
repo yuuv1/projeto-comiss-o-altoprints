@@ -1,43 +1,50 @@
-// Tabela de preços da metragem (DTF) e cálculo automático do valor
+// Tabela de preços da metragem (DTF) e cálculo automático do valor.
+//
+// Os preços moram nas configurações do sistema (Configurações → Preços), então
+// o proprietário muda a tabela sem mexer no código.
 
-import type { Pedido } from './types'
+import { FAIXAS_PRECO_PADRAO, type FaixaPreco, type Pedido } from './types'
 
-export const FAIXAS = [
-  { de: 1, ate: 4, valor: 59.9, rotulo: '1 a 4 metros' },
-  { de: 5, ate: 19, valor: 54.9, rotulo: '5 a 19 metros' },
-  { de: 20, ate: Infinity, valor: 44.9, rotulo: '20 metros ou mais' },
-] as const
+/** faixas em uso (as salvas pelo proprietário ou a tabela padrão) */
+export const faixasDePreco = (faixas?: FaixaPreco[] | null): FaixaPreco[] =>
+  faixas && faixas.length ? faixas : FAIXAS_PRECO_PADRAO
+
+/** Faixa de preço em que a metragem cai */
+export const faixaDePreco = (m: number, faixas?: FaixaPreco[] | null): FaixaPreco | undefined => {
+  const metros = Number(m) || 0
+  const lista = [...faixasDePreco(faixas)].sort((a, b) => a.de - b.de)
+  return (
+    lista.find((f) => metros >= f.de && (f.ate === null || metros < f.ate)) ??
+    // metragem acima da última faixa: usa a última mesmo
+    [...lista].reverse().find((f) => metros >= f.de) ??
+    lista[0]
+  )
+}
 
 /** Preço do metro conforme a faixa de metragem */
-export const precoMetro = (m: number): number => {
-  const metros = Number(m) || 0
-  if (metros <= 0) return FAIXAS[0].valor
-  if (metros <= 4) return FAIXAS[0].valor
-  if (metros <= 19) return FAIXAS[1].valor
-  return FAIXAS[2].valor
-}
+export const precoMetro = (m: number, faixas?: FaixaPreco[] | null): number =>
+  Number(faixaDePreco(m, faixas)?.valor ?? 0)
 
-export const faixaRotulo = (m: number) => {
-  const metros = Number(m) || 0
-  if (metros <= 4) return FAIXAS[0].rotulo
-  if (metros <= 19) return FAIXAS[1].rotulo
-  return FAIXAS[2].rotulo
-}
+export const faixaRotulo = (m: number, faixas?: FaixaPreco[] | null) => faixaDePreco(m, faixas)?.rotulo ?? ''
 
 /** Arredonda como o sistema original (2 casas, mesma regra do toFixed do JS) */
 const arredonda = (v: number) => Number(v.toFixed(2))
 
 /**
- * Valor automático do pedido.
+ * Valor automático da fila.
  * Se o cliente tiver "valor especial do metro", esse valor é usado no lugar da tabela.
  */
-export const calcularValor = (m: number | null | undefined, valorEspecial?: number | null) => {
+export const calcularValor = (
+  m: number | null | undefined,
+  valorEspecial?: number | null,
+  faixas?: FaixaPreco[] | null,
+) => {
   const metros = Number(m) || 0
   if (metros <= 0) return 0
   const base =
     valorEspecial !== null && valorEspecial !== undefined && Number(valorEspecial) > 0
       ? Number(valorEspecial)
-      : precoMetro(metros)
+      : precoMetro(metros, faixas)
   return arredonda(metros * base)
 }
 

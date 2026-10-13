@@ -60,17 +60,19 @@ async function prepararAmbiente() {
     papel: 'vendedor' as const,
     vendedor_id: banco.vendedores[0].id,
     ativo: true,
-    telas: { relatorio: true, paraImprimir: true, impressoes: true },
+    telas: { relatorio: true, paraImprimir: true },
     criado_em: new Date().toISOString(),
   }
 
-  // garante um pedido na fila de impressão (para testar o registro da impressão)
-  const naFila = banco.pedidos.find((p: { vendedor_id: string }) => p.vendedor_id === vendedor.vendedor_id)
+  // garante uma fila do vendedor esperando na máquina (para testar os passos no cartão)
+  const naFila = banco.pedidos.find(
+    (p: { vendedor_id: string; estagio: string; iniciado_em: string | null }) =>
+      p.vendedor_id === vendedor.vendedor_id && p.estagio === 'em_andamento' && !p.iniciado_em,
+  )
   if (naFila) {
-    naFila.status_pagamento = 'pago'
-    naFila.impresso = false
-    naFila.impresso_em = null
-    naFila.status_producao = 'imprimir'
+    naFila.pago = false
+    naFila.data_pagamento = null
+    naFila.entregue = false
   }
 
   banco.usuarios = [dono, vendedor]
@@ -167,8 +169,6 @@ async function main() {
     '/vendedores',
     '/por-vendedor',
     '/para-imprimir',
-    '/impressoes',
-    '/entregas',
     '/relatorio',
     '/relatorio-cliente-especial',
     '/equipe',
@@ -178,80 +178,66 @@ async function main() {
     '/rota-inexistente',
   ])
 
-  // a tela de impressões mostra os totais da produção (aba "Impressas" das Filas)
-  dom.window.location.hash = '#/impressoes'
-  await espera(700)
-  clicar(raiz, 'Impressas')
-  await espera(400)
-  const textoImpressoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const impressoesOk =
-    textoImpressoes.includes('Metros impressos') &&
-    textoImpressoes.includes('% de reimpressão') &&
-    textoImpressoes.includes('Metros em reimpressão') &&
-    textoImpressoes.includes('Exportar CSV') &&
-    textoImpressoes.includes('Quem imprimiu')
-  if (!impressoesOk) falhas++
-  console.log(`\n  ${impressoesOk ? '✅' : '❌'} tela Impressões mostra totais, filtros e o resumo da produção`)
+  // ---------- Pedidos: filtros da fila e os passos clicáveis ----------
+  dom.window.location.hash = '#/pedidos'
+  await espera(800)
+  const textoPedidos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
 
-  // registrar impressão pela fila: abre a janelinha e grava no histórico
-  dom.window.location.hash = '#/para-imprimir'
-  await espera(700)
-  const antesImpressoes = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes
-    .length
-  const abriuJanela = clicar(raiz, 'Marcar como impresso')
-  await espera(500)
-  const textoJanela = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const janelaOk =
-    abriuJanela &&
-    textoJanela.includes('Registrar impressão — pedido') &&
-    textoJanela.includes('Quem imprimiu') &&
-    textoJanela.includes('Metros impressos') &&
-    textoJanela.includes('Reimpressão')
-  if (!janelaOk) falhas++
-  console.log(`  ${janelaOk ? '✅' : '❌'} fila abre a janela de registro (metros, quem imprimiu, reimpressão)`)
-
-  // o último "Registrar impressão" é o botão de salvar de dentro da janela
-  const salvouImpressao = clicarUltimo(raiz, 'Registrar impressão')
-  await espera(700)
-  const depoisImpressoes = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes
-    .length
-  const gravouImpressao = salvouImpressao && depoisImpressoes === antesImpressoes + 1
-  if (!gravouImpressao) falhas++
-  console.log(
-    `  ${gravouImpressao ? '✅' : '❌'} registrar impressão grava no histórico de produção (${antesImpressoes} → ${depoisImpressoes})`,
+  const filtrosFilaOk = ['Todas', 'A pagar', 'A imprimir', 'Imprimindo', 'Concluídas', 'Entregues'].every((f) =>
+    textoPedidos.includes(f),
   )
+  if (!filtrosFilaOk) falhas++
+  console.log(`\n  ${filtrosFilaOk ? '✅' : '❌'} Pedidos traz os filtros da fila (de todas até as entregues)`)
 
-  // ---------- catalogar impressão direto pela aba "Impressões" ----------
-  dom.window.location.hash = '#/impressoes'
-  await espera(700)
-  const antesCatalogo = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes.length
-  const abriuCatalogo = clicar(raiz, 'Registrar impressão')
-  await espera(500)
-  const textoEscolha = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const escolhaOk =
-    abriuCatalogo && textoEscolha.includes('escolha o pedido') && textoEscolha.includes('na fila de impressão')
-  if (!escolhaOk) falhas++
-  console.log(`\n  ${escolhaOk ? '✅' : '❌'} aba Impressões → “Registrar impressão” abre a escolha do pedido`)
+  const botoesDaTela = () => [...(raiz?.querySelectorAll('button') ?? [])]
+  /** acha o passo que ainda NÃO foi marcado (quando marcado, o título ganha “clicar desfaz”) */
+  const acharPasso = (titulo: string) => botoesDaTela().find((b) => (b.getAttribute('title') ?? '') === titulo)
 
-  const escolheuPedido = clicar(raiz, 'na fila')
-  await espera(500)
-  const textoDepoisEscolha = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const formOk =
-    escolheuPedido &&
-    textoDepoisEscolha.includes('Quem imprimiu') &&
-    textoDepoisEscolha.includes('Metros impressos') &&
-    textoDepoisEscolha.includes('Trocar pedido')
-  if (!formOk) falhas++
-  console.log(`  ${formOk ? '✅' : '❌'} escolhido o pedido, a janela pede metros e quem imprimiu`)
+  const passosOk = [
+    'Marcar como pago',
+    'Deu início na impressão',
+    'Fila concluída (saiu da máquina)',
+    'Entregue ao cliente',
+  ].every((t) => Boolean(acharPasso(t)))
+  if (!passosOk) falhas++
+  console.log(`  ${passosOk ? '✅' : '❌'} cada fila tem os 4 passos clicáveis no cartão`)
 
-  const salvouCatalogo = clicarUltimo(raiz, 'Registrar impressão')
-  await espera(700)
-  const depoisCatalogo = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes.length
-  const catalogou = salvouCatalogo && depoisCatalogo === antesCatalogo + 1
-  if (!catalogou) falhas++
-  console.log(
-    `  ${catalogou ? '✅' : '❌'} catalogação pela aba grava no histórico (${antesCatalogo} → ${depoisCatalogo})`,
-  )
+  const lerPedidos = (): { estagio: string; iniciado_em: string | null; entregue: boolean }[] =>
+    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).pedidos
+
+  // clicar em "deu início na impressão" grava a data no pedido
+  clicar(raiz, 'A imprimir')
+  await espera(600)
+  const antesInicio = lerPedidos().filter((p) => p.iniciado_em).length
+  const botaoIniciar = acharPasso('Deu início na impressão')
+  botaoIniciar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await espera(900)
+  const depoisInicio = lerPedidos().filter((p) => p.iniciado_em).length
+  const iniciouOk = Boolean(botaoIniciar) && depoisInicio === antesInicio + 1
+  if (!iniciouOk) falhas++
+  console.log(`  ${iniciouOk ? '✅' : '❌'} “deu início na impressão” grava o início (${antesInicio} → ${depoisInicio})`)
+
+  // clicar em "fila concluída" muda o estágio do pedido
+  const antesConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
+  const botaoConcluir = acharPasso('Fila concluída (saiu da máquina)')
+  botaoConcluir?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await espera(900)
+  const depoisConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
+  const concluiuOk = Boolean(botaoConcluir) && depoisConcluidas === antesConcluidas + 1
+  if (!concluiuOk) falhas++
+  console.log(`  ${concluiuOk ? '✅' : '❌'} “fila concluída” muda o status pela tela Pedidos (${antesConcluidas} → ${depoisConcluidas})`)
+
+  // entregue é uma marcação separada do estágio
+  clicar(raiz, 'Concluídas')
+  await espera(600)
+  const antesEntregues = lerPedidos().filter((p) => p.entregue).length
+  const botaoEntregar = acharPasso('Entregue ao cliente')
+  botaoEntregar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await espera(900)
+  const depoisEntregues = lerPedidos().filter((p) => p.entregue).length
+  const entregouOk = Boolean(botaoEntregar) && depoisEntregues === antesEntregues + 1
+  if (!entregouOk) falhas++
+  console.log(`  ${entregouOk ? '✅' : '❌'} “entregue” marca a entrega sem mudar o estágio (${antesEntregues} → ${depoisEntregues})`)
 
   // ---------- formulário de pedido: essenciais na frente, resto em "Mais opções" ----------
   dom.window.location.hash = '#/pedido/novo'
@@ -386,35 +372,19 @@ async function main() {
   if (!engrenagem) falhas++
   console.log(`  ${engrenagem ? '✅' : '❌'} engrenagem no canto leva a Configurações (Equipe e Vendedores lá dentro)`)
 
-  // ---------- o que passou a morar dentro das abas ----------
+  // ---------- relatório: uma tela só, sem tela de impressões ----------
   dom.window.location.hash = '#/relatorio'
-  await espera(700)
+  await espera(900)
   const textoRel = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const relatorioComAbas = textoRel.includes('Filas registradas') && textoRel.includes('Resumo e comissões')
-  if (!relatorioComAbas) falhas++
-  console.log(`  ${relatorioComAbas ? '✅' : '❌'} Relatório tem as abas "Filas registradas" e "Resumo e comissões"`)
+  const relatorioOk = textoRel.includes('Resumo por vendedor') && textoRel.includes('Comissão por faixa')
+  if (!relatorioOk) falhas++
+  console.log(`\n  ${relatorioOk ? '✅' : '❌'} Relatório traz o resumo por vendedor e a comissão por faixa`)
 
-  const filaOk =
-    textoRel.includes('Registrar impressão') &&
-    textoRel.includes('A imprimir') &&
-    textoRel.includes('Impressas') &&
-    textoRel.includes('Na fila')
-  if (!filaOk) falhas++
-  console.log(`  ${filaOk ? '✅' : '❌'} Relatório abre na fila de impressão (com "Registrar impressão")`)
-
-  clicar(raiz, 'Impressas')
-  await espera(500)
-  const textoRegistradas = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const registradasOk = textoRegistradas.includes('Vendedor') && textoRegistradas.includes('Quem imprimiu')
-  if (!registradasOk) falhas++
-  console.log(`  ${registradasOk ? '✅' : '❌'} a visão "Impressas" traz o histórico com filtro por vendedor`)
-
-  const trocouResumo = clicar(raiz, 'Resumo e comissões')
-  await espera(600)
-  const textoResumo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const resumoOk = trocouResumo && textoResumo.includes('Resumo por vendedor') && textoResumo.includes('Comissão por faixa')
-  if (!resumoOk) falhas++
-  console.log(`  ${resumoOk ? '✅' : '❌'} a aba de resumo continua com faturamento e comissões`)
+  const semTelaDeImpressoes = !textoRel.includes('Filas registradas') && !textoRel.includes('Quem imprimiu')
+  if (!semTelaDeImpressoes) falhas++
+  console.log(
+    `  ${semTelaDeImpressoes ? '✅' : '❌'} a tela de impressões saiu do sistema (o status muda pela tela Pedidos)`,
+  )
 
   // ---------- comissões no relatório impresso (A4) ----------
   const areaImpressa = raiz?.querySelector('.print-area')
@@ -441,13 +411,15 @@ async function main() {
   console.log(`  ${especiaisOk ? '✅' : '❌'} o cliente especial virou uma aba dentro de Clientes`)
 
   dom.window.location.hash = '#/pedidos'
-  await espera(700)
-  const clicouEntregas = clicar(raiz, 'Entregas')
-  await espera(600)
-  const textoEntregas2 = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const entregasOk = clicouEntregas && textoEntregas2.includes('Correios') && textoEntregas2.includes('Retirada')
-  if (!entregasOk) falhas++
-  console.log(`  ${entregasOk ? '✅' : '❌'} Entregas virou uma aba dentro de Pedidos`)
+  await espera(800)
+  const textoEntregaFila = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const entregaNaFilaOk =
+    textoEntregaFila.includes('Entregues') &&
+    (textoEntregaFila.includes('Retirada') || textoEntregaFila.includes('Correios'))
+  if (!entregaNaFilaOk) falhas++
+  console.log(
+    `  ${entregaNaFilaOk ? '✅' : '❌'} a entrega virou uma etapa da fila (filtro “Entregues” + retirada/correios no cartão)`,
+  )
 
   dom.window.location.hash = '#/configuracoes'
   await espera(700)
@@ -556,8 +528,6 @@ async function main() {
     { rota: '/por-vendedor', esperado: 'liberada' },
     { rota: '/relatorio', esperado: 'liberada' },
     { rota: '/para-imprimir', esperado: 'liberada' },
-    { rota: '/impressoes', esperado: 'liberada' },
-    { rota: '/entregas', esperado: 'nao-liberada' },
     { rota: '/equipe', esperado: 'proprietario' },
     { rota: '/configuracoes', esperado: 'proprietario' },
   ]
@@ -609,23 +579,15 @@ async function main() {
     `  ${impressoSoDele ? '✅' : '❌'} relatório impresso do funcionário mostra só a comissão de ${nomeDoVinculo}`,
   )
 
-  dom.window.location.hash = '#/para-imprimir'
-  await espera(700)
-  const textoImpressao = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
-  const semDinheiro = !textoImpressao.includes('Valor na fila') && !textoImpressao.includes('R$')
-  if (!semDinheiro) falhas++
-  console.log(`  ${semDinheiro ? '✅' : '❌'} fila de impressão liberada para o vendedor, sem valores em dinheiro`)
-
-  // o histórico de impressões também abre para quem produz, sem valores em dinheiro
-  dom.window.location.hash = '#/impressoes'
-  await espera(700)
-  clicar(raiz2, 'Impressas')
-  await espera(400)
-  const textoImpressoesVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
-  const impressoesSemDinheiro =
-    textoImpressoesVendedor.includes('Metros impressos') && !textoImpressoesVendedor.includes('R$')
-  if (!impressoesSemDinheiro) falhas++
-  console.log(`  ${impressoesSemDinheiro ? '✅' : '❌'} histórico de impressões liberado para quem produz, sem valores`)
+  // quem cuida da produção (fila liberada) vê a fila de todo mundo em Pedidos
+  dom.window.location.hash = '#/pedidos'
+  await espera(900)
+  const textoFilaVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const veAFilaToda = textoFilaVendedor.includes(outroVendedor) && textoFilaVendedor.includes('Entregues')
+  if (!veAFilaToda) falhas++
+  console.log(
+    `  ${veAFilaToda ? '✅' : '❌'} fila liberada: ${nomeDoVinculo} vê a fila completa (com ${outroVendedor})`,
+  )
 
   // tela de login (sem sessão)
   dom.window.localStorage.removeItem('altoprints:sessao')

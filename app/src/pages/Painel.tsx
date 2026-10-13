@@ -1,15 +1,14 @@
 import {
-  AlertTriangle,
   BarChart3,
   ClipboardList,
   Crown,
   Package,
+  PackageCheck,
   Percent,
   Printer,
+  RotateCcw,
   Settings,
-  Store,
   TrendingUp,
-  Truck,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -55,7 +54,7 @@ export default function Painel() {
     [db.pedidos, fim, inicio],
   )
 
-  const pagos = pedidosPeriodo.filter((p) => p.status_pagamento === 'pago')
+  const pagos = pedidosPeriodo.filter((p) => p.pago)
   const faturamento = pagos.reduce((s, p) => s + Number(p.valor || 0), 0)
   const comissao = calcularComissao(pagos, faixas, semMetragem)
 
@@ -63,14 +62,10 @@ export default function Painel() {
     .filter(pedidoPendenteFinanceiro)
     .reduce((s, p) => s + Number(p.valor || 0), 0)
 
-  const filaImpressao = db.pedidos.filter(
-    (p) => p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto',
-  )
-  const entregasCorreios = db.pedidos.filter((p) => p.tipo_entrega === 'correios' && !p.data_entrega)
-  const retiradas = db.pedidos.filter((p) => p.tipo_entrega === 'retirada' && !p.data_retirada)
-  const incompletos = db.pedidos.filter(
-    (p) => !(p.status_producao === 'dtf_pronto' && p.status_pagamento === 'pago') && p.status_pagamento !== 'cancelado',
-  )
+  const aPagar = db.pedidos.filter((p) => !p.pago)
+  const aImprimir = db.pedidos.filter((p) => !p.iniciado_em && p.estagio !== 'concluido')
+  const imprimindo = db.pedidos.filter((p) => p.iniciado_em && p.estagio !== 'concluido')
+  const aEntregar = db.pedidos.filter((p) => p.estagio === 'concluido' && !p.entregue)
 
   const ranking = useMemo(
     () =>
@@ -85,11 +80,12 @@ export default function Painel() {
 
   const maiorFaturamento = Math.max(1, ...ranking.map((r) => r.faturamento))
 
+  /** os atalhos caem direto na fila certa dentro de Pedidos */
   const atalhos = [
-    { label: 'Fila de impressão', valor: filaImpressao.length, icone: Printer, to: '/relatorio', cor: 'from-fuchsia-500 to-pink-600' },
-    { label: 'Correios a entregar', valor: entregasCorreios.length, icone: Truck, to: '/entregas', cor: 'from-sky-500 to-blue-600' },
-    { label: 'Retiradas pendentes', valor: retiradas.length, icone: Store, to: '/entregas', cor: 'from-violet-500 to-indigo-600' },
-    { label: 'Pedidos incompletos', valor: incompletos.length, icone: AlertTriangle, to: '/pedidos', cor: 'from-amber-500 to-orange-600' },
+    { label: 'A pagar', valor: aPagar.length, icone: Wallet, to: '/pedidos?filtro=a_pagar', cor: 'from-amber-500 to-orange-600' },
+    { label: 'A imprimir', valor: aImprimir.length, icone: Printer, to: '/pedidos?filtro=a_imprimir', cor: 'from-sky-500 to-blue-600' },
+    { label: 'Imprimindo agora', valor: imprimindo.length, icone: RotateCcw, to: '/pedidos?filtro=imprimindo', cor: 'from-fuchsia-500 to-pink-600' },
+    { label: 'A entregar', valor: aEntregar.length, icone: PackageCheck, to: '/pedidos?filtro=concluida', cor: 'from-violet-500 to-indigo-600' },
   ]
 
   return (

@@ -20,31 +20,16 @@ export interface Cliente {
   created_at: string
 }
 
-export const STATUS_PRODUCAO = [
-  'editar_arte',
-  'fila_impressao',
-  'pagamento',
-  'imprimir',
-  'dtf_pronto',
-] as const
-export type StatusProducao = (typeof STATUS_PRODUCAO)[number]
+/**
+ * A fila tem só dois estágios: está em andamento ou está concluída.
+ * "Entregue" é uma marcação separada (opcional) e não entra no relatório.
+ */
+export const ESTAGIOS_FILA = ['em_andamento', 'concluido'] as const
+export type EstagioFila = (typeof ESTAGIOS_FILA)[number]
 
-export const LABEL_PRODUCAO: Record<StatusProducao, string> = {
-  editar_arte: 'Editar arte',
-  fila_impressao: 'Fila de impressão',
-  pagamento: 'Pagamento',
-  imprimir: 'Imprimir',
-  dtf_pronto: 'DTF pronto',
-}
-
-export const STATUS_PAGAMENTO = ['pendente', 'pago', 'parcial', 'cancelado'] as const
-export type StatusPagamento = (typeof STATUS_PAGAMENTO)[number]
-
-export const LABEL_PAGAMENTO: Record<StatusPagamento, string> = {
-  pendente: 'Pendente',
-  pago: 'Pago',
-  parcial: 'Parcial',
-  cancelado: 'Cancelado',
+export const LABEL_ESTAGIO: Record<EstagioFila, string> = {
+  em_andamento: 'Em andamento',
+  concluido: 'Concluído',
 }
 
 export const FORMAS_PAGAMENTO = [
@@ -79,8 +64,14 @@ export interface Pedido {
   metragem: number | null
   valor: number
   valor_modo: ValorModo
-  status_producao: StatusProducao
-  status_pagamento: StatusPagamento
+  /** em andamento (na máquina/fila) ou concluído (já saiu) */
+  estagio: EstagioFila
+  /** quando a pessoa clicou em "deu início na impressão" (null = ainda não começou) */
+  iniciado_em: string | null
+  /** já foi entregue ao cliente? marcação opcional — não entra no relatório */
+  entregue: boolean
+  /** marcação opcional de pagamento (não é etapa da fila) */
+  pago: boolean
   forma_pagamento: string
   data_pagamento: string | null // YYYY-MM-DD
   data_pedido: string // ISO
@@ -95,9 +86,6 @@ export interface Pedido {
   data_entrega: string | null
   retirado_por: string
   data_retirada: string | null
-  impresso: boolean
-  impresso_em: string | null
-  aviso_visto: boolean
   created_at: string
   updated_at: string
 }
@@ -175,6 +163,27 @@ export interface DadosImpressao {
   quando?: string
 }
 
+/**
+ * Faixa de metragem que define o preço do metro (valor automático da fila).
+ * O proprietário muda os valores em Configurações → Preços.
+ */
+export interface FaixaPreco {
+  id: string
+  /** metragem inicial da faixa (inclusive) */
+  de: number
+  /** metragem final da faixa (o valor de `ate` já entra na faixa seguinte) — null = sem limite */
+  ate: number | null
+  /** preço do metro dentro da faixa */
+  valor: number
+  rotulo: string
+}
+
+export const FAIXAS_PRECO_PADRAO: FaixaPreco[] = [
+  { id: 'preco-1', de: 1, ate: 5, valor: 59.9, rotulo: '1 a 5 m' },
+  { id: 'preco-2', de: 5, ate: 20, valor: 54.9, rotulo: '5 a 20 m' },
+  { id: 'preco-3', de: 20, ate: null, valor: 44.9, rotulo: '20 m ou mais' },
+]
+
 /** Faixa de metragem que define o percentual de comissão do pedido */
 export interface FaixaComissao {
   id: string
@@ -221,10 +230,7 @@ export interface TelasAcesso {
   relatorio: boolean
   /** Fila de impressão (sem valores em dinheiro) */
   paraImprimir: boolean
-  /** Registro das impressões (produção: metros, quem imprimiu, reimpressões) */
-  impressoes: boolean
   /** Entregas: endereços, retiradas e código de rastreio (sem valores) */
-  entregas: boolean
   /** Relatório de cliente especial — só os clientes dele */
   clienteEspecial: boolean
 }
@@ -232,31 +238,25 @@ export interface TelasAcesso {
 export const TELAS_PADRAO: TelasAcesso = {
   relatorio: false,
   paraImprimir: false,
-  impressoes: false,
-  entregas: false,
   clienteEspecial: false,
 }
 
 export const LABEL_TELA: Record<keyof TelasAcesso, string> = {
   relatorio: 'Relatório de vendas (só os dados dele)',
   paraImprimir: 'Para imprimir (fila de impressão, sem valores)',
-  impressoes: 'Impressões (o que saiu da máquina, sem valores)',
-  entregas: 'Entregas (endereços, retiradas e rastreio, sem valores)',
   clienteEspecial: 'Cliente especial (só os clientes dele)',
 }
 
 export const DESCRICAO_TELA: Record<keyof TelasAcesso, string> = {
   relatorio: 'Vê a mesma tela de relatório, mas só com os pedidos, a metragem e a comissão dele.',
   paraImprimir: 'Ajuda na produção: vê a fila do que falta imprimir, sem valores em dinheiro.',
-  impressoes: 'Acompanha a produção: o que foi impresso, os metros e as reimpressões — sem valores.',
-  entregas: 'Vê os endereços e códigos de rastreio para ajudar na entrega, sem valores.',
   clienteEspecial: 'Vê os clientes especiais dele (valor especial do metro), sem os dos outros.',
 }
 
 /** Telas liberadas para um acesso — o proprietário vê tudo, sempre */
 export const telasDoUsuario = (u: Usuario | null | undefined): TelasAcesso => {
   if (!u || u.papel === 'proprietario')
-    return { relatorio: true, paraImprimir: true, impressoes: true, entregas: true, clienteEspecial: true }
+    return { relatorio: true, paraImprimir: true, clienteEspecial: true }
   return { ...TELAS_PADRAO, ...(u.telas ?? {}) }
 }
 
@@ -307,6 +307,13 @@ export interface Configuracoes {
   comissao_sem_metragem: number
   /** o que o vendedor pode fazer com os próprios pedidos */
   permissao_vendedor: PermissaoVendedor
+  /** preço do metro por faixa (valor automático da fila) */
+  faixas_preco: FaixaPreco[]
+  /**
+   * Base da comissão: 'todos' conta todas as filas do período,
+   * 'pagos' conta só as marcadas como pagas.
+   */
+  comissao_base: 'todos' | 'pagos'
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -317,6 +324,44 @@ export const CONFIG_PADRAO: Configuracoes = {
   faixas_comissao: FAIXAS_PADRAO,
   comissao_sem_metragem: 0,
   permissao_vendedor: 'sem_excluir',
+  faixas_preco: FAIXAS_PRECO_PADRAO,
+  comissao_base: 'todos',
+}
+
+/**
+ * Converte uma fila que veio de uma versão antiga (status_producao/pagamento)
+ * para os campos de hoje. Também é usada ao restaurar um backup.
+ */
+export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown>): Pedido => {
+  const p = { ...pedidoVazio(), ...bruto } as Pedido & {
+    status_producao?: string
+    status_pagamento?: string
+    impresso?: boolean
+  }
+  if (!p.estagio) {
+    const concluido =
+      bruto.estagio === 'concluido' ||
+      Boolean(bruto.impresso) ||
+      bruto.status_producao === 'dtf_pronto' ||
+      bruto.status_producao === 'imprimir'
+    p.estagio = concluido ? 'concluido' : 'em_andamento'
+  }
+  if (p.iniciado_em === undefined || p.iniciado_em === null) {
+    const antigo = bruto as { status_producao?: string; impresso_em?: string | null }
+    const comecou =
+      p.estagio === 'concluido' ||
+      antigo.status_producao === 'imprimir' ||
+      antigo.status_producao === 'dtf_pronto' ||
+      Boolean(antigo.impresso_em)
+    p.iniciado_em = comecou ? String(antigo.impresso_em || p.data_pedido || new Date().toISOString()) : null
+  }
+  if (p.entregue === undefined || p.entregue === null) {
+    p.entregue = Boolean(p.data_entrega || p.data_retirada)
+  }
+  if (p.pago === undefined || p.pago === null) {
+    p.pago = bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
+  }
+  return p
 }
 
 /** Resumo de uma faixa de comissão (usado nos relatórios) */
@@ -349,8 +394,10 @@ export const pedidoVazio = (): Omit<Pedido, 'id'> => ({
   metragem: null,
   valor: 0,
   valor_modo: 'auto',
-  status_producao: 'editar_arte',
-  status_pagamento: 'pendente',
+  estagio: 'em_andamento',
+  iniciado_em: null,
+  entregue: false,
+  pago: false,
   forma_pagamento: '',
   data_pagamento: null,
   data_pedido: new Date().toISOString(),
@@ -365,48 +412,88 @@ export const pedidoVazio = (): Omit<Pedido, 'id'> => ({
   data_entrega: null,
   retirado_por: '',
   data_retirada: null,
-  impresso: false,
-  impresso_em: null,
-  aviso_visto: true,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 })
 
 /* ------------------------------------------------------------------ */
-/* Etapas da fila (o caminho que o pedido faz até a entrega)           */
+/* Estágios da fila                                                   */
 /* ------------------------------------------------------------------ */
 
-export const ETAPAS_FILA = ['a_pagar', 'a_imprimir', 'imprimindo', 'concluido', 'entregue'] as const
-export type EtapaFila = (typeof ETAPAS_FILA)[number]
+/** filas que ainda estão na máquina / por concluir */
+export const naFilaDeImpressao = (p: Pedido) => p.estagio !== 'concluido'
 
-export const LABEL_ETAPA: Record<EtapaFila, string> = {
-  a_pagar: 'A pagar',
-  a_imprimir: 'A imprimir',
-  imprimindo: 'Imprimindo',
-  concluido: 'Concluído',
-  entregue: 'Entregue',
-}
+/** fila concluída (já saiu da máquina) */
+export const isPedidoCompleto = (p: Pedido) => p.estagio === 'concluido'
 
-/** Em que ponto da fila o pedido está (usado nos filtros e nos botões). */
-export const etapaFila = (p: Pedido): EtapaFila => {
-  if (p.data_entrega || p.data_retirada) return 'entregue'
-  if (p.impresso || p.status_producao === 'dtf_pronto') return 'concluido'
-  if (p.status_pagamento !== 'pago') return 'a_pagar'
-  return p.status_producao === 'imprimir' ? 'imprimindo' : 'a_imprimir'
-}
+/**
+ * Filas que entram na comissão: todas as do período, ou só as marcadas como
+ * pagas — depende da escolha do proprietário em Configurações → Comissões.
+ */
+export const filasDaComissao = (pedidos: Pedido[], base: 'todos' | 'pagos' = 'todos') =>
+  base === 'pagos' ? pedidos.filter((p) => p.pago) : pedidos
 
-/** Pedido pago que ainda precisa passar pela máquina. */
-export const naFilaDeImpressao = (p: Pedido) =>
-  p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto'
-
-export const isPedidoCompleto = (p: Pedido) =>
-  p.status_producao === 'dtf_pronto' && p.status_pagamento === 'pago'
-
-export const pedidoPendenteFinanceiro = (p: Pedido) =>
-  p.status_pagamento === 'pendente' || p.status_pagamento === 'parcial'
+/** fila ainda não marcada como paga (controle opcional do dono) */
+export const pedidoPendenteFinanceiro = (p: Pedido) => !p.pago
 
 /** Data usada no relatório: data do pagamento e, se não houver, a data do pedido. */
 export const dataReferencia = (p: Pedido) => p.data_pagamento || (p.data_pedido || '').slice(0, 10)
+
+/* ------------------------------------------------------------------ */
+/* Passos da fila (os botões que a pessoa clica no cartão)             */
+/* ------------------------------------------------------------------ */
+
+/** os quatro passos, na ordem em que acontecem */
+export type PassoFila = 'pago' | 'imprimindo' | 'concluida' | 'entregue'
+
+export const PASSOS_FILA: { id: PassoFila; label: string; curto: string }[] = [
+  { id: 'pago', label: 'Marcar como pago', curto: 'Pago' },
+  { id: 'imprimindo', label: 'Deu início na impressão', curto: 'Imprimindo' },
+  { id: 'concluida', label: 'Fila concluída (saiu da máquina)', curto: 'Concluída' },
+  { id: 'entregue', label: 'Entregue ao cliente', curto: 'Entregue' },
+]
+
+/** o cartão mostra: o passo já está feito? */
+export const passoFeito = (p: Pedido, passo: PassoFila) =>
+  passo === 'pago'
+    ? p.pago
+    : passo === 'imprimindo'
+      ? Boolean(p.iniciado_em)
+      : passo === 'concluida'
+        ? p.estagio === 'concluido'
+        : p.entregue
+
+/* ------------------------------------------------------------------ */
+/* Filtros da tela Pedidos                                             */
+/* ------------------------------------------------------------------ */
+
+export type FiltroFila = 'todas' | 'a_pagar' | 'a_imprimir' | 'imprimindo' | 'concluida' | 'entregue'
+
+export const FILTROS_FILA: { id: FiltroFila; label: string; ajuda: string }[] = [
+  { id: 'todas', label: 'Todas', ajuda: 'Todas as filas registradas.' },
+  { id: 'a_pagar', label: 'A pagar', ajuda: 'Filas que ainda não foram marcadas como pagas.' },
+  { id: 'a_imprimir', label: 'A imprimir', ajuda: 'Filas que ainda não começaram a imprimir.' },
+  { id: 'imprimindo', label: 'Imprimindo', ajuda: 'Filas que já deram início na impressão.' },
+  { id: 'concluida', label: 'Concluídas', ajuda: 'Filas que já saíram da máquina e ainda não foram entregues.' },
+  { id: 'entregue', label: 'Entregues', ajuda: 'Filas que o cliente já recebeu.' },
+]
+
+export const combinaFiltro = (p: Pedido, filtro: FiltroFila) => {
+  switch (filtro) {
+    case 'a_pagar':
+      return !p.pago
+    case 'a_imprimir':
+      return !p.iniciado_em && p.estagio !== 'concluido'
+    case 'imprimindo':
+      return Boolean(p.iniciado_em) && p.estagio !== 'concluido'
+    case 'concluida':
+      return p.estagio === 'concluido' && !p.entregue
+    case 'entregue':
+      return p.entregue
+    default:
+      return true
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Ajuda de permissões                                                 */

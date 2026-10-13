@@ -9,15 +9,12 @@ import { LABEL_TELA, telasDoUsuario, type TelasAcesso } from './lib/types'
 import Administracao from './pages/Administracao'
 import Clientes from './pages/Clientes'
 import Configuracoes from './pages/Configuracoes'
-import Entregas from './pages/Entregas'
 import Equipe from './pages/Equipe'
-import Impressoes from './pages/Impressoes'
 import Login from './pages/Login'
 import MinhaArea from './pages/MinhaArea'
 import Painel from './pages/Painel'
 import PedidoForm from './pages/PedidoForm'
 import Pedidos from './pages/Pedidos'
-import PorVendedor from './pages/PorVendedor'
 import Relatorio from './pages/Relatorio'
 import RelatorioResumo from './pages/RelatorioResumo'
 import RelatorioClienteEspecial from './pages/RelatorioClienteEspecial'
@@ -130,25 +127,10 @@ export default function App() {
           <Route path="/pedido/:id" element={<PedidoForm />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/vendedores" element={<Vendedores />} />
-          <Route path="/por-vendedor" element={<PorVendedor />} />
-          {/* a fila de impressão agora é a primeira aba da tela Filas (Relatório) */}
-          <Route path="/para-imprimir" element={<Navigate to="/relatorio" replace />} />
-          <Route
-            path="/impressoes"
-            element={
-              <Permitido tela="impressoes">
-                <Impressoes />
-              </Permitido>
-            }
-          />
-          <Route
-            path="/entregas"
-            element={
-              <Permitido tela="entregas">
-                <Entregas />
-              </Permitido>
-            }
-          />
+          {/* a fila de impressão virou um filtro dentro de Pedidos */}
+          <Route path="/para-imprimir" element={<Navigate to="/pedidos" replace />} />
+
+          <Route path="/por-vendedor" element={<Navigate to="/relatorio" replace />} />
           <Route
             path="/relatorio"
             element={

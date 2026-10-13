@@ -14,6 +14,7 @@ import {
   type Usuario,
   type Vendedor,
 } from './types'
+import { normalizarPedido } from './types'
 
 export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos' | 'impressoes' | 'usuarios'
 export type Registro = Vendedor | Cliente | Pedido | Arquivo | Impressao | Usuario
@@ -58,7 +59,8 @@ const lerLocal = async (): Promise<DB> => {
     return {
       vendedores: parsed.vendedores ?? [],
       clientes: parsed.clientes ?? [],
-      pedidos: parsed.pedidos ?? [],
+      // pedidos gravados por versões antigas ganham o modelo novo (estágio, entrega, pago)
+      pedidos: ((parsed.pedidos ?? []) as Partial<Pedido>[]).map(normalizarPedido),
       arquivos: parsed.arquivos ?? [],
       impressoes: parsed.impressoes ?? [],
       usuarios: parsed.usuarios ?? [],
@@ -125,7 +127,7 @@ export async function carregarTudo(): Promise<DB> {
   return {
     vendedores: (vendedores.data ?? []) as Vendedor[],
     clientes: (clientes.data ?? []) as Cliente[],
-    pedidos: (pedidos.data ?? []) as Pedido[],
+    pedidos: ((pedidos.data ?? []) as Partial<Pedido>[]).map(normalizarPedido),
     arquivos: (arquivos.data ?? []) as Arquivo[],
     impressoes: (impressoes.data ?? []) as Impressao[],
     usuarios: (usuarios.data ?? []) as Usuario[],

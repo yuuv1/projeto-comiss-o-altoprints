@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { filasDaComissao } from '../lib/types'
 import { JanelaConexao } from '../components/Nuvem'
 import { Botao, Campo, Entrada, Etiqueta, Selecao, cn } from '../components/ui'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
@@ -63,7 +64,7 @@ export default function Login() {
         .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
-          const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
           return {
             id: v.id,
             nome: v.nome,
@@ -72,7 +73,7 @@ export default function Login() {
           }
         })
         .sort((a, b) => b.pedidos - a.pedidos),
-    [db.pedidos, db.usuarios, db.vendedores],
+    [db.configuracoes.comissao_base, db.pedidos, db.usuarios, db.vendedores],
   )
 
   const escolhido = disponiveis.find((v) => v.id === vendedorId)

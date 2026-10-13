@@ -46,7 +46,6 @@ import {
   type Arquivo,
   type Cliente,
   type Configuracoes,
-  type DadosImpressao,
   type DB,
   type ID,
   type Impressao,
@@ -84,11 +83,6 @@ interface Ctx {
   /* arquivos */
   enviarArquivos: (pedidoId: ID, arquivos: File[]) => Promise<void>
   excluirArquivoDoPedido: (arquivo: Arquivo) => Promise<void>
-  /* impressões (produção) */
-  /** registra uma impressão (ou reimpressão) e marca o pedido como impresso */
-  registrarImpressao: (pedido: Pedido, dados: DadosImpressao) => Promise<Impressao>
-  /** apaga um registro de impressão (ajuste de quem se enganou) */
-  excluirImpressao: (id: ID) => Promise<void>
   /* configurações */
   salvarConfig: (parcial: Partial<Configuracoes>) => Promise<void>
   /** apaga tudo; com `manterContaId`, o acesso do proprietário atual é preservado */
@@ -333,27 +327,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       const existente = id ? db.pedidos.find((p) => p.id === id) : undefined
       const agora = new Date().toISOString()
-      const clienteVinculado = db.clientes.find(
-        (c) => c.nome.toLowerCase() === dados.cliente_nome.trim().toLowerCase(),
-      )
+      const nomeCliente = dados.cliente_nome.trim()
+
+      /*
+       * O vendedor pode escolher um cliente que já existe ou escrever um nome
+       * novo: nesse caso o cliente é cadastrado junto com a fila.
+       */
+      let clienteVinculado = db.clientes.find((c) => c.nome.toLowerCase() === nomeCliente.toLowerCase())
+      if (!clienteVinculado) {
+        clienteVinculado = {
+          id: novoId(),
+          nome: nomeCliente,
+          telefone: '',
+          email: '',
+          observacoes: '',
+          vendedor_id: dados.vendedor_id,
+          valor_especial_metro: null,
+          especial: false,
+          created_at: agora,
+        }
+        await salvarRegistro('clientes', clienteVinculado)
+      }
+      const clienteCriado = !db.clientes.some((c) => c.id === clienteVinculado?.id)
       const valorEspecial = clienteVinculado?.valor_especial_metro ?? null
 
       const valor =
         dados.valor_modo === 'auto'
-          ? calcularValor(dados.metragem, valorEspecial)
+          ? calcularValor(dados.metragem, valorEspecial, db.configuracoes.faixas_preco)
           : Number(Number(dados.valor || 0).toFixed(2))
-
-      const impresso = dados.impresso || dados.status_producao === 'dtf_pronto'
-      const mudouParaPronto = !existente?.impresso && impresso
 
       const registro: Pedido = {
         ...dados,
         cliente_nome: dados.cliente_nome.trim(),
         cliente_id: clienteVinculado?.id ?? existente?.cliente_id ?? null,
         valor,
-        impresso,
-        impresso_em: impresso ? existente?.impresso_em ?? dados.impresso_em ?? agora : null,
-        aviso_visto: mudouParaPronto ? false : dados.aviso_visto,
         id: id ?? novoId(),
         numero: existente?.numero ?? proximoNumero(db.pedidos.map((p) => p.numero)),
         created_at: existente?.created_at ?? agora,
@@ -367,13 +374,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const pedidos = existente
           ? atual.pedidos.map((p) => (p.id === registro.id ? registro : p))
           : [registro, ...atual.pedidos]
-        return { ...atual, pedidos }
+        const clientes = clienteCriado && clienteVinculado ? [...atual.clientes, clienteVinculado] : atual.clientes
+        return { ...atual, pedidos, clientes }
       })
 
-      avisar(existente ? `Pedido #${registro.numero} atualizado com sucesso!` : `Pedido #${registro.numero} criado com sucesso!`)
+      avisar(
+        clienteCriado
+          ? `Fila #${registro.numero} registrada e cliente ${nomeCliente} cadastrado!`
+          : existente
+            ? `Fila #${registro.numero} atualizada com sucesso!`
+            : `Fila #${registro.numero} registrada com sucesso!`,
+      )
       return registro
     },
-    [avisar, db.clientes, db.pedidos, enviarArquivos],
+    [avisar, db.clientes, db.configuracoes.faixas_preco, db.pedidos, enviarArquivos],
   )
 
   const atualizarPedido = useCallback(
@@ -394,8 +408,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const arquivos = db.arquivos.filter((a) => a.pedido_id === id)
       await apagarVariosArquivos(arquivos)
       await removerArquivosDoPedido(id)
-      // o histórico de impressões do pedido vai junto (na nuvem isso é automático)
-      for (const i of db.impressoes.filter((i) => i.pedido_id === id)) await removerRegistro('impressoes', i.id)
       await removerRegistro('pedidos', id)
       setDb((atual) => ({
         ...atual,
@@ -417,72 +429,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       avisar('Arquivo excluído.', 'info')
     },
     [avisar],
-  )
-
-  /* ----------------------------- impressões ----------------------------- */
-
-  const registrarImpressao = useCallback(async (pedido: Pedido, dados: DadosImpressao) => {
-    bloquearSeVisualizando()
-    const quando = dados.quando ?? new Date().toISOString()
-    const registro: Impressao = {
-      id: novoId(),
-      pedido_id: pedido.id,
-      pedido_numero: pedido.numero,
-      cliente_nome: pedido.cliente_nome,
-      arquivo_id: dados.arquivo_id ?? '',
-      arquivo_nome: dados.arquivo_nome ?? '',
-      metros: Number(dados.metros) || 0,
-      quem: dados.quem.trim(),
-      usuario_id: dados.usuario_id ?? '',
-      tipo: dados.tipo,
-      motivo: dados.tipo === 'reimpressao' ? (dados.motivo ?? '').trim() : '',
-      observacao: (dados.observacao ?? '').trim(),
-      quando,
-      created_at: new Date().toISOString(),
-    }
-    // o pedido passa a contar como impresso (também na reimpressão: já saiu da fila)
-    const atualizado: Pedido = {
-      ...pedido,
-      impresso: true,
-      impresso_em: quando,
-      status_producao: 'dtf_pronto',
-      aviso_visto: false,
-      updated_at: quando,
-    }
-    await salvarRegistro('impressoes', registro)
-    await salvarRegistro('pedidos', atualizado)
-    setDb((atual) => ({
-      ...atual,
-      impressoes: [registro, ...atual.impressoes],
-      pedidos: atual.pedidos.map((p) => (p.id === pedido.id ? atualizado : p)),
-    }))
-    return registro
-  }, [])
-
-  const excluirImpressao = useCallback(
-    async (id: ID) => {
-      bloquearSeVisualizando()
-      const alvo = db.impressoes.find((i) => i.id === id)
-      await removerRegistro('impressoes', id)
-      const restantes = db.impressoes.filter((i) => i.id !== id)
-      // se era a única impressão do pedido, ele volta para a fila de impressão
-      const pedido = alvo ? db.pedidos.find((p) => p.id === alvo.pedido_id) : undefined
-      let pedidos = db.pedidos
-      if (pedido) {
-        const ultima = restantes
-          .filter((i) => i.pedido_id === pedido.id)
-          .sort((a, b) => String(a.quando).localeCompare(String(b.quando)))
-          .pop()
-        const atualizado: Pedido = ultima
-          ? { ...pedido, impresso: true, impresso_em: ultima.quando }
-          : { ...pedido, impresso: false, impresso_em: null }
-        await salvarRegistro('pedidos', atualizado)
-        pedidos = db.pedidos.map((p) => (p.id === pedido.id ? atualizado : p))
-      }
-      setDb((atual) => ({ ...atual, impressoes: restantes, pedidos }))
-      avisar('Registro de impressão excluído.', 'info')
-    },
-    [avisar, db.impressoes, db.pedidos],
   )
 
   /* ---------------------------- configurações --------------------------- */
@@ -629,8 +575,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       excluirPedido,
       enviarArquivos,
       excluirArquivoDoPedido,
-      registrarImpressao,
-      excluirImpressao,
       salvarConfig,
       resetarDados,
       carregarDemo,
@@ -672,8 +616,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
-      registrarImpressao,
-      excluirImpressao,
       vendedorPorId,
       nomeVendedor,
       pedidoPorId,

@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../lib/format'
 import { useStore } from '../lib/store'
-import { isPedidoCompleto, type Pedido } from '../lib/types'
-import { EtiquetaPagamento, EtiquetaProducao } from './StatusBadges'
+import { isPedidoCompleto, passoFeito, type PassoFila, type Pedido } from '../lib/types'
+import { EtiquetaEntrega, EtiquetaEstagio, EtiquetaPago } from './StatusBadges'
 import { Etiqueta, cn, useConfirmacao } from './ui'
 
 /** Cartão de pedido usado nas listas */
@@ -71,8 +71,9 @@ export function PedidoCartao({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <EtiquetaProducao status={pedido.status_producao} />
-        <EtiquetaPagamento status={pedido.status_pagamento} />
+        <EtiquetaEstagio status={pedido.estagio} />
+        <EtiquetaEntrega entregue={pedido.entregue} />
+        {mostrarValor ? <EtiquetaPago pago={pedido.pago} /> : null}
       </div>
 
       {mostrarValor ? (
@@ -112,21 +113,67 @@ export function useAcoesPedido() {
     if (ok) await excluirPedido(p.id)
   }
 
-  const marcarPago = async (p: Pedido) => {
-    await atualizarPedido(p.id, {
-      status_pagamento: 'pago',
-      data_pagamento: p.data_pagamento || hojeISO(),
-      status_producao: p.status_producao === 'pagamento' ? 'imprimir' : p.status_producao,
-    })
-    avisar(`Pagamento do pedido #${p.numero} confirmado!`)
+  /**
+   * Clique num passo da fila (pago → imprimindo → concluída → entregue).
+   * Passo já feito desfaz; passo novo marca.
+   */
+  const alternarPasso = async (p: Pedido, passo: PassoFila) => {
+    const feito = passoFeito(p, passo)
+    const agora = new Date().toISOString()
+    const voltar = feito ? 'info' : undefined
+    if (passo === 'pago') {
+      await atualizarPedido(p.id, feito ? { pago: false, data_pagamento: null } : { pago: true, data_pagamento: p.data_pagamento || hojeISO() })
+      avisar(feito ? `Fila #${p.numero} voltou para “a pagar”.` : `Pagamento da fila #${p.numero} confirmado!`, voltar)
+    } else if (passo === 'imprimindo') {
+      await atualizarPedido(p.id, feito ? { iniciado_em: null } : { iniciado_em: agora, estagio: 'em_andamento' })
+      avisar(feito ? `Fila #${p.numero} voltou para “a imprimir”.` : `Fila #${p.numero} entrou na impressão!`, voltar)
+    } else if (passo === 'concluida') {
+      await atualizarPedido(
+        p.id,
+        feito ? { estagio: 'em_andamento' } : { estagio: 'concluido', iniciado_em: p.iniciado_em ?? agora },
+      )
+      avisar(feito ? `Fila #${p.numero} voltou para em andamento.` : `Fila #${p.numero} concluída!`, voltar)
+    } else {
+      await atualizarPedido(
+        p.id,
+        feito
+          ? { entregue: false, data_entrega: null, data_envio: null, retirado_por: '', data_retirada: null }
+          : { entregue: true, data_entrega: hojeISO(), data_envio: p.data_envio || hojeISO() },
+      )
+      avisar(feito ? `Fila #${p.numero} voltou para “não entregue”.` : `Fila #${p.numero} entregue ao cliente!`, voltar)
+    }
   }
 
+  /** fecha a fila: já saiu da máquina */
+  const concluir = async (p: Pedido) => {
+    await atualizarPedido(p.id, { estagio: 'concluido' })
+    avisar(`Fila #${p.numero} concluída!`)
+  }
+
+  /** volta a fila para em andamento (quem clicou sem querer) */
+  const reabrir = async (p: Pedido) => {
+    await atualizarPedido(p.id, { estagio: 'em_andamento' })
+    avisar(`Fila #${p.numero} voltou para em andamento.`, 'info')
+  }
+
+  /** o cliente já recebeu (marcação opcional, fora do relatório) */
   const marcarEntregue = async (p: Pedido) => {
     await atualizarPedido(p.id, {
-      data_entrega: hojeISO(),
+      entregue: true,
+      data_entrega: p.data_entrega || hojeISO(),
       data_envio: p.data_envio || hojeISO(),
     })
-    avisar(`Pedido #${p.numero} marcado como entregue!`)
+    avisar(`Fila #${p.numero} marcada como entregue!`)
+  }
+
+  const desmarcarEntregue = async (p: Pedido) => {
+    await atualizarPedido(p.id, { entregue: false, data_entrega: null })
+    avisar(`Fila #${p.numero} voltou para “não entregue”.`, 'info')
+  }
+
+  const marcarPago = async (p: Pedido) => {
+    await atualizarPedido(p.id, { pago: true, data_pagamento: p.data_pagamento || hojeISO() })
+    avisar(`Pagamento da fila #${p.numero} confirmado!`)
   }
 
   const marcarRetirado = async (p: Pedido, quem: string) => {
@@ -134,12 +181,12 @@ export function useAcoesPedido() {
       avisar('Informe quem retirou o pedido.', 'erro')
       return
     }
-    await atualizarPedido(p.id, { retirado_por: quem.trim(), data_retirada: p.data_retirada || hojeISO() })
-    avisar(`Retirada do pedido #${p.numero} registrada!`)
-  }
-
-  const marcarVisto = async (p: Pedido) => {
-    await atualizarPedido(p.id, { aviso_visto: true })
+    await atualizarPedido(p.id, {
+      retirado_por: quem.trim(),
+      data_retirada: p.data_retirada || hojeISO(),
+      entregue: true,
+    })
+    avisar(`Retirada da fila #${p.numero} registrada!`)
   }
 
   const atualizar = async (p: Pedido, patch: Partial<Pedido>, mensagem?: string) => {
@@ -158,10 +205,13 @@ export function useAcoesPedido() {
   return {
     editar,
     pedirExclusao,
-    marcarPago,
+    alternarPasso,
+    concluir,
+    reabrir,
     marcarEntregue,
+    desmarcarEntregue,
+    marcarPago,
     marcarRetirado,
-    marcarVisto,
     atualizar,
     salvarRastreio,
     dialog,

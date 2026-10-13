@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { dataBR, moeda } from '../lib/format'
 import { calcularComissao } from '../lib/comissao'
 import {
+  filasDaComissao,
   DESCRICAO_TELA,
   FAIXAS_PADRAO,
   LABEL_PAPEL,
@@ -142,7 +143,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
-          const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
           return {
             id: v.id,
             nome: v.nome,
@@ -214,7 +215,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         <div className="space-y-3">
           {contas.map((c) => {
             const pedidos = db.pedidos.filter((p) => p.vendedor_id === c.vendedor_id)
-            const pagos = pedidos.filter((p) => p.status_pagamento === 'pago')
+            const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
             const comissao = calcularComissao(pagos, faixas, semMetragem)
             const vendedor = db.vendedores.find((v) => v.id === c.vendedor_id)
             return (
