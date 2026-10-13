@@ -216,7 +216,7 @@ export default function MinhaArea() {
                   className="mt-3 justify-start"
                   variante="secundario"
                   icone={Printer}
-                  onClick={() => navegar('/para-imprimir')}
+                  onClick={() => navegar('/relatorio')}
                 >
                   Abrir a fila de impressão
                 </Botao>

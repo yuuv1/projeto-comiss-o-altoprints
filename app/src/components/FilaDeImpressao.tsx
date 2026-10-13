@@ -1,15 +1,19 @@
 import { CheckCircle2, Clock, Pencil, Printer, PrinterCheck, RotateCcw, Wallet } from 'lucide-react'
 import { useMemo } from 'react'
-import { ultimaImpressao, useRegistrarImpressao } from '../components/impressao'
-import { PedidoCartao, useAcoesPedido } from '../components/pedido'
-import { Botao, CartaoResumo, Etiqueta, TituloPagina, Vazio } from '../components/ui'
+import { ultimaImpressao, useRegistrarImpressao } from './impressao'
+import { PedidoCartao, useAcoesPedido } from './pedido'
+import { Botao, CartaoResumo, Etiqueta, Vazio } from './ui'
 import { dataBR, dataHoraBR, moeda, numeroBR } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { doDia, resumirImpressoes } from '../lib/impressoes'
 import { useStore } from '../lib/store'
-import { LABEL_PRODUCAO } from '../lib/types'
+import { LABEL_PRODUCAO, naFilaDeImpressao } from '../lib/types'
 
-export default function ParaImprimir() {
+/**
+ * Fila de impressão: os pedidos pagos que ainda não saíram da máquina, com o
+ * botão de registrar a impressão. É a primeira aba da tela Filas (Relatório).
+ */
+export default function FilaDeImpressao() {
   const { db, nomeVendedor } = useStore()
   const { ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
@@ -19,9 +23,7 @@ export default function ParaImprimir() {
 
   const fila = useMemo(
     () =>
-      db.pedidos
-        .filter((p) => p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto')
-        .sort((a, b) => a.data_pedido.localeCompare(b.data_pedido)),
+      db.pedidos.filter(naFilaDeImpressao).sort((a, b) => a.data_pedido.localeCompare(b.data_pedido)),
     [db.pedidos],
   )
 
@@ -41,12 +43,6 @@ export default function ParaImprimir() {
 
   return (
     <>
-      <TituloPagina
-        icone={Printer}
-        titulo="Para imprimir"
-        subtitulo="Somente pedidos com pagamento confirmado que ainda não foram impressos."
-      />
-
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Na fila" valor={fila.length} icone={Printer} gradiente="from-fuchsia-500 to-pink-600" />
         <CartaoResumo

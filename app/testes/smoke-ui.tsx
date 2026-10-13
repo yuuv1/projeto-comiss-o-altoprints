@@ -178,9 +178,11 @@ async function main() {
     '/rota-inexistente',
   ])
 
-  // a tela de impressões mostra os totais da produção
+  // a tela de impressões mostra os totais da produção (aba "Impressas" das Filas)
   dom.window.location.hash = '#/impressoes'
   await espera(700)
+  clicar(raiz, 'Impressas')
+  await espera(400)
   const textoImpressoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const impressoesOk =
     textoImpressoes.includes('Metros impressos') &&
@@ -208,7 +210,8 @@ async function main() {
   if (!janelaOk) falhas++
   console.log(`  ${janelaOk ? '✅' : '❌'} fila abre a janela de registro (metros, quem imprimiu, reimpressão)`)
 
-  const salvouImpressao = clicar(raiz, 'Registrar impressão')
+  // o último "Registrar impressão" é o botão de salvar de dentro da janela
+  const salvouImpressao = clicarUltimo(raiz, 'Registrar impressão')
   await espera(700)
   const depoisImpressoes = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes
     .length
@@ -359,7 +362,7 @@ async function main() {
   if (!(clicouCompacto && deVoltaAoCompacto)) falhas++
   console.log(`  ${clicouCompacto && deVoltaAoCompacto ? '✅' : '❌'} “Compacto” volta a apertar a tela`)
 
-  // ---------- barra de cima: só os 5 atalhos do dia a dia ----------
+  // ---------- barra de cima: só os 4 atalhos do dia a dia ----------
   dom.window.location.hash = '#/'
   await espera(700)
   const navTopo = raiz?.querySelector('header nav') ?? null
@@ -367,15 +370,15 @@ async function main() {
   const barraEnxuta =
     textoNav.includes('Pedidos') &&
     textoNav.includes('Clientes') &&
-    textoNav.includes('Para imprimir') &&
     textoNav.includes('Relatório') &&
+    !textoNav.includes('Para imprimir') &&
     !textoNav.includes('Configurações') &&
     !textoNav.includes('Entregas') &&
     !textoNav.includes('Impressões') &&
     !textoNav.includes('Vendedores') &&
     !textoNav.includes('Mais')
   if (!barraEnxuta) falhas++
-  console.log(`\n  ${barraEnxuta ? '✅' : '❌'} barra de cima só com os atalhos do dia a dia (5)`)
+  console.log(`\n  ${barraEnxuta ? '✅' : '❌'} barra de cima só com os 4 atalhos do dia a dia`)
 
   const engrenagem = [...(raiz?.querySelectorAll('header a') ?? [])].find((a) =>
     (a.getAttribute('href') ?? '').includes('/configuracoes'),
@@ -391,9 +394,20 @@ async function main() {
   if (!relatorioComAbas) falhas++
   console.log(`  ${relatorioComAbas ? '✅' : '❌'} Relatório tem as abas "Filas registradas" e "Resumo e comissões"`)
 
-  const textoFilas = textoRel.includes('Registrar impressão') && textoRel.includes('Vendedor')
-  if (!textoFilas) falhas++
-  console.log(`  ${textoFilas ? '✅' : '❌'} dentro de Relatório dá para registrar a fila e filtrar por vendedor`)
+  const filaOk =
+    textoRel.includes('Registrar impressão') &&
+    textoRel.includes('A imprimir') &&
+    textoRel.includes('Impressas') &&
+    textoRel.includes('Na fila')
+  if (!filaOk) falhas++
+  console.log(`  ${filaOk ? '✅' : '❌'} Relatório abre na fila de impressão (com "Registrar impressão")`)
+
+  clicar(raiz, 'Impressas')
+  await espera(500)
+  const textoRegistradas = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const registradasOk = textoRegistradas.includes('Vendedor') && textoRegistradas.includes('Quem imprimiu')
+  if (!registradasOk) falhas++
+  console.log(`  ${registradasOk ? '✅' : '❌'} a visão "Impressas" traz o histórico com filtro por vendedor`)
 
   const trocouResumo = clicar(raiz, 'Resumo e comissões')
   await espera(600)
@@ -605,6 +619,8 @@ async function main() {
   // o histórico de impressões também abre para quem produz, sem valores em dinheiro
   dom.window.location.hash = '#/impressoes'
   await espera(700)
+  clicar(raiz2, 'Impressas')
+  await espera(400)
   const textoImpressoesVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
   const impressoesSemDinheiro =
     textoImpressoesVendedor.includes('Metros impressos') && !textoImpressoesVendedor.includes('R$')

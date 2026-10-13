@@ -42,11 +42,13 @@ const variantes: Record<Variante, string> = {
   aviso: 'text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 shadow-soft dark:shadow-dark-soft',
 }
 
+/* As alturas ficam um degrau acima do que parecem porque o espaçamento
+   compacto (--espaco) encolhe tudo: assim o botão continua confortável. */
 const tamanhos: Record<Tamanho, string> = {
-  sm: 'h-8 px-2.5 text-xs gap-1.5',
-  md: 'h-9 px-3.5 text-sm gap-1.5',
-  lg: 'h-11 px-5 text-base gap-2',
-  icone: 'h-8 w-8 text-sm',
+  sm: 'h-9 px-3 text-xs gap-1.5',
+  md: 'h-10 px-3.5 text-sm gap-1.5',
+  lg: 'h-12 px-5 text-base gap-2',
+  icone: 'h-9 w-9 text-sm',
 }
 
 interface BotaoProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -123,18 +125,18 @@ export function CartaoResumo({
   sub?: string
 }) {
   return (
-    <Cartao className="flex items-center gap-3">
+    <Cartao className="flex items-center gap-2.5 p-3">
       <div
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
           gradiente,
         )}
       >
-        <Icone className="h-5 w-5" />
+        <Icone className="h-4 w-4" />
       </div>
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
-        <p className="truncate text-xl font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
+        <p className="truncate text-lg font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
         {sub ? <p className="truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p> : null}
       </div>
     </Cartao>
@@ -435,18 +437,18 @@ export function TituloPagina({
   icone?: LucideIcon
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-      <div className="flex items-center gap-2.5">
+    <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-center gap-2">
         {Icone ? (
-          <div className="hidden h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
+          <div className="hidden h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
             <Icone className="h-5 w-5" />
           </div>
         ) : null}
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-2xl">
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-xl">
             {titulo}
           </h1>
-          {subtitulo ? <p className="text-sm text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
+          {subtitulo ? <p className="text-[13px] text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">{acoes}</div>
@@ -466,13 +468,17 @@ export function Abas<T extends string>({
   abas,
   ativa,
   onChange,
+  acoes,
 }: {
   abas: { id: T; label: string; icone?: LucideIcon; contador?: number }[]
   ativa: T
   onChange: (id: T) => void
+  /** botões da tela (Novo pedido, Exportar...) ficam na mesma linha das abas */
+  acoes?: ReactNode
 }) {
   return (
-    <div className="mb-4 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft">
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft">
       {abas.map((aba) => {
         const Icone = aba.icone
         const selecionada = aba.id === ativa
@@ -497,6 +503,57 @@ export function Abas<T extends string>({
                 )}
               >
                 {aba.contador}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
+      </div>
+      {acoes ? <div className="ml-auto flex flex-wrap items-center gap-2">{acoes}</div> : null}
+    </div>
+  )
+}
+
+/**
+ * Filtros compactos (bolinhas) usados dentro de uma tela para separar as
+ * etapas da fila, tipos de entrega e afins.
+ */
+export function Pilulas<T extends string>({
+  itens,
+  ativo,
+  onChange,
+  className,
+}: {
+  itens: { id: T; label: string; contador?: number }[]
+  ativo: T
+  onChange: (id: T) => void
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      {itens.map((item) => {
+        const selecionado = item.id === ativo
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+              selecionado
+                ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-purple-300',
+            )}
+          >
+            {item.label}
+            {item.contador !== undefined ? (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px] font-black',
+                  selecionado ? 'bg-white/25' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                )}
+              >
+                {item.contador}
               </span>
             ) : null}
           </button>

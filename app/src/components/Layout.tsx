@@ -92,8 +92,7 @@ export function Layout() {
     { to: '/', label: ehProprietario ? 'Painel' : 'Minha área', icone: ehProprietario ? LayoutDashboard : UserCheck },
     { to: '/pedidos', label: ehProprietario ? 'Pedidos' : 'Meus pedidos', icone: ClipboardList },
     { to: '/clientes', label: ehProprietario ? 'Clientes' : 'Meus clientes', icone: Users },
-    { to: '/para-imprimir', label: 'Para imprimir', icone: Printer, badge: paraImprimir, tela: 'paraImprimir' },
-    { to: '/relatorio', label: 'Relatório', icone: BarChart3, badge: avisos, tela: 'relatorio' },
+    { to: '/relatorio', label: 'Relatório', icone: BarChart3, badge: paraImprimir || avisos, tela: 'relatorio' },
   ]
 
   const visiveis = menu.filter((m) => {
@@ -112,7 +111,7 @@ export function Layout() {
       </div>
 
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/80 backdrop-blur-xl print:hidden dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex max-w-[1700px] items-center gap-2 px-3 py-2">
+        <div className="mx-auto flex max-w-[1900px] items-center gap-1.5 px-3 py-1.5">
           <NavLink to="/" className="shrink-0" onClick={tocarNoLogo}>
             <Logo />
           </NavLink>
@@ -124,7 +123,7 @@ export function Layout() {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-bold transition-all duration-200',
+                    'relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold transition-all duration-200',
                     isActive
                       ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
                       : 'text-slate-600 hover:bg-white hover:text-purple-700 hover:shadow-soft dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-purple-300',
@@ -145,7 +144,7 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2 xl:ml-1">
             <button
               onClick={alternar}
-              className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
               title={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
             >
               {escuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -266,7 +265,7 @@ export function Layout() {
 
       </header>
 
-      <main className="relative mx-auto max-w-[1700px] px-3 py-3">
+      <main className="relative mx-auto max-w-[1900px] px-3 py-2">
         {emVisualizacao && usuario ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
@@ -283,7 +282,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="relative mx-auto max-w-[1700px] px-3 pb-3 text-center text-[11px] text-slate-400 print:hidden dark:text-slate-500">
+      <footer className="relative mx-auto max-w-[1900px] px-3 pb-2 text-center text-[11px] text-slate-400 print:hidden dark:text-slate-500">
         {db.configuracoes.empresa_nome || 'Altoprints'} · Sistema de pedidos DTF ·{' '}
         {ehProprietario
           ? `${db.pedidos.length} pedidos • ${db.vendedores.length} vendedores • visão do proprietário`

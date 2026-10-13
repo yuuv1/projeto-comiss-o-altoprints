@@ -86,7 +86,7 @@ export default function Painel() {
   const maiorFaturamento = Math.max(1, ...ranking.map((r) => r.faturamento))
 
   const atalhos = [
-    { label: 'Fila de impressão', valor: filaImpressao.length, icone: Printer, to: '/para-imprimir', cor: 'from-fuchsia-500 to-pink-600' },
+    { label: 'Fila de impressão', valor: filaImpressao.length, icone: Printer, to: '/relatorio', cor: 'from-fuchsia-500 to-pink-600' },
     { label: 'Correios a entregar', valor: entregasCorreios.length, icone: Truck, to: '/entregas', cor: 'from-sky-500 to-blue-600' },
     { label: 'Retiradas pendentes', valor: retiradas.length, icone: Store, to: '/entregas', cor: 'from-violet-500 to-indigo-600' },
     { label: 'Pedidos incompletos', valor: incompletos.length, icone: AlertTriangle, to: '/pedidos', cor: 'from-amber-500 to-orange-600' },

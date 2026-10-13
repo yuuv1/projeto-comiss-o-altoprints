@@ -44,7 +44,7 @@ import {
 import { AbaNuvem } from '../components/Nuvem'
 import Equipe from './Equipe'
 import Vendedores from './Vendedores'
-import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmacao } from '../components/ui'
+import { Abas, Botao, Campo, Cartao, Entrada, Etiqueta, cn, useConfirmacao } from '../components/ui'
 
 type Aba =
   | 'comissoes'
@@ -168,10 +168,10 @@ export default function Configuracoes() {
 
   return (
     <>
-      <TituloPagina
-        icone={Settings}
-        titulo="Configurações"
-        subtitulo="Regras de comissão, permissões da equipe, empresa e dados. Só o proprietário acessa."
+      <Abas<Aba>
+        ativa={aba}
+        onChange={setAba}
+        abas={abas.map(({ id, label, icone }) => ({ id, label, icone }))}
         acoes={
           <>
             {aba === 'comissoes' ? (
@@ -187,24 +187,6 @@ export default function Configuracoes() {
           </>
         }
       />
-
-      <div className="mb-4 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft dark:border-slate-800 dark:bg-slate-900">
-        {abas.map(({ id, label, icone: Icone }) => (
-          <button
-            key={id}
-            onClick={() => setAba(id)}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition',
-              aba === id
-                ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-            )}
-          >
-            <Icone className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* ------------------------------ COMISSÕES ------------------------------ */}
       {aba === 'comissoes' ? (

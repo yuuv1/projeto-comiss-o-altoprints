@@ -15,7 +15,6 @@ import Impressoes from './pages/Impressoes'
 import Login from './pages/Login'
 import MinhaArea from './pages/MinhaArea'
 import Painel from './pages/Painel'
-import ParaImprimir from './pages/ParaImprimir'
 import PedidoForm from './pages/PedidoForm'
 import Pedidos from './pages/Pedidos'
 import PorVendedor from './pages/PorVendedor'
@@ -132,14 +131,8 @@ export default function App() {
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/vendedores" element={<Vendedores />} />
           <Route path="/por-vendedor" element={<PorVendedor />} />
-          <Route
-            path="/para-imprimir"
-            element={
-              <Permitido tela="paraImprimir">
-                <ParaImprimir />
-              </Permitido>
-            }
-          />
+          {/* a fila de impressão agora é a primeira aba da tela Filas (Relatório) */}
+          <Route path="/para-imprimir" element={<Navigate to="/relatorio" replace />} />
           <Route
             path="/impressoes"
             element={

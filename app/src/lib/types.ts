@@ -372,6 +372,33 @@ export const pedidoVazio = (): Omit<Pedido, 'id'> => ({
   updated_at: new Date().toISOString(),
 })
 
+/* ------------------------------------------------------------------ */
+/* Etapas da fila (o caminho que o pedido faz até a entrega)           */
+/* ------------------------------------------------------------------ */
+
+export const ETAPAS_FILA = ['a_pagar', 'a_imprimir', 'imprimindo', 'concluido', 'entregue'] as const
+export type EtapaFila = (typeof ETAPAS_FILA)[number]
+
+export const LABEL_ETAPA: Record<EtapaFila, string> = {
+  a_pagar: 'A pagar',
+  a_imprimir: 'A imprimir',
+  imprimindo: 'Imprimindo',
+  concluido: 'Concluído',
+  entregue: 'Entregue',
+}
+
+/** Em que ponto da fila o pedido está (usado nos filtros e nos botões). */
+export const etapaFila = (p: Pedido): EtapaFila => {
+  if (p.data_entrega || p.data_retirada) return 'entregue'
+  if (p.impresso || p.status_producao === 'dtf_pronto') return 'concluido'
+  if (p.status_pagamento !== 'pago') return 'a_pagar'
+  return p.status_producao === 'imprimir' ? 'imprimindo' : 'a_imprimir'
+}
+
+/** Pedido pago que ainda precisa passar pela máquina. */
+export const naFilaDeImpressao = (p: Pedido) =>
+  p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto'
+
 export const isPedidoCompleto = (p: Pedido) =>
   p.status_producao === 'dtf_pronto' && p.status_pagamento === 'pago'
 

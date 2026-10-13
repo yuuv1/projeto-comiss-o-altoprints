@@ -11,7 +11,6 @@ import {
   Interruptor,
   Modal,
   Selecao,
-  TituloPagina,
   Vazio,
   useConfirmacao,
 } from '../components/ui'
@@ -94,14 +93,9 @@ export default function Clientes() {
 
   return (
     <>
-      <TituloPagina
-        icone={Users}
-        titulo={ehProprietario ? 'Clientes' : 'Meus clientes'}
-        subtitulo={
-          ehProprietario
-            ? 'Cadastro de clientes com vendedor responsável e valor especial do metro.'
-            : 'Aqui aparecem somente os clientes ligados a você.'
-        }
+      <Abas<'clientes' | 'especiais'>
+        ativa={aba}
+        onChange={setAba}
         acoes={
           aba === 'clientes' ? (
             <Botao icone={Plus} onClick={abrirNovo}>
@@ -109,11 +103,6 @@ export default function Clientes() {
             </Botao>
           ) : undefined
         }
-      />
-
-      <Abas<'clientes' | 'especiais'>
-        ativa={aba}
-        onChange={setAba}
         abas={[
           { id: 'clientes', label: 'Clientes', icone: Users, contador: db.clientes.length },
           { id: 'especiais', label: '★ Especiais', icone: Star, contador: especiais },

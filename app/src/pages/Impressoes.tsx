@@ -13,15 +13,16 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import FilaDeImpressao from '../components/FilaDeImpressao'
 import { useRegistrarImpressao } from '../components/impressao'
 import { LogoImpressao } from '../components/Logo'
 import {
   Abas,
-  BarraAcoes,
   Botao,
   Campo,
   CartaoResumo,
   Etiqueta,
+  Pilulas,
   Selecao,
   TituloPagina,
   Vazio,
@@ -40,13 +41,18 @@ import {
   type PeriodoImpressoes,
 } from '../lib/impressoes'
 import { useStore } from '../lib/store'
-import { type Impressao, LABEL_TIPO_IMPRESSAO } from '../lib/types'
+import { type Impressao, LABEL_TIPO_IMPRESSAO, naFilaDeImpressao, telasDoUsuario } from '../lib/types'
 
 export default function Impressoes({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, excluirImpressao, avisar, nomeVendedor } = useStore()
-  const { ehProprietario } = useAuth()
+  const { usuario, ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const impressao = useRegistrarImpressao()
+
+  /** a tela Filas tem as duas pontas: o que ainda vai imprimir e o que já saiu */
+  const podeVerFila = ehProprietario || telasDoUsuario(usuario).paraImprimir
+  const naFila = useMemo(() => db.pedidos.filter(naFilaDeImpressao), [db.pedidos])
+  const [visao, setVisao] = useState<'fila' | 'registradas'>(podeVerFila && naFila.length ? 'fila' : 'registradas')
 
   const [periodo, setPeriodo] = useState<PeriodoImpressoes>('hoje')
   const [quem, setQuem] = useState('todos')
@@ -98,28 +104,31 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
 
   return (
     <>
-      {embutido ? (
-        <BarraAcoes>
+      {embutido ? null : (
+        <TituloPagina
+          icone={History}
+          titulo="Filas registradas"
+          subtitulo="O que está para imprimir e tudo o que já saiu da máquina: metros, quem imprimiu e reimpressões."
+        />
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
+        {podeVerFila ? (
+          <Pilulas<'fila' | 'registradas'>
+            ativo={visao}
+            onChange={setVisao}
+            itens={[
+              { id: 'fila', label: 'A imprimir', contador: naFila.length },
+              { id: 'registradas', label: 'Impressas', contador: db.impressoes.length },
+            ]}
+          />
+        ) : null}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
             Registrar impressão
           </Botao>
-          <Botao variante="secundario" icone={Printer} onClick={() => window.print()} disabled={!filtradas.length}>
-            Imprimir / PDF
-          </Botao>
-          <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV} disabled={!filtradas.length}>
-            Exportar CSV
-          </Botao>
-        </BarraAcoes>
-      ) : (
-        <TituloPagina
-          icone={History}
-          titulo="Impressões"
-          subtitulo="Tudo o que saiu da máquina: metros, quem imprimiu, reimpressões e o motivo."
-          acoes={
+          {visao === 'registradas' ? (
             <>
-              <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
-                Registrar impressão
-              </Botao>
               <Botao variante="secundario" icone={Printer} onClick={() => window.print()} disabled={!filtradas.length}>
                 Imprimir / PDF
               </Botao>
@@ -127,10 +136,14 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
                 Exportar CSV
               </Botao>
             </>
-          }
-        />
-      )}
+          ) : null}
+        </div>
+      </div>
 
+      {visao === 'fila' && podeVerFila ? (
+        <FilaDeImpressao />
+      ) : (
+        <>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Impressões"
@@ -230,15 +243,15 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-bold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:bg-slate-900">
-                    <th className="px-4 py-3">Quando</th>
-                    <th className="px-4 py-3">Pedido</th>
-                    {ehProprietario ? <th className="px-4 py-3">Vendedor</th> : null}
-                    <th className="px-4 py-3">Arte</th>
-                    <th className="px-4 py-3">Metros</th>
-                    <th className="px-4 py-3">Quem imprimiu</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3">Observação</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-3 py-2">Quando</th>
+                    <th className="px-3 py-2">Pedido</th>
+                    {ehProprietario ? <th className="px-3 py-2">Vendedor</th> : null}
+                    <th className="px-3 py-2">Arte</th>
+                    <th className="px-3 py-2">Metros</th>
+                    <th className="px-3 py-2">Quem imprimiu</th>
+                    <th className="px-3 py-2">Tipo</th>
+                    <th className="px-3 py-2">Observação</th>
+                    <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -250,13 +263,13 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
                         i.tipo === 'reimpressao' ? 'bg-amber-50/60 dark:bg-amber-950/20' : '',
                       )}
                     >
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">
+                      <td className="whitespace-nowrap px-3 py-2 text-slate-500 dark:text-slate-400">
                         <span className="inline-flex items-center gap-1.5">
                           <CalendarDays className="h-3.5 w-3.5" />
                           {dataHoraBR(i.quando)}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <Link
                           to={`/pedido/${i.pedido_id}`}
                           className="font-extrabold text-slate-700 hover:text-purple-700 dark:text-slate-200 dark:hover:text-purple-300"
@@ -266,23 +279,23 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
                         <div className="text-xs text-slate-500 dark:text-slate-400">{i.cliente_nome}</div>
                       </td>
                       {ehProprietario ? (
-                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                           {nomeVendedor(vendedorDoPedido.get(i.pedido_id))}
                         </td>
                       ) : null}
-                      <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
                         {i.arquivo_nome || '—'}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-700 dark:text-slate-200">
+                      <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-700 dark:text-slate-200">
                         {numeroBR(i.metros)} m
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
+                      <td className="whitespace-nowrap px-3 py-2">
                         <span className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                           <User className="h-3.5 w-3.5" />
                           {i.quem || '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         {i.tipo === 'reimpressao' ? (
                           <Etiqueta className="border-amber-200 bg-amber-50 text-amber-800" icone={RotateCcw}>
                             {i.motivo || LABEL_TIPO_IMPRESSAO.reimpressao}
@@ -293,10 +306,10 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
                           </Etiqueta>
                         )}
                       </td>
-                      <td className="max-w-[240px] px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      <td className="max-w-[240px] px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
                         {i.observacao || '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-2 text-right">
                         {ehProprietario ? (
                           <Botao
                             tamanho="icone"
@@ -369,6 +382,9 @@ export default function Impressoes({ embutido = false }: { embutido?: boolean } 
           {dataBR(new Date().toISOString())}.
         </p>
       </div>
+
+        </>
+      )}
 
       {dialog}
       {impressao.janela}

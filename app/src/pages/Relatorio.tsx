@@ -1,6 +1,6 @@
 import { BarChart3, History } from 'lucide-react'
 import { useState } from 'react'
-import { Abas, TituloPagina } from '../components/ui'
+import { Abas } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { telasDoUsuario } from '../lib/types'
 import Impressoes from './Impressoes'
@@ -24,11 +24,6 @@ export default function Relatorio() {
 
   return (
     <>
-      <TituloPagina
-        icone={BarChart3}
-        titulo="Relatório"
-        subtitulo="As filas que saíram da máquina e o resumo de vendas e comissões do período."
-      />
       <Abas<AbaRelatorio>
         ativa={aba}
         onChange={setAba}

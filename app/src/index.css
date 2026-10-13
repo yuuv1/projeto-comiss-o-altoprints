@@ -427,15 +427,15 @@
 /* ------------------------------------------------------------------ */
 /* Densidade da tela                                                   */
 /*                                                                     */
-/* O sistema abre no modo compacto (--espaco 0.82): todo espaçamento,   */
+/* O sistema abre no modo compacto (--espaco 0.75): todo espaçamento,   */
 /* altura de botão e canto arredondado é multiplicado por essas duas    */
 /* variáveis (veja tailwind.config.js). Configurações → Aparência troca  */
 /* para o modo confortável, que devolve o espaçamento original.         */
 /* ------------------------------------------------------------------ */
 
 :root {
-  --espaco: 0.82;
-  --raio: 0.8;
+  --espaco: 0.75;
+  --raio: 0.72;
 }
 
 html.confortavel {
