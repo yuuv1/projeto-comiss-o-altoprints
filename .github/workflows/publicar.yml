@@ -28,22 +28,38 @@ jobs:
           # Os testes de tela usam o jsdom 30, que precisa do Node 22.22+
           # (Promise.withResolvers). No Node 20 eles quebravam.
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
 
       - name: Instalar dependências
         working-directory: app
-        run: npm install
+        run: npm ci
+
+      - name: Conferir os tipos (TypeScript)
+        working-directory: app
+        run: npx tsc -b
 
       - name: Rodar os testes
         working-directory: app
         run: npm run testar
 
+      # Gera o app/dist (site) + a pasta publicar/ (Netlify Drop) + o arquivo
+      # único Altoprints.html. As chaves do Supabase são opcionais: sem elas o
+      # site sobe em modo local e a conexão é feita depois pela tela Nuvem.
       - name: Gerar a versão de produção
         working-directory: app
         env:
           # Configure em Settings > Secrets and variables > Actions (opcional)
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run build
+        run: npm run publicar
+
+      # Trava de segurança: nenhuma credencial de exemplo, dado de pessoa real ou
+      # chave SECRETA do Supabase pode sair daqui para o ar.
+      - name: Conferir o pacote antes de publicar
+        working-directory: app
+        run: npm run checar
 
       # Liga o Pages se ainda não estiver ligado (Settings → Pages →
       # Source: GitHub Actions). Em repositório PRIVADO o Pages só existe em
@@ -59,7 +75,7 @@ jobs:
       - name: Como publicar quando o GitHub Pages não está disponível
         if: steps.paginas.outcome != 'success'
         run: |
-          echo "::warning::O GitHub Pages não está disponível neste repositório (em repositório privado ele exige conta paga). Os testes e a versão de produção passaram: publique a pasta publicar/ no Netlify Drop — o passo a passo está em app/DEPLOY.md."
+          echo "::warning::O GitHub Pages não está disponível neste repositório (em repositório privado ele exige conta paga). Os testes e a versão de produção passaram: baixe o artefato \"Altoprints-pronto-para-publicar\" desta execução e arraste a pasta publicar/ no Netlify Drop — o passo a passo está em LANCAMENTO.md."
           {
             echo "## O GitHub Pages não está disponível neste repositório"
             echo ""
@@ -68,17 +84,28 @@ jobs:
             echo ""
             echo "Para publicar de graça hoje (5 minutos, sem instalar nada):"
             echo ""
-            echo "1. Abra <https://app.netlify.com/drop>"
-            echo "2. Arraste a pasta \`publicar/\` para a área pontilhada"
-            echo "3. Espere o deploy terminar e clique em **Claim site**"
+            echo "1. Baixe o artefato **Altoprints-pronto-para-publicar** no fim desta página"
+            echo "2. Abra <https://app.netlify.com/drop>"
+            echo "3. Arraste a pasta \`publicar/\` (que está dentro do artefato) para a área pontilhada"
+            echo "4. Espere o deploy terminar e clique em **Claim site**"
             echo ""
-            echo "Passo a passo completo em [app/DEPLOY.md](app/DEPLOY.md)."
+            echo "Passo a passo completo em [LANCAMENTO.md](LANCAMENTO.md)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-pages-artifact@v3
         if: steps.paginas.outcome == 'success'
         with:
           path: app/dist
+
+      # A pasta pronta para arrastar no Netlify Drop fica disponível para baixar
+      # mesmo quando o GitHub Pages não está liberado (conta gratuita).
+      - name: Disponibilizar a pasta pronta (Netlify Drop)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Altoprints-pronto-para-publicar
+          path: publicar/
+          if-no-files-found: error
+          retention-days: 30
 
   deploy:
     needs: build

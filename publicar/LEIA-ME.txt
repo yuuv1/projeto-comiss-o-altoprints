@@ -1,4 +1,12 @@
-Altoprints — Sistema de Pedidos DTF  (versão 1.0.10)
+Altoprints — Sistema de Pedidos DTF  (versão 1.1.0)
+
+O SISTEMA COMEÇA VAZIO, DO ZERO:
+  - Nenhum pedido, cliente, vendedor ou conta vem pronto.
+  - Não existe usuário nem senha padrão: o primeiro acesso de proprietário é
+    criado por você, na hora (veja "PRIMEIRO ACESSO" abaixo).
+  - Exemplos para treinar a equipe são opcionais e fictícios: entram só se você
+    pedir em Configurações → Dados → "Carregar demonstração" (e a tela fica com
+    um aviso amarelo de "dados de exemplo" até você apagar).
 
 DUAS FORMAS DE USAR:
 
@@ -18,19 +26,24 @@ COMO ATUALIZAR DEPOIS:
   - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)
   - O arquivo Altoprints.html é gerado de novo junto (é só clicar duas vezes nele)
 
-PRIMEIRO ACESSO:
-  - Se o sistema ainda estiver com os DADOS DE EXEMPLO, já existe um acesso pronto:
-      usuário: gui        senha: 12345
-    (troque a senha depois em Configurações → Meu acesso)
-  - Para criar o seu próprio acesso de proprietário (quando não houver nenhum):
-      Endereço:   .../#/administracao   (salve na tela de início do celular)
-      Alternativa: 5 toques no logo, ou Ctrl + Alt + D no computador
+PRIMEIRO ACESSO (criar o dono do sistema):
+  1. Abra o sistema e vá no endereço  .../#/administracao
+     (alternativas: 5 toques seguidos no logo, ou Ctrl + Alt + D no computador)
+  2. Como ainda não existe proprietário, a tela oferece "Criar acesso do proprietário":
+     digite o seu nome, o usuário e uma SENHA FORTE (guarde-a bem).
+  3. Salve esse endereço como ícone na tela de início do celular: entra com 1 toque.
+  4. Quer um segundo login de dono (sócio, gerente, escritório)?
+     Equipe → Nova conta → Tipo de acesso: "Proprietário — vê tudo".
+  5. Contas da equipe: Equipe → Nova conta (vendedor), ou cada um toca em
+     "Criar meu acesso" na tela de entrada.
 
 ONDE OS DADOS FICAM (importante):
   - Neste aparelho, os dados ficam guardados no próprio navegador, num espaço
     grande (IndexedDB) — o registro de impressões, pedidos e clientes não
     esbarra mais no limite pequeno do navegador.
-  - Para a equipe trabalhar junta, conecte a nuvem (Configurações → Nuvem).
+  - SEM A NUVEM, CADA APARELHO TEM OS PRÓPRIOS DADOS: o celular do vendedor não
+    vê os pedidos do computador. Para a equipe trabalhar junta, conecte a nuvem
+    (Configurações → Nuvem) — leva uns 8 minutos e é grátis.
 
 CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:
   - Configurações → Nuvem → siga o assistente: cria o projeto do Supabase,
@@ -39,18 +52,20 @@ CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:
     fica conectado naquele aparelho.
   - Guia completo: app/CONECTAR-NUVEM.md
 
-IMPORTANTE:
-  - Sem a nuvem conectada, cada aparelho guarda a própria lista de pedidos.
-  - No arquivo Altoprints.html (aberto do computador), os dados ficam no navegador
-    daquele computador; para a equipe trabalhar junta, use a opção B + nuvem.
-  - Anexar arquivos de arte funciona hospedado (opção B) ou com a nuvem conectada;
-    abrindo o arquivo direto do computador, alguns navegadores não guardam os anexos.
+ANTES DE COMEÇAR A USAR DE VERDADE:
+  - Se carregou os exemplos para treinar: Configurações → Dados →
+    "Apagar todos os dados" (o seu acesso de proprietário é mantido).
+  - Confira as comissões e os preços em Configurações.
+  - Envie o logo da empresa em Configurações → Empresa.
   - Faça backup de vez em quando (Configurações → Dados → Baixar backup).
 
 SE APARECER UM ERRO DE "SEM ESPAÇO" OU NADA FOR SALVO:
   - Confira se a janela do navegador não está ANÔNIMA/PRIVADA: nesse modo o
     navegador não deixa o sistema salvar nada. Abra numa janela normal.
   - A tela de login avisa quando isso está acontecendo e mostra a versão do
-    sistema no rodapé (ex.: "versão 1.0.10").
+    sistema no rodapé (ex.: "versão 1.1.0").
   - Em Configurações → Dados existe o bloco "Onde os dados ficam neste aparelho",
     com o botão "Liberar espaço" quando o armazenamento antigo estiver cheio.
+
+ESQUECI A SENHA DO PROPRIETÁRIO:
+  - O caminho está em app/DEPLOY.md (título "Esqueci a senha").

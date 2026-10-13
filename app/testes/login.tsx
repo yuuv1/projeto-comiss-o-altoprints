@@ -96,6 +96,7 @@ async function main() {
       administrador?: boolean
     }) => Promise<void>
     alternarAtivo: (id: string, ativo: boolean) => Promise<void>
+    excluirUsuario: (id: string) => Promise<void>
   }
   let auth: Auth | null = null
   function Probe() {
@@ -104,10 +105,8 @@ async function main() {
   }
   const pegar = () => auth as unknown as Auth
 
-  // O login é testado num sistema VAZIO (sem os dados de exemplo, que hoje já
-  // vêm com um acesso de proprietário pronto): marca a carga da demonstração
-  // como já feita, para o sistema não semeá-la.
-  dom.window.localStorage.setItem('altoprints:demo-inicial-carregada', '1')
+  // O sistema começa VAZIO: nenhum dado de exemplo é semeado no primeiro acesso
+  // (a demonstração só entra quando o proprietário pede em Configurações → Dados).
 
   const raiz = dom.window.document.getElementById('root')
   createRoot(raiz as unknown as Element).render(
@@ -119,6 +118,12 @@ async function main() {
   )
   await espera(1200)
 
+  const brutoInicial = dom.window.localStorage.getItem('altoprints:db:v1')
+  const inicio = brutoInicial ? JSON.parse(brutoInicial) : null
+  igual('sistema novo começa sem pedidos de exemplo', inicio?.pedidos?.length ?? 0, 0)
+  igual('sistema novo começa sem clientes de exemplo', inicio?.clientes?.length ?? 0, 0)
+  igual('sistema novo começa sem vendedores de exemplo', inicio?.vendedores?.length ?? 0, 0)
+  igual('sistema novo começa sem nenhuma conta pronta', inicio?.usuarios?.length ?? 0, 0)
   igual('sistema novo não tem proprietário', pegar().temProprietario, false)
 
   /* ------------------------ conta do proprietário ---------------------- */
@@ -218,6 +223,54 @@ async function main() {
   await pegar().entrar('dona', '1234', true)
   await respirar()
   igual('dono volta a entrar normalmente', pegar().usuario?.usuario, 'dona')
+
+  /* ------------- vários proprietários: desativar e excluir -------------- */
+  // O sistema aceita mais de um acesso de proprietário (sócio, gerente...), mas
+  // nunca pode ficar sem nenhum ativo — e ninguém apaga o próprio acesso.
+  const banco4 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
+  const idDona = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'dona').id
+  const idSocio = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'socio').id
+  const idRaissa = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'raissa').id
+
+  await esperaErro('ninguém exclui o próprio acesso', pegar().excluirUsuario(idDona), 'próprio acesso')
+  await pegar().alternarAtivo(idSocio, false)
+  await respirar()
+  igual(
+    'segundo proprietário pode ser desativado (resta um ativo)',
+    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.find(
+      (u: { usuario: string }) => u.usuario === 'socio',
+    )?.ativo,
+    false,
+  )
+  await pegar().excluirUsuario(idSocio)
+  await respirar()
+  igual(
+    'segundo proprietário foi excluído',
+    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.some(
+      (u: { usuario: string }) => u.usuario === 'socio',
+    ),
+    false,
+  )
+  // agora só resta a "dona": o sistema não pode ficar sem proprietário
+  await pegar().sair()
+  await respirar()
+  await pegar().entrar('raissa', '1234', true)
+  await respirar()
+  await esperaErro(
+    'o último proprietário ativo não pode ser excluído',
+    pegar().excluirUsuario(idDona),
+    'único proprietário',
+  )
+  await pegar().sair()
+  await respirar()
+  igual(
+    'a dona continua cadastrada (o sistema não ficou sem proprietário)',
+    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.some(
+      (u: { usuario: string }) => u.usuario === 'dona' && u.ativo,
+    ),
+    true,
+  )
+  igual('a conta usada no teste continua existindo', Boolean(idRaissa), true)
 
   // volta a sessão para a JESSICA (é ela que troca a própria senha abaixo)
   await pegar().sair()

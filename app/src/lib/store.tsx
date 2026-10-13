@@ -11,7 +11,6 @@ import {
 import {
   carregarTudo,
   limparTudo,
-  modoNuvem,
   removerArquivosDoPedido,
   removerRegistro,
   salvarConfiguracoes,
@@ -30,8 +29,7 @@ import {
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
 import { bloquearSeVisualizando, registrarAvisoDeBloqueio } from './visualizacao'
-import { gerarDadosDemo, prepararAcessoDemo } from './seed'
-import { gerarHashSenha } from './senha'
+import { gerarDadosDemo } from './seed'
 import {
   espacoNoLocalStorage,
   liberarCopiaAntiga,
@@ -40,7 +38,7 @@ import {
   type DiagnosticoArmazenamento,
   type OndeEstaGuardado,
 } from './armazenamento'
-import { limparChavesDoSistema, lsGravar, lsLer } from './local'
+import { limparChavesDoSistema, lsRemover } from './local'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -127,10 +125,12 @@ const dbVazio = (): DB => ({
   configuracoes: { ...CONFIG_PADRAO },
 })
 
-const CHAVE_DEMO = 'altoprints:demo-inicial-carregada'
-
-/** o acesso de exemplo nasce sem senha: ela é definida aqui, no primeiro uso */
-const prepararDemo = (dados: DB) => prepararAcessoDemo(dados, gerarHashSenha)
+/**
+ * Marca de versões antigas, que semeavam dados de exemplo sozinhas no primeiro
+ * acesso. Hoje o sistema **sempre** começa vazio; a chave só é apagada de
+ * aparelhos que já tinham o sistema instalado, para não sobrar lixo.
+ */
+const CHAVE_DEMO_ANTIGA = 'altoprints:demo-inicial-carregada'
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<DB>(dbVazio())
@@ -207,16 +207,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       try {
         const dados = await carregarTudo()
-        const vazio = !dados.pedidos.length && !dados.clientes.length && !dados.vendedores.length
-        const jaCarregouDemo = lsLer(CHAVE_DEMO) === '1'
-        if (vazio && !jaCarregouDemo && !modoNuvem()) {
-          const demo = gerarDadosDemo()
-          await substituirTudo(demo)
-          lsGravar(CHAVE_DEMO, '1')
-          setDb(demo)
-        } else {
-          setDb(await prepararDemo(dados))
-        }
+        // O sistema começa SEMPRE vazio: nenhum dado de exemplo é semeado aqui.
+        // Quem quiser exemplos para treinar pede em Configurações → Dados.
+        setDb(dados)
+        lsRemover(CHAVE_DEMO_ANTIGA)
         // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
         // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
         try {
@@ -451,7 +445,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await limparTudo()
       if (contaMantida) await salvarRegistro('usuarios', contaMantida)
       const vazio = { ...dbVazio(), usuarios: contaMantida ? [contaMantida] : [] }
-      localStorage.setItem(CHAVE_DEMO, '1')
+      lsRemover(CHAVE_DEMO_ANTIGA)
       setDb(vazio)
       avisar(
         contaMantida
@@ -500,14 +494,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [avisar],
   )
 
+  /**
+   * Carrega os dados de EXEMPLO (fictícios) para treinar a equipe.
+   * Nunca toca nas contas de acesso nem nas configurações do dono: assim ninguém
+   * é trancado para fora do sistema e o logo/comissões continuam os mesmos.
+   */
   const carregarDemo = useCallback(async () => {
     bloquearSeVisualizando()
-    const demo = await prepararDemo(gerarDadosDemo())
+    const exemplo = gerarDadosDemo()
+    const demo: DB = {
+      ...exemplo,
+      usuarios: db.usuarios,
+      configuracoes: {
+        ...db.configuracoes,
+        // avisa na tela que os pedidos abaixo não são reais
+        modo_exemplo: true,
+        revisao_ultima_em: new Date().toISOString(),
+      },
+    }
     await substituirTudo(demo)
-    lsGravar(CHAVE_DEMO, '1')
     setDb(demo)
-    avisar('Dados de demonstração carregados! O acesso de exemplo é o usuário "gui".')
-  }, [avisar])
+    avisar('Dados de exemplo (fictícios) carregados. Os seus acessos e configurações foram mantidos.')
+  }, [avisar, db.configuracoes, db.usuarios])
 
   /* ------------------------- espaço no aparelho ------------------------- */
 

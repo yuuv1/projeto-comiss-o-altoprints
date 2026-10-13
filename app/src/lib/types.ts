@@ -309,6 +309,13 @@ export interface Configuracoes {
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
   faixas_preco: FaixaPreco[]
+  /**
+   * `true` enquanto o banco estiver com os DADOS DE EXEMPLO (fictícios), que só
+   * entram quando o proprietário pede em Configurações → Dados. Serve para o
+   * sistema avisar na tela que aqueles pedidos não são reais — ninguém confunde
+   * treino com produção. Volta a `false` ao apagar todos os dados.
+   */
+  modo_exemplo?: boolean
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -320,6 +327,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   comissao_sem_metragem: 0,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
+  modo_exemplo: false,
 }
 
 /**

@@ -98,7 +98,7 @@ quantos metros saíram, quantas vezes reimprimiu nem por quê**.
    - Cada linha mostra: data/hora, pedido, cliente, arte, metros, quem imprimiu, observação
    - Exportar CSV e **Imprimir/PDF** (folha de produção do dia)
 3. **No pedido** (ficha do pedido): histórico de impressões — *"impresso 2× · 4,5 m no total · por
-   RAISSA em 08/10 14:32"*.
+   NOME DA PESSOA em 08/10 14:32"*.
 4. **Catálogo de artes** (segunda aba da mesma tela): os arquivos enviados viram uma biblioteca com
    **prévia da imagem**, cliente, tema/tag e "usado em N pedidos" — dá para reenviar a mesma arte
    para um pedido novo em 1 clique, sem o cliente precisar mandar de novo.

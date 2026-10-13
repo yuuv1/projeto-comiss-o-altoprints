@@ -303,30 +303,36 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                       >
                         {c.ativo ? 'Desativar' : 'Liberar'}
                       </Botao>
-                      {c.papel !== 'proprietario' ? (
-                        <Botao
-                          tamanho="sm"
-                          variante="ghost"
-                          className="text-rose-500 hover:bg-rose-50"
-                          icone={Trash2}
-                          onClick={async () => {
-                            const ok = await confirmar({
-                              titulo: `Excluir o acesso de ${c.nome}?`,
-                              mensagem:
-                                'Os pedidos dele continuam salvos no sistema — só o acesso é apagado. Se ele saiu da empresa, prefira “Desativar”.',
-                            })
-                            if (ok) {
-                              try {
-                                await excluirUsuario(c.id)
-                              } catch (e) {
-                                avisar((e as Error).message, 'erro')
-                              }
+                      <Botao
+                        tamanho="sm"
+                        variante="ghost"
+                        className="text-rose-500 hover:bg-rose-50"
+                        icone={Trash2}
+                        title={
+                          c.papel === 'proprietario'
+                            ? 'Excluir este acesso de proprietário (o sistema nunca fica sem nenhum)'
+                            : 'Excluir este acesso'
+                        }
+                        onClick={async () => {
+                          const ok = await confirmar({
+                            titulo: `Excluir o acesso de ${c.nome}?`,
+                            mensagem:
+                              c.papel === 'proprietario'
+                                ? 'É um acesso de PROPRIETÁRIO (vê tudo). Os pedidos continuam salvos — só o acesso é apagado. O sistema não permite ficar sem nenhum proprietário ativo.'
+                                : 'Os pedidos dele continuam salvos no sistema — só o acesso é apagado. Se ele saiu da empresa, prefira “Desativar”.',
+                            textoBotao: 'Excluir acesso',
+                          })
+                          if (ok) {
+                            try {
+                              await excluirUsuario(c.id)
+                            } catch (e) {
+                              avisar((e as Error).message, 'erro')
                             }
-                          }}
-                        >
-                          Excluir
-                        </Botao>
-                      ) : null}
+                          }
+                        }}
+                      >
+                        Excluir
+                      </Botao>
                     </>
                   ) : (
                     <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -344,6 +350,10 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         <b>Como cada acesso funciona:</b> o vendedor entra e vê apenas os pedidos dele (e a comissão dele). O
         proprietário vê tudo. Aqui você pode trocar a senha de quem esqueceu, desativar quem saiu e ligar cada acesso
         ao vendedor correspondente — é esse vínculo que define quais pedidos aparecem para cada pessoa.
+        <br />
+        <b>Mais de um proprietário?</b> Pode: use <b>Nova conta</b> e escolha “Proprietário — vê tudo” (útil para sócio,
+        gerente ou para o escritório). O sistema só não deixa ficar <b>sem nenhum</b> proprietário ativo — por isso o
+        último não pode ser desativado nem excluído.
       </p>
 
       <Modal
@@ -352,7 +362,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         icone={UserPlus}
         largura="max-w-lg"
         titulo="Nova conta de acesso"
-        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui."
+        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui. Para criar mais um acesso de PROPRIETÁRIO (sócio, gerente, escritório), escolha “Proprietário — vê tudo” em Tipo de acesso."
         rodape={
           <>
             <Botao variante="secundario" onClick={() => setCriando(false)}>

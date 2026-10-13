@@ -11,7 +11,6 @@ import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
 import { lsGravar, lsLer, lsRemover } from './local'
 import { definirVisualizacao } from './visualizacao'
-import { ACESSO_DEMO, contaDemo } from './seed'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { clienteNuvem, emNuvem } from './supabase'
 import { type TelasAcesso, type Usuario, type Vendedor } from './types'
@@ -44,6 +43,8 @@ const CHAVE_SESSAO = 'altoprints:sessao'
 const CHAVE_TENTATIVAS = 'altoprints:tentativas'
 /** marca usada só no modo de desenvolvimento (prévia): entra sozinho uma vez */
 const CHAVE_ENTRADA_DEV = 'altoprints:entrada-automatica'
+/** usuário da conta criada só na prévia (npm run dev) — nunca existe no sistema publicado */
+const USUARIO_DEV = 'dev'
 const DIAS_CONECTADO = 30
 const MAX_TENTATIVAS = 5
 const BLOQUEIO_MINUTOS = 5
@@ -209,35 +210,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (achou) setUsuarioId(achou.id)
           else lsRemover(CHAVE_SESSAO)
         } else if (import.meta.env.DEV && lsLer(CHAVE_ENTRADA_DEV) !== '1') {
-          // Na prévia (modo de desenvolvimento) o sistema entra sozinho com o
-          // acesso de exemplo, uma única vez — para ver o sistema sem passar pelo
-          // login. A versão publicada nunca faz isso.
+          // SÓ NA PRÉVIA (npm run dev): abre a sessão sozinho uma única vez, para
+          // não precisar digitar senha a cada reinício do Vite.
+          // A versão publicada NUNCA faz isso (import.meta.env.DEV vira false no
+          // build) e não existe senha padrão no sistema: a conta de
+          // desenvolvimento é criada com uma senha aleatória impossível de
+          // digitar — a entrada acontece pela sessão, não pela senha.
           lsGravar(CHAVE_ENTRADA_DEV, '1')
           // o StrictMode roda este efeito duas vezes: confere no banco antes de criar
-          const jaExiste = (await lerUsuarios()).find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
-          let demo = jaExiste ?? usuarios.find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
-          if (!demo && !(await lerUsuarios()).some((u) => u.papel === 'proprietario')) {
-            // dados de exemplo de uma versão anterior (sem o acesso pronto): cria agora
-            const conta = { ...contaDemo(), senha_hash: await gerarHashSenha(ACESSO_DEMO.senha) }
+          const noBanco = await lerUsuarios()
+          let dev = noBanco.find((u) => u.usuario === USUARIO_DEV && u.ativo)
+          if (!dev && !noBanco.some((u) => u.papel === 'proprietario')) {
+            const conta: Usuario = {
+              id: novoId(),
+              nome: 'Desenvolvimento',
+              usuario: USUARIO_DEV,
+              senha_hash: await gerarHashSenha(novoId()),
+              papel: 'proprietario',
+              vendedor_id: '',
+              ativo: true,
+              criado_em: new Date().toISOString(),
+            }
             try {
               await salvarRegistro('usuarios', conta)
               await recarregar()
-              demo = conta
+              dev = conta
             } catch (e) {
-              console.warn('[altoprints] não foi possível criar o acesso de exemplo:', (e as Error).message)
+              console.warn('[altoprints] não foi possível criar o acesso de desenvolvimento:', (e as Error).message)
             }
           }
-          if (demo) {
+          if (dev) {
             lsGravar(
               CHAVE_SESSAO,
               JSON.stringify({
-                usuario_id: demo.id,
+                usuario_id: dev.id,
                 expira_em: new Date(Date.now() + 30 * 86400000).toISOString(),
                 conectado: true,
               }),
             )
-            console.info(`[altoprints] prévia: entrando com o acesso de exemplo "${ACESSO_DEMO.usuario}".`)
-            setUsuarioId(demo.id)
+            console.info(`[altoprints] prévia: sessão de desenvolvimento aberta como "${dev.usuario}".`)
+            setUsuarioId(dev.id)
           }
         }
       } finally {
@@ -533,13 +545,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     avisar(ativo ? `Acesso de ${alvo.nome} liberado.` : `Acesso de ${alvo.nome} desativado.`, ativo ? 'sucesso' : 'info')
   }
 
+  /**
+   * Exclui uma conta de acesso.
+   * Regras: ninguém exclui o próprio acesso e o sistema nunca fica sem
+   * proprietário ativo — mas, havendo mais de um, os extras podem ser apagados
+   * (ex.: um acesso de dono criado por engano, ou alguém que deixou a sociedade).
+   */
   const excluirUsuario: AuthContexto['excluirUsuario'] = async (usuarioId) => {
-    const alvo = usuarios.find((u) => u.id === usuarioId)
+    if (usuarioId === usuarioReal?.id) throw new Error('Você não pode excluir o seu próprio acesso.')
+    const noBanco = await lerUsuarios()
+    const lista = noBanco.length ? noBanco : usuarios
+    const alvo = lista.find((u) => u.id === usuarioId)
     if (!alvo) return
-    if (alvo.papel === 'proprietario') throw new Error('Contas de proprietário não podem ser excluídas.')
+    if (alvo.papel === 'proprietario') {
+      const outrosDonos = lista.filter((u) => u.papel === 'proprietario' && u.ativo && u.id !== alvo.id)
+      if (!outrosDonos.length)
+        throw new Error(
+          'Este é o único proprietário ativo do sistema: crie (ou libere) outro acesso de proprietário antes de excluí-lo.',
+        )
+    }
     await removerRegistro('usuarios', usuarioId)
     await recarregar()
-    avisar('Conta excluída.', 'info')
+    avisar(`Acesso de ${alvo.nome} excluído.`, 'info')
   }
 
   const vendedorNome = useMemo(() => {

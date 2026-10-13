@@ -60,19 +60,23 @@ Endereço sugerido: **`#/administracao`** (fácil de ditar e de guardar). Se pre
 
 **A ideia:** você conversa com cada uma, ela escolhe a senha, e você cria a conta dela **já ligada ao histórico antigo** — ela continua exatamente de onde parou.
 
-Base atual (exemplo): **JESSICA** · 24 pedidos · R$ 8.967,55 — **RAISSA** · 44 pedidos · R$ 13.980,54.
+Como aparece na tela (valores ilustrativos): **VENDEDORA A** · *N* pedidos · *R$ total* — **VENDEDORA B** · *N* pedidos · *R$ total*.
+
+> Os nomes e números reais das funcionárias **não ficam neste documento nem no sistema
+> publicado**: o sistema sobe vazio e os dados de treino são fictícios (`CLIENTE EXEMPLO 01`,
+> `VENDEDOR EXEMPLO A`). Os vínculos de verdade são criados por você em *Equipe → Nova conta*.
 
 ### 3.1 Como você cria a conta (tela Equipe → **Nova conta**)
 Uma janela com 4 campos:
 
 | Campo | Exemplo |
 | --- | --- |
-| Nome da pessoa | `JESSICA` |
-| Nome de usuário | `jessica` |
+| Nome da pessoa | `NOME DA PESSOA` |
+| Nome de usuário | `nome.da.pessoa` |
 | Senha (a que ela escolheu com você) | `••••••` |
-| Vínculo — **Já trabalha aqui?** | `JESSICA · 24 pedidos · R$ 8.967,55` |
+| Vínculo — **Já trabalha aqui?** | `VENDEDORA A · N pedidos · R$ total` |
 
-Antes de salvar, o sistema mostra: *"Esta conta vai entrar vendo **24 pedidos** de JESSICA (R$ 8.967,55)"*. Salvo isso, você só manda para ela: **usuário e senha**.
+Antes de salvar, o sistema mostra: *"Esta conta vai entrar vendo **N pedidos** de VENDEDORA A (R$ total)"*. Salvo isso, você só manda para ela: **usuário e senha**.
 
 - O nome escolhido **sai da lista pública** de cadastro (ninguém assume por cima).
 - Se ela errar/esquecer a senha, você redefine na mesma tela (Equipe → Vínculo e senha).
@@ -100,7 +104,7 @@ Antes de salvar, o sistema mostra: *"Esta conta vai entrar vendo **24 pedidos** 
 
 ## 4. Checklist do lançamento
 
-**Antes (você, sozinho)**
+**Antes (você, sozinho)** — o roteiro detalhado está em **[LANCAMENTO.md](LANCAMENTO.md)**
 1. Publicar o site — Netlify ligado ao GitHub (atualiza sozinho a cada melhoria).
 2. Conectar o **Supabase** — obrigatório para a equipe toda ver os mesmos pedidos (sem ele, cada aparelho teria os seus dados).
 3. Criar o **acesso do proprietário** pela porta administrativa + salvar o ícone no celular.
@@ -130,10 +134,24 @@ Antes de salvar, o sistema mostra: *"Esta conta vai entrar vendo **24 pedidos** 
 - [x] Testes cobrindo a porta administrativa, a janela Nova conta, as travas e os 5 toques no logo
 - [x] Decisões: endereço `#/administracao` e o dono **também** entra pela tela comum
 
+**Feito na rodada da limpeza para o lançamento:**
+- [x] **Sistema 100% vazio no primeiro acesso** — nada de dados de exemplo é semeado sozinho
+- [x] **Fim do acesso de exemplo** (`gui` / `12345`): não existe mais usuário nem senha
+      padrão no código, nos documentos nem no pacote publicado
+- [x] **Dados de treino fictícios e opcionais** (`CLIENTE EXEMPLO 01`, telefone
+      `(00) 90000-0001`), com aviso amarelo “não são reais” no topo da tela
+- [x] **Vários acessos de proprietário**: *Equipe → Nova conta → “Proprietário — vê tudo”*,
+      com atalho em *Configurações → Meu acesso*; o sistema nunca fica sem nenhum dono ativo
+      (o último não sai, ninguém apaga o próprio acesso)
+- [x] **Guarda de publicação** (`npm run checar`): o pacote só sai se não houver senha de
+      exemplo, dado de pessoa real, chave secreta do Supabase ou `.env` dentro da pasta
+- [x] Pasta `publicar/` regenerada já limpa (versão 1.1.0) + artefato para baixar no GitHub Actions
+
 **Ainda falta:**
+- [ ] Publicar (Netlify) — passo a passo em **[LANCAMENTO.md](LANCAMENTO.md)**
+- [ ] Conectar o Supabase (a equipe só vê os mesmos pedidos com a nuvem ligada)
 - [ ] Cadastro "Já trabalho aqui?": lista de vendedores já existentes **com histórico do sistema antigo** (trazer/importar) — depende da migração dos dados
 - [ ] Equipe: botão **Desvincular/Liberar** explícito no modal de vínculo
-- [ ] Publicar (Netlify + Supabase) — depois do seu "ok"
 
 ---
 

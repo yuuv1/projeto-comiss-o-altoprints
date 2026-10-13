@@ -1,8 +1,17 @@
 # Como colocar o sistema online (de graça)
 
+> 🚀 **Só quer o passo a passo do lançamento?** Use o
+> **[LANCAMENTO.md](../LANCAMENTO.md)** (guia curto, na ordem certa). Este arquivo aqui é a
+> **referência completa**: todas as opções de hospedagem, o banco na nuvem, recuperação de
+> senha e manutenção.
+
 O sistema é um site estático (arquivos HTML/JS/CSS). Isso significa que ele pode ser
 hospedado de graça em vários serviços. O banco de dados é separado — e também tem
 opção gratuita (Supabase).
+
+**O sistema sobe limpo:** sem dados de exemplo carregados sozinhos, sem usuário e sem
+senha padrão. O primeiro acesso de proprietário é criado no endereço
+`…/#/administracao` (ou 5 toques no logo, ou `Ctrl + Alt + D`).
 
 ---
 
@@ -157,6 +166,11 @@ npm run publicar      # cria a pasta ../publicar (site + _redirects + LEIA-ME.tx
 3. Clique em **Claim site** para o site ficar seu (site não reivindicado é apagado pelo Netlify)
 4. Para atualizar depois: `npm run publicar` e arraste a pasta de novo em *Deploys*
 
+> **Sem instalar nada no seu computador:** a pasta `publicar/` também é gerada pelo robô do
+> GitHub. Na aba **Actions** do repositório, abra a última execução de
+> *“Publicar sistema (GitHub Pages)”* e baixe o artefato
+> **`Altoprints-pronto-para-publicar`** — é só descompactar e arrastar a pasta.
+
 > Sem o Supabase configurado, cada aparelho guarda os próprios dados. Para a equipe ver os mesmos
 > pedidos, vale o passo do Supabase (acima) e então gerar a pasta com as chaves no `.env`.
 
@@ -197,8 +211,11 @@ Se a senha perdida for a **do proprietário**:
 - **Imprimir/PDF**: nas telas de Relatório use o botão *Imprimir / PDF* e escolha
   "Salvar como PDF" no navegador. A folha já sai em A4 em pé, preto e branco, com o
   logo no cabeçalho e os totais no final.
-- **Dados de exemplo**: em ⚙️ Configurações existe *Carregar demonstração* e
-  *Apagar todos os dados* para começar a usar de verdade.
+- **Dados de exemplo (opcionais e fictícios)**: em ⚙️ *Configurações → Dados* existe
+  *Carregar demonstração* — nomes como `CLIENTE EXEMPLO 01`, telefones `(00) 90000-0001`,
+  nenhuma conta de acesso criada — e *Apagar todos os dados* para começar de verdade.
+  Enquanto os exemplos estiverem carregados, um aviso amarelo fica no topo da tela
+  (ninguém confunde treino com produção).
 - **Atualizar o sistema publicado**: com o GitHub conectado (GitHub Pages ou Netlify B1)
   basta enviar a alteração para o repositório que o site se atualiza sozinho, em 1 a 2
   minutos. As alterações **não apagam nada**: os pedidos ficam no Supabase (nuvem) ou,
@@ -207,9 +224,17 @@ Se a senha perdida for a **do proprietário**:
   cópias diárias por alguns dias. Também é possível exportar CSV pelo próprio relatório.
 - **Celular**: o sistema é responsivo — dá para usar no celular do vendedor durante a
   venda, e o menu vira um botão no topo.
-- **Segurança**: o sistema não tem tela de login (igual ao antigo). Não publique o
-  link em redes sociais e, se em algum momento quiser, adicionamos login com e-mail e
-  senha em uma próxima etapa.
+- **Segurança**: o sistema tem **login próprio** (usuário + senha, com hash e bloqueio
+  depois de 5 tentativas erradas) e dois perfis — proprietário e vendedor. Ainda assim:
+  **use senha forte no proprietário**, não publique o link em redes sociais e nunca coloque
+  a chave **secreta** do Supabase no site (só a pública). O banco fica com leitura/escrita
+  liberada pela chave pública, como é normal em sistema interno; para trancar por login no
+  próprio banco, o caminho é ligar o *Supabase Auth* e trocar as políticas do
+  `schema.sql` — nenhuma tela muda.
+- **Guarda de publicação**: `npm run checar` (rodado automaticamente pelo
+  `npm run publicar` e pelo GitHub Actions) confere o pacote antes de ele ir para o ar —
+  barra senha de exemplo, dado de pessoa real, chave secreta do Supabase, `.env` dentro da
+  pasta e arquivos quebrados.
 
 ---
 

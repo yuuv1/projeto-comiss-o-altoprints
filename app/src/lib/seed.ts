@@ -1,7 +1,18 @@
-// Dados de demonstração (podem ser apagados nas Configurações)
-import { salvarRegistro } from './backend'
-import { novoId } from './files'
+/**
+ * Dados de EXEMPLO — 100% fictícios, só para treinar a equipe.
+ *
+ * Regras importantes (valem para o sistema publicado):
+ *  1. O sistema **nunca** começa com estes dados. Ele sobe vazio, do zero.
+ *     Quem quiser exemplos pede em Configurações → Dados → "Carregar demonstração".
+ *  2. Nenhum nome, telefone, endereço ou valor de pessoa/empresa real aparece
+ *     aqui: tudo é rotulado como "EXEMPLO" de propósito, para ninguém confundir
+ *     treino com produção (e para não vazar dado de cliente).
+ *  3. A demonstração **não cria nenhuma conta de acesso** — nem de proprietário.
+ *     As contas de verdade são criadas pela porta administrativa (#/administracao)
+ *     ou em Equipe → Nova conta. Não existe mais usuário/senha padrão no sistema.
+ */
 import { calcularValor } from './pricing'
+import { novoId } from './files'
 import {
   CONFIG_PADRAO,
   type Cliente,
@@ -10,67 +21,31 @@ import {
   type Impressao,
   MOTIVOS_REIMPRESSAO,
   type Pedido,
-  type Usuario,
   type Vendedor,
 } from './types'
 
-/**
- * Acesso de administrador que vem junto com os dados de exemplo, para dar para
- * entrar e conhecer o sistema sem passar pela tela de criação.
- * Ele some quando os dados de exemplo são apagados (Configurações → Dados).
- */
-export const ACESSO_DEMO = { nome: 'GUI', usuario: 'gui', senha: '12345' }
+/** Quantos registros de cada tipo a demonstração gera (números pequenos de propósito) */
+export const TAMANHO_DEMO = { vendedores: 2, clientes: 30, pedidos: 68 } as const
 
-/**
- * A senha do acesso de exemplo é calculada no próprio aparelho, no primeiro
- * uso (o cálculo depende do navegador). Até isso acontecer, o registro fica
- * com esta marca — e nenhuma senha é aceita.
- */
-export const MARCA_SENHA_DEMO = 'definir-no-primeiro-uso'
+/** Nomes obviamente fictícios: ninguém confunde com um vendedor de verdade */
+const VENDEDORES_EXEMPLO = ['VENDEDOR EXEMPLO A', 'VENDEDOR EXEMPLO B']
 
-/** O acesso de exemplo que acompanha os dados de demonstração */
-export const contaDemo = (): Usuario => ({
-  id: novoId(),
-  nome: ACESSO_DEMO.nome,
-  usuario: ACESSO_DEMO.usuario,
-  senha_hash: MARCA_SENHA_DEMO,
-  papel: 'proprietario',
-  vendedor_id: '',
-  ativo: true,
-  criado_em: new Date().toISOString(),
-})
-
-const NOMES = [
-  'BRUNO','SAMUEL','IVANETE','MURILO','TELMA','JAMIR','LORRAINE','ROGERIO','FABIA','CAMILA','DOUGLAS','PATRICIA',
-  'rubiana','RUAN','NUBIA','MARCOS','LIDIMO','IVANILDE','MIRIAN','LARISSA','jesus','JUNIOR','MATHEUS','MICHELLE',
-  'WANESSA','GUILHERME','ANA CAROLINA','TALLITA','JULIANA','RICARDO','EMERSON','LEANDRO','CRISTIANE','ANDRE',
-  'VITOR K','JAKELINE','TATY','ANTONIA','KATHERYN','CASSIA','FELIPE','MORENA','LAINE','STEPHANIE','ISABELLA','KARLA',
-]
-
-const CIDADES: [string, string][] = [
-  ['SAO PAULO', 'SP'],
-  ['CAMPINAS', 'SP'],
-  ['RIO DE JANEIRO', 'RJ'],
-  ['BELO HORIZONTE', 'MG'],
-  ['GOIANIA', 'GO'],
-  ['CURITIBA', 'PR'],
-  ['SALVADOR', 'BA'],
-  ['FORTALEZA', 'CE'],
-  ['RECIFE', 'PE'],
-  ['PORTO ALEGRE', 'RS'],
-]
-
+/** Descrição das filas — textos genéricos, sem anotação de pedido real */
 const DESCRICOES = [
-  '755+220',
-  '74+22',
-  'PAGO SEXTA',
-  'arte frente e costas',
-  '+ APLICACAO',
-  '2 estampas diferentes',
-  'logo + nome',
+  'arte frente e costas (exemplo)',
+  '2 estampas diferentes (exemplo)',
+  'logo + nome (exemplo)',
+  'aplicação inclusa (exemplo)',
+  'repetição de arte (exemplo)',
 ]
 
-// PRNG simples para gerar sempre os mesmos dados
+const OBSERVACOES = [
+  'Registro de exemplo — pode apagar.',
+  'Exemplo para treino da equipe.',
+  'Fila fictícia: nenhum cliente real aqui.',
+]
+
+/** PRNG simples: gera sempre os mesmos exemplos (nada de dado aleatório real) */
 const criarRandom = (semente: number) => {
   let s = semente
   return () => {
@@ -79,26 +54,32 @@ const criarRandom = (semente: number) => {
   }
 }
 
+/** telefone visivelmente falso: DDD 00, número sequencial */
+const telefoneExemplo = (i: number) => `(00) 90000-${String(i).padStart(4, '0')}`
+
+/** e-mail em domínio reservado (nunca existe de verdade — RFC 2606) */
+const emailExemplo = (i: number) => `cliente.exemplo${String(i).padStart(2, '0')}@exemplo.invalid`
+
 export function gerarDadosDemo(): DB {
   const rnd = criarRandom(20261008)
 
-  const vendedores: Vendedor[] = ['JESSICA', 'RAISSA'].map((nome) => ({
+  const vendedores: Vendedor[] = VENDEDORES_EXEMPLO.map((nome) => ({
     id: novoId(),
     nome,
     created_at: new Date().toISOString(),
   }))
 
-  const clientes: Cliente[] = NOMES.slice(0, 30).map((nome, i) => {
-    const especial = i % 7 === 0
+  const clientes: Cliente[] = Array.from({ length: TAMANHO_DEMO.clientes }, (_, indice) => {
+    const numero = indice + 1
+    const nome = `CLIENTE EXEMPLO ${String(numero).padStart(2, '0')}`
+    const especial = indice % 7 === 0
     return {
       id: novoId(),
       nome,
-      telefone: `(64) 9${String(80000000 + Math.floor(rnd() * 9999999)).slice(0, 4)}-${String(
-        1000 + Math.floor(rnd() * 8999),
-      )}`,
-      email: rnd() > 0.6 ? `${nome.split(' ')[0].toLowerCase()}@email.com` : '',
-      observacoes: especial ? 'Cliente antigo — condição especial combinada.' : '',
-      vendedor_id: vendedores[Math.floor(rnd() * vendedores.length)].id,
+      telefone: telefoneExemplo(numero),
+      email: indice % 3 === 0 ? emailExemplo(numero) : '',
+      observacoes: especial ? 'Cliente de exemplo com condição especial (fictício).' : '',
+      vendedor_id: vendedores[indice % vendedores.length].id,
       valor_especial_metro: especial ? 49.9 : null,
       especial,
       created_at: new Date().toISOString(),
@@ -106,7 +87,7 @@ export function gerarDadosDemo(): DB {
   })
 
   const pedidos: Pedido[] = []
-  const total = 68
+  const total = TAMANHO_DEMO.pedidos
   const agora = new Date()
 
   for (let i = 0; i < total; i++) {
@@ -130,7 +111,6 @@ export function gerarDadosDemo(): DB {
     const pago = i === 7 ? false : rnd() < (diasAtras > 3 ? 0.92 : 0.6)
 
     const tipo_entrega = rnd() < 0.1 ? 'correios' : 'retirada'
-    const [cidade, estado] = CIDADES[Math.floor(rnd() * CIDADES.length)]
 
     pedidos.push({
       id: novoId(),
@@ -149,14 +129,16 @@ export function gerarDadosDemo(): DB {
       forma_pagamento: pago ? (rnd() < 0.7 ? 'Pix' : 'Dinheiro') : '',
       data_pagamento: pago ? data.toISOString().slice(0, 10) : null,
       data_pedido: data.toISOString(),
-      observacoes: rnd() < 0.12 ? 'Cliente pediu para avisar quando ficar pronto.' : '',
+      observacoes: rnd() < 0.12 ? OBSERVACOES[Math.floor(rnd() * OBSERVACOES.length)] : '',
       tipo_entrega,
-      endereco: tipo_entrega === 'correios' ? `Rua das Estampas, ${100 + Math.floor(rnd() * 900)}` : '',
-      cidade: tipo_entrega === 'correios' ? cidade : '',
-      estado: tipo_entrega === 'correios' ? estado : '',
-      cep: tipo_entrega === 'correios' ? `759${String(1000 + Math.floor(rnd() * 8999))}` : '',
+      endereco: tipo_entrega === 'correios' ? `Rua Exemplo, ${100 + Math.floor(rnd() * 900)}` : '',
+      cidade: tipo_entrega === 'correios' ? 'CIDADE EXEMPLO' : '',
+      estado: tipo_entrega === 'correios' ? 'EX' : '',
+      cep: tipo_entrega === 'correios' ? '00000-000' : '',
       codigo_rastreio:
-        tipo_entrega === 'correios' && diasAtras > 2 ? `AA${String(100000000 + Math.floor(rnd() * 899999999))}BR` : '',
+        tipo_entrega === 'correios' && diasAtras > 2
+          ? `EX${String(100000000 + Math.floor(rnd() * 899999999))}BR`
+          : '',
       data_envio:
         entregue && tipo_entrega === 'correios'
           ? new Date(data.getTime() + 86400000).toISOString().slice(0, 10)
@@ -171,7 +153,7 @@ export function gerarDadosDemo(): DB {
 
   /* ---------------------- filas impressas de exemplo --------------------- */
   // Toda fila já concluída ganha o registro de produção (metros e quem imprimiu)
-  // e algumas levam reimpressão com motivo — assim a tela abre com dados.
+  // e algumas levam reimpressão com motivo — assim a tela abre com movimento.
   const impressoes: Impressao[] = []
   const concluidas = pedidos.filter((p) => p.estagio === 'concluido').sort((a, b) => b.numero - a.numero)
 
@@ -197,7 +179,7 @@ export function gerarDadosDemo(): DB {
       usuario_id: '',
       tipo: 'impressao',
       motivo: '',
-      observacao: rnd() < 0.1 ? 'O filme acabou no meio — completado na sequência.' : '',
+      observacao: rnd() < 0.1 ? 'Exemplo: o filme acabou no meio — completado na sequência.' : '',
       quando,
       created_at: quando,
     })
@@ -229,23 +211,13 @@ export function gerarDadosDemo(): DB {
     pedidos: pedidos.sort((a, b) => b.numero - a.numero),
     arquivos: [],
     impressoes: impressoes.sort((a, b) => b.quando.localeCompare(a.quando)),
-    usuarios: [contaDemo()],
-    configuracoes: { ...CONFIG_PADRAO, revisao_ultima_em: new Date().toISOString() },
+    // nenhuma conta é criada pela demonstração: o acesso é sempre decidido pelo dono
+    usuarios: [],
+    configuracoes: {
+      ...CONFIG_PADRAO,
+      revisao_ultima_em: new Date().toISOString(),
+      // liga o aviso "dados de exemplo" na tela, para ninguém confundir com produção
+      modo_exemplo: true,
+    },
   }
-}
-
-/**
- * Troca a marca do acesso de exemplo pela senha de verdade. O cálculo do hash
- * depende do navegador, então ele é feito no primeiro uso, neste aparelho —
- * e não pode vir pronto no arquivo dos dados de exemplo.
- */
-export async function prepararAcessoDemo(dados: DB, calcularHash: (senha: string) => Promise<string>) {
-  const pendentes = dados.usuarios.filter((u) => u.senha_hash === MARCA_SENHA_DEMO)
-  if (!pendentes.length) return dados
-  const hash = await calcularHash(ACESSO_DEMO.senha)
-  const usuarios = dados.usuarios.map((u) => (pendentes.some((p) => p.id === u.id) ? { ...u, senha_hash: hash } : u))
-  for (const u of usuarios) {
-    if (pendentes.some((p) => p.id === u.id)) await salvarRegistro('usuarios', u)
-  }
-  return { ...dados, usuarios }
 }

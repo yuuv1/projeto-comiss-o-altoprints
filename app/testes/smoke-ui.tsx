@@ -414,8 +414,8 @@ async function main() {
     textoImpresso.includes('Comissões da equipe') &&
     textoImpresso.includes('TOTAL DE COMISSÕES') &&
     textoImpresso.includes('Comissão por faixa de metragem') &&
-    textoImpresso.includes('JESSICA') &&
-    textoImpresso.includes('RAISSA')
+    textoImpresso.includes(nomeDoVinculo) &&
+    textoImpresso.includes(outroVendedor)
   if (!impressoComComissoes) falhas++
   console.log(
     `\n  ${impressoComComissoes ? '✅' : '❌'} relatório impresso do dono traz a comissão de cada vendedor (com total)`,
@@ -476,6 +476,12 @@ async function main() {
   if (!temPainel) falhas++
   console.log(`  ${temPainel ? '✅' : '❌'} início do proprietário mostra o painel geral`)
 
+  // os dados de exemplo avisam na tela que não são reais (ninguém confunde treino
+  // com produção) e oferecem o atalho para apagar tudo
+  const avisoExemplo = painel.includes('não são reais') && painel.includes('Apagar dados de exemplo')
+  if (!avisoExemplo) falhas++
+  console.log(`  ${avisoExemplo ? '✅' : '❌'} dados de exemplo avisam que "não são reais" e trazem o atalho para apagar`)
+
   // a tela Equipe precisa abrir a janela de criar conta (por ela o dono registra a equipe)
   dom.window.location.hash = '#/equipe'
   await espera(700)
@@ -490,6 +496,12 @@ async function main() {
   if (!novaContaOk) falhas++
   console.log(`\n  ${novaContaOk ? '✅' : '❌'} Equipe abre a janela “Nova conta” com o vínculo e o histórico`)
 
+  // pela mesma janela o dono cria OUTRO acesso de proprietário (sócio/gerente)
+  const novoDonoOk =
+    textoNovaConta.includes('Proprietário — vê tudo') && textoNovaConta.includes('Tipo de acesso')
+  if (!novoDonoOk) falhas++
+  console.log(`  ${novoDonoOk ? '✅' : '❌'} “Nova conta” deixa criar outro acesso de proprietário (vê tudo)` )
+
   // a aba "Meu acesso" das configurações (só o proprietário) precisa abrir
   dom.window.location.hash = '#/configuracoes'
   await espera(700)
@@ -497,9 +509,14 @@ async function main() {
   await espera(400)
   const textoAcesso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const acessoOk =
-    abriuAcesso && textoAcesso.includes('Trocar a minha senha') && textoAcesso.includes('Meu nome de usuário')
+    abriuAcesso &&
+    textoAcesso.includes('Trocar a minha senha') &&
+    textoAcesso.includes('Meu nome de usuário') &&
+    // o dono encontra ali o caminho para criar um segundo login de proprietário
+    textoAcesso.includes('Outro acesso de proprietário') &&
+    textoAcesso.includes('Abrir Equipe para criar outro proprietário')
   if (!acessoOk) falhas++
-  console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” abre a troca de usuário e senha do dono`)
+  console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” abre a troca de usuário/senha e o atalho para outro proprietário`)
 
   // a aba Nuvem mostra o assistente de conexão (3 passos) quando está no modo local
   await clicar(raiz, 'Nuvem')
@@ -693,7 +710,7 @@ async function main() {
     textoPorta.includes('Entrar como administrador') &&
     // quem descobrir a porta não encontra lista de nomes nem cadastro na tela
     !textoPorta.includes('Criar meu acesso') &&
-    !textoPorta.includes('RAISSA') &&
+    !textoPorta.includes(outroVendedor) &&
     !textoPorta.includes('Faturamento')
   if (!portaOk) falhas++
   console.log(`  ${portaOk ? '✅' : '❌'} porta administrativa pede o login do proprietário (sem dados na tela)`)

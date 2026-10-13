@@ -13,6 +13,7 @@ import {
   Moon,
   Printer,
   Settings,
+  Sparkles,
   Star,
   Sun,
   Truck,
@@ -268,6 +269,22 @@ export function Layout() {
       </header>
 
       <main className="relative mx-auto max-w-[1900px] px-3 py-2">
+        {db.configuracoes.modo_exemplo ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <p className="min-w-[220px] flex-1 text-sm font-semibold text-amber-900 dark:text-amber-100">
+              Dados de <b>exemplo</b> (fictícios) carregados — estes pedidos <b>não são reais</b>.
+              {ehProprietario ? ' Apague tudo em Dados (menu da engrenagem) antes de usar de verdade.' : ''}
+            </p>
+            {ehProprietario ? (
+              <Botao tamanho="sm" variante="aviso" icone={Settings} onClick={() => navegar('/configuracoes')}>
+                Apagar dados de exemplo
+              </Botao>
+            ) : null}
+          </div>
+        ) : null}
         {emVisualizacao && usuario ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
