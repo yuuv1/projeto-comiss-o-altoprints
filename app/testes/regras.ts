@@ -29,7 +29,8 @@ import {
   resumirImpressoes,
   resumoDoPedido,
 } from '../src/lib/impressoes'
-import { gerarDadosDemo } from '../src/lib/seed'
+import { ACESSO_DEMO, gerarDadosDemo, MARCA_SENHA_DEMO, prepararAcessoDemo } from '../src/lib/seed'
+import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
 import {
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
@@ -145,6 +146,43 @@ igual(
   demo.pedidos.every((p) => (p.impresso ? demo.impressoes.some((i) => i.pedido_id === p.id) : true)),
   true,
 )
+
+/* ------------------------- acesso de exemplo --------------------------- */
+igual('demo: vem com um acesso de exemplo', demo.usuarios.length, 1)
+igual('demo: o acesso de exemplo é do proprietário', demo.usuarios[0].papel, 'proprietario')
+igual('demo: usuário do acesso de exemplo', demo.usuarios[0].usuario, ACESSO_DEMO.usuario)
+igual('demo: o acesso de exemplo está ativo', demo.usuarios[0].ativo, true)
+igual('demo: a senha do exemplo ainda não foi definida', demo.usuarios[0].senha_hash, MARCA_SENHA_DEMO)
+igualAsync('demo: a marca não vale como senha', senhaConfere('12345', MARCA_SENHA_DEMO), false)
+igualAsync(
+  'demo: depois de preparado, entra com a senha combinada',
+  prepararAcessoDemo(gerarDadosDemo(), gerarHashSenha).then((d) =>
+    senhaConfere(ACESSO_DEMO.senha, d.usuarios[0].senha_hash),
+  ),
+  true,
+)
+igualAsync(
+  'demo: depois de preparado, senha errada não entra',
+  prepararAcessoDemo(gerarDadosDemo(), gerarHashSenha).then((d) => senhaConfere('9999', d.usuarios[0].senha_hash)),
+  false,
+)
+igualAsync(
+  'demo: banco sem o acesso de exemplo não é mexido',
+  prepararAcessoDemo({ ...demo, usuarios: [] }, gerarHashSenha).then((d) => d.usuarios.length),
+  0,
+)
+
+/* ------------------------- espaço no navegador ------------------------- */
+igual(
+  'espaço: o erro do navegador cheio é reconhecido',
+  ehErroDeEspaco(
+    new Error("Failed to execute 'setItem' on 'Storage': Setting the value of 'altoprints:db:v1' exceeded the quota."),
+  ),
+  true,
+)
+igual('espaço: erro comum não é confundido', ehErroDeEspaco(new Error('Usuário ou senha inválidos.')), false)
+igual('espaço: a mensagem explica o que fazer', MENSAGEM_SEM_ESPACO.includes('Configurações → Dados'), true)
+igual('espaço: sem navegador, a medição não quebra', espacoNoLocalStorage(), 0)
 
 /* ------------------------------ impressões ----------------------------- */
 const agoraImpressao = new Date()

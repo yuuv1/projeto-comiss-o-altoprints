@@ -9,6 +9,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
+import { ACESSO_DEMO, contaDemo } from './seed'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { clienteNuvem, emNuvem } from './supabase'
 import { type TelasAcesso, type Usuario, type Vendedor } from './types'
@@ -39,6 +40,8 @@ export const emailInterno = (usuario: string) => `${normalizarUsuario(usuario)}@
 
 const CHAVE_SESSAO = 'altoprints:sessao'
 const CHAVE_TENTATIVAS = 'altoprints:tentativas'
+/** marca usada só no modo de desenvolvimento (prévia): entra sozinho uma vez */
+const CHAVE_ENTRADA_DEV = 'altoprints:entrada-automatica'
 const DIAS_CONECTADO = 30
 const MAX_TENTATIVAS = 5
 const BLOQUEIO_MINUTOS = 5
@@ -173,6 +176,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const achou = usuarios.find((u) => u.id === sessao.usuario_id && u.ativo)
           if (achou) setUsuarioId(achou.id)
           else localStorage.removeItem(CHAVE_SESSAO)
+        } else if (import.meta.env.DEV) {
+          // Na prévia (modo de desenvolvimento) o sistema entra sozinho com o
+          // acesso de exemplo, uma única vez — para ver o sistema sem passar pelo
+          // login. A versão publicada nunca faz isso.
+          const demo = usuarios.find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
+          if (demo && localStorage.getItem(CHAVE_ENTRADA_DEV) !== '1') {
+            try {
+              localStorage.setItem(CHAVE_ENTRADA_DEV, '1')
+            } catch {
+              /* sem problema: só não vai lembrar que já entrou */
+            }
+            localStorage.setItem(
+              CHAVE_SESSAO,
+              JSON.stringify({
+                usuario_id: demo.id,
+                expira_em: new Date(Date.now() + 30 * 86400000).toISOString(),
+                conectado: true,
+              }),
+            )
+            setUsuarioId(demo.id)
+          }
         }
       } finally {
         setCarregando(false)

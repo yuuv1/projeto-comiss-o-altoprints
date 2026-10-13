@@ -104,6 +104,11 @@ async function main() {
   }
   const pegar = () => auth as unknown as Auth
 
+  // O login é testado num sistema VAZIO (sem os dados de exemplo, que hoje já
+  // vêm com um acesso de proprietário pronto): marca a carga da demonstração
+  // como já feita, para o sistema não semeá-la.
+  dom.window.localStorage.setItem('altoprints:demo-inicial-carregada', '1')
+
   const raiz = dom.window.document.getElementById('root')
   createRoot(raiz as unknown as Element).render(
     React.createElement(

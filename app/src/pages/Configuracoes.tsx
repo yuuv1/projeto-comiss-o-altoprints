@@ -19,9 +19,11 @@ import {
   Upload,
   UserCog,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
 import { useAuth } from '../lib/auth'
+import { type OndeEstaGuardado } from '../lib/armazenamento'
+import { tamanhoLegivel } from '../lib/files'
 import { dataBR, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import {
@@ -37,12 +39,29 @@ import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmac
 type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso' | 'nuvem'
 
 export default function Configuracoes() {
-  const { db, nuvem, salvarConfig, resetarDados, carregarDemo, baixarBackup, restaurarBackup, avisar } =
-    useStore()
+  const {
+    db,
+    nuvem,
+    salvarConfig,
+    resetarDados,
+    carregarDemo,
+    baixarBackup,
+    restaurarBackup,
+    avisar,
+    medirEspaco,
+    liberarEspaco,
+  } = useStore()
   const { usuario, trocarMinhaSenha, trocarMeuUsuario, atualizarMeuPerfil } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const [aba, setAba] = useState<Aba>('comissoes')
   const [salvando, setSalvando] = useState(false)
+
+  /* --------------------------- espaço no aparelho --------------------------- */
+  const [espaco, setEspaco] = useState<{ onde: OndeEstaGuardado; bytes: number }>({ onde: 'nenhum', bytes: 0 })
+  const medir = async () => setEspaco(await medirEspaco())
+  useEffect(() => {
+    if (aba === 'dados') void medir()
+  }, [aba])
 
   /* ------------------------------ meu acesso ----------------------------- */
   const [meuUsuario, setMeuUsuario] = useState(usuario?.usuario ?? '')
@@ -564,6 +583,42 @@ export default function Configuracoes() {
           </Cartao>
 
           <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
+              <Database className="h-4 w-4" /> Espaço neste aparelho
+            </p>
+            <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
+              Os dados deste aparelho ficam guardados no próprio navegador.{' '}
+              {espaco.onde === 'IndexedDB'
+                ? 'Estão no armazenamento novo (IndexedDB), que tem espaço de sobra.'
+                : espaco.onde === 'localStorage'
+                  ? 'Ainda estão no armazenamento antigo, que é pequeno (cerca de 5 MB) e pode encher.'
+                  : 'Nenhum dado guardado neste aparelho ainda.'}
+            </p>
+            <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+              Espaço ocupado pelos dados: <b>{tamanhoLegivel(espaco.bytes)}</b>
+            </p>
+            {espaco.onde === 'localStorage' ? (
+              <>
+                <Botao
+                  tamanho="sm"
+                  variante="secundario"
+                  icone={RefreshCw}
+                  onClick={async () => {
+                    await liberarEspaco()
+                    await medir()
+                  }}
+                >
+                  Liberar espaço
+                </Botao>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  Passa os dados para o armazenamento novo e tira a cópia antiga que ocupava o espaço pequeno — nenhum
+                  pedido é apagado.
+                </p>
+              </>
+            ) : null}
+          </Cartao>
+
+          <Cartao hover={false}>
             <p className="mb-1 flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
               <Upload className="h-4 w-4" /> Backup (cópia de segurança)
             </p>
@@ -636,7 +691,7 @@ export default function Configuracoes() {
             </div>
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
               <Campo label="Meu nome de usuário (login)" dica={nuvem ? 'No modo nuvem, para trocar o usuário é preciso refazer a conexão do Supabase.' : 'Só letras, números, ponto, traço e underline.'}>
-                <Entrada value={meuUsuario} onChange={(e) => setMeuUsuario(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="ex.: altoprints" />
+                <Entrada value={meuUsuario} onChange={(e) => setMeuUsuario(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="Digite seu usuário" />
               </Campo>
               <Botao
                 variante="secundario"

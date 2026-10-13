@@ -24,6 +24,12 @@ Rode `npm run publicar` e clique **duas vezes** em **`publicar/Altoprints.html`*
 É um arquivo único (programa + visual embutidos) que abre no navegador já funcionando,
 sem internet e sem instalar nada — os dados ficam salvos nesse computador.
 
+> **Acesso de exemplo:** enquanto os dados de demonstração estiverem carregados existe
+> um acesso de proprietário pronto — usuário **`gui`** e senha **`12345`** (troque a
+> senha em Configurações → Meu acesso, ou crie o seu próprio acesso em
+> `#/administracao`). Ele sai junto quando os dados de exemplo são apagados
+> (Configurações → Dados → Apagar todos os dados).
+
 > ⚠️ **Não abra o `publicar/index.html` com dois cliques** — a tela fica em branco. Esse
 > arquivo serve para **hospedar** (ele busca o programa na pasta `assets/`, e o navegador
 > bloqueia esse carregamento quando o arquivo é aberto direto do disco). Detalhes em

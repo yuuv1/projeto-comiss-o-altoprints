@@ -174,7 +174,7 @@ export default function Vendedores() {
       >
         <form id="form-vendedor" onSubmit={salvar}>
           <Campo label="Nome" obrigatorio>
-            <Entrada value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus placeholder="Ex.: JESSICA" />
+            <Entrada value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus placeholder="Nome do vendedor" />
           </Campo>
         </form>
       </Modal>

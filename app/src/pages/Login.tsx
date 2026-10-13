@@ -127,7 +127,7 @@ export default function Login() {
           {tela === 'criar' ? (
             <>
               <Campo label="Seu nome" obrigatorio className="mb-3">
-                <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: JESSICA" required autoFocus />
+                <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required autoFocus />
               </Campo>
 
               <Campo
@@ -167,7 +167,7 @@ export default function Login() {
             <Entrada
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="ex.: jessica"
+              placeholder="Digite seu usuário"
               autoCapitalize="none"
               autoCorrect="off"
               required

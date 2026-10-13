@@ -89,7 +89,7 @@ export default function Administracao() {
 
           {criando ? (
             <Campo label="Seu nome" obrigatorio className="mb-3">
-              <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: ALTUNE" required autoFocus />
+              <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required autoFocus />
             </Campo>
           ) : null}
 
@@ -97,7 +97,7 @@ export default function Administracao() {
             <Entrada
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="ex.: altoprints"
+              placeholder="Digite seu usuário"
               autoCapitalize="none"
               autoCorrect="off"
               required

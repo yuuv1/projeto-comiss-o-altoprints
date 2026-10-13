@@ -1,4 +1,5 @@
 // Dados de demonstração (podem ser apagados nas Configurações)
+import { salvarRegistro } from './backend'
 import { novoId } from './files'
 import { calcularValor } from './pricing'
 import {
@@ -10,8 +11,35 @@ import {
   type Pedido,
   type StatusPagamento,
   type StatusProducao,
+  type Usuario,
   type Vendedor,
 } from './types'
+
+/**
+ * Acesso de administrador que vem junto com os dados de exemplo, para dar para
+ * entrar e conhecer o sistema sem passar pela tela de criação.
+ * Ele some quando os dados de exemplo são apagados (Configurações → Dados).
+ */
+export const ACESSO_DEMO = { nome: 'GUI', usuario: 'gui', senha: '12345' }
+
+/**
+ * A senha do acesso de exemplo é calculada no próprio aparelho, no primeiro
+ * uso (o cálculo depende do navegador). Até isso acontecer, o registro fica
+ * com esta marca — e nenhuma senha é aceita.
+ */
+export const MARCA_SENHA_DEMO = 'definir-no-primeiro-uso'
+
+/** O acesso de exemplo que acompanha os dados de demonstração */
+export const contaDemo = (): Usuario => ({
+  id: novoId(),
+  nome: ACESSO_DEMO.nome,
+  usuario: ACESSO_DEMO.usuario,
+  senha_hash: MARCA_SENHA_DEMO,
+  papel: 'proprietario',
+  vendedor_id: '',
+  ativo: true,
+  criado_em: new Date().toISOString(),
+})
 
 const NOMES = [
   'BRUNO','SAMUEL','IVANETE','MURILO','TELMA','JAMIR','LORRAINE','ROGERIO','FABIA','CAMILA','DOUGLAS','PATRICIA',
@@ -206,7 +234,23 @@ export function gerarDadosDemo(): DB {
     pedidos: pedidos.sort((a, b) => b.numero - a.numero),
     arquivos: [],
     impressoes: impressoes.sort((a, b) => b.quando.localeCompare(a.quando)),
-    usuarios: [],
+    usuarios: [contaDemo()],
     configuracoes: { ...CONFIG_PADRAO, revisao_ultima_em: new Date().toISOString() },
   }
+}
+
+/**
+ * Troca a marca do acesso de exemplo pela senha de verdade. O cálculo do hash
+ * depende do navegador, então ele é feito no primeiro uso, neste aparelho —
+ * e não pode vir pronto no arquivo dos dados de exemplo.
+ */
+export async function prepararAcessoDemo(dados: DB, calcularHash: (senha: string) => Promise<string>) {
+  const pendentes = dados.usuarios.filter((u) => u.senha_hash === MARCA_SENHA_DEMO)
+  if (!pendentes.length) return dados
+  const hash = await calcularHash(ACESSO_DEMO.senha)
+  const usuarios = dados.usuarios.map((u) => (pendentes.some((p) => p.id === u.id) ? { ...u, senha_hash: hash } : u))
+  for (const u of usuarios) {
+    if (pendentes.some((p) => p.id === u.id)) await salvarRegistro('usuarios', u)
+  }
+  return { ...dados, usuarios }
 }

@@ -29,7 +29,9 @@ import {
   limparAvisoDeConexao,
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
-import { gerarDadosDemo } from './seed'
+import { gerarDadosDemo, prepararAcessoDemo } from './seed'
+import { gerarHashSenha } from './senha'
+import { espacoNoLocalStorage, liberarCopiaAntiga, ondeEstaGuardado, type OndeEstaGuardado } from './armazenamento'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -98,6 +100,11 @@ interface Ctx {
   nomeVendedor: (id: ID | '' | null | undefined) => string
   proximoNumeroPedido: number
   pedidoPorId: (id: ID | undefined) => Pedido | undefined
+  /* espaço no aparelho (Configurações → Dados) */
+  /** onde os dados estão guardados neste aparelho e quanto espaço ocupam */
+  medirEspaco: () => Promise<{ onde: OndeEstaGuardado; bytes: number }>
+  /** tira do localStorage a cópia antiga do banco (libera o espaço pequeno) */
+  liberarEspaco: () => Promise<number>
 }
 
 const StoreContext = createContext<Ctx | null>(null)
@@ -113,6 +120,9 @@ const dbVazio = (): DB => ({
 })
 
 const CHAVE_DEMO = 'altoprints:demo-inicial-carregada'
+
+/** o acesso de exemplo nasce sem senha: ela é definida aqui, no primeiro uso */
+const prepararDemo = (dados: DB) => prepararAcessoDemo(dados, gerarHashSenha)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<DB>(dbVazio())
@@ -190,7 +200,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(CHAVE_DEMO, '1')
           setDb(demo)
         } else {
-          setDb(dados)
+          setDb(await prepararDemo(dados))
+        }
+        // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
+        // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
+        try {
+          const liberado = await liberarCopiaAntiga(JSON.stringify(dados))
+          if (liberado > 0) console.info(`[altoprints] ${Math.round(liberado / 1024)} KB liberados no navegador.`)
+        } catch {
+          /* sem problema: o sistema segue funcionando com o que tem */
         }
         setErro(null)
       } catch (e) {
@@ -502,12 +520,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const carregarDemo = useCallback(async () => {
-    const demo = gerarDadosDemo()
+    const demo = await prepararDemo(gerarDadosDemo())
     await substituirTudo(demo)
     localStorage.setItem(CHAVE_DEMO, '1')
     setDb(demo)
-    avisar('Dados de demonstração carregados!')
+    avisar('Dados de demonstração carregados! O acesso de exemplo é o usuário "gui".')
   }, [avisar])
+
+  /* ------------------------- espaço no aparelho ------------------------- */
+
+  const medirEspaco = useCallback(async () => {
+    const onde = await ondeEstaGuardado()
+    // no armazenamento novo o que importa é o tamanho dos dados; no antigo, o total do navegador
+    const bytes =
+      onde === 'localStorage' ? espacoNoLocalStorage() : new Blob([JSON.stringify(db)]).size
+    return { onde, bytes }
+  }, [db])
+
+  const liberarEspaco = useCallback(async () => {
+    const liberado = await liberarCopiaAntiga(JSON.stringify(db))
+    avisar(
+      liberado
+        ? `Espaço liberado neste aparelho (${Math.round(liberado / 1024)} KB). Os dados continuam salvos.`
+        : 'Nada a liberar: os dados deste aparelho já estão no armazenamento novo.',
+      'info',
+    )
+    return liberado
+  }, [avisar, db])
 
   /* ------------------------------ utilidades ---------------------------- */
 
@@ -555,6 +594,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       nomeVendedor,
       proximoNumeroPedido: proximoNumero(db.pedidos.map((p) => p.numero)),
       pedidoPorId,
+      medirEspaco,
+      liberarEspaco,
     }),
     [
       db,
@@ -586,6 +627,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       vendedorPorId,
       nomeVendedor,
       pedidoPorId,
+      medirEspaco,
+      liberarEspaco,
     ],
   )
 

@@ -1,4 +1,5 @@
-// Camada de persistência: funciona com Supabase (nuvem) ou localStorage (modo local)
+// Camada de persistência: funciona com Supabase (nuvem) ou com o navegador (modo local)
+import { gravarBancoBruto, lerBancoBruto } from './armazenamento'
 import { migrarFaixas } from './comissao'
 import { clienteNuvem } from './supabase'
 import {
@@ -19,8 +20,6 @@ export type Registro = Vendedor | Cliente | Pedido | Arquivo | Impressao | Usuar
 
 /** todas as tabelas de dados (usado ao limpar/substituir o banco) */
 const TABELAS: Tabela[] = ['vendedores', 'clientes', 'pedidos', 'arquivos', 'impressoes', 'usuarios']
-
-const LS_KEY = 'altoprints:db:v1'
 
 /**
  * Ajusta a configuração para o padrão atual: quem nunca editou as faixas recebe a
@@ -48,12 +47,12 @@ const dbVazio = (): DB => ({
 })
 
 /* ------------------------------------------------------------------ */
-/* Modo local (localStorage)                                           */
+/* Modo local (IndexedDB; localStorage só quando ele não existe)       */
 /* ------------------------------------------------------------------ */
 
-const lerLocal = (): DB => {
+const lerLocal = async (): Promise<DB> => {
   try {
-    const bruto = localStorage.getItem(LS_KEY)
+    const bruto = await lerBancoBruto()
     if (!bruto) return dbVazio()
     const parsed = JSON.parse(bruto) as Partial<DB>
     return {
@@ -70,8 +69,8 @@ const lerLocal = (): DB => {
   }
 }
 
-const gravarLocal = (db: DB) => {
-  localStorage.setItem(LS_KEY, JSON.stringify(db))
+const gravarLocal = async (db: DB) => {
+  await gravarBancoBruto(JSON.stringify(db))
 }
 
 /* ------------------------------------------------------------------ */
@@ -105,7 +104,7 @@ export const modoNuvem = () => Boolean(clienteNuvem())
 
 export async function carregarTudo(): Promise<DB> {
   const sb = clienteNuvem()
-  if (!sb) return lerLocal()
+  if (!sb) return await lerLocal()
 
   const [vendedores, clientes, pedidos, arquivos, impressoes, usuarios, config] = await Promise.all([
     sb.from('vendedores').select('*').order('nome', { ascending: true }),
@@ -137,12 +136,12 @@ export async function carregarTudo(): Promise<DB> {
 export async function salvarRegistro(tabela: Tabela, registro: Registro): Promise<void> {
   const sb = clienteNuvem()
   if (!sb) {
-    const db = lerLocal()
+    const db = await lerLocal()
     const lista = db[tabela] as Registro[]
     const i = lista.findIndex((r) => r.id === registro.id)
     if (i >= 0) lista[i] = registro
     else lista.push(registro)
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   const { error } = await sb.from(tabela).upsert(registro as never)
@@ -153,14 +152,14 @@ export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promi
   if (!registros.length) return
   const sb = clienteNuvem()
   if (!sb) {
-    const db = lerLocal()
+    const db = await lerLocal()
     const lista = db[tabela] as Registro[]
     for (const registro of registros) {
       const i = lista.findIndex((r) => r.id === registro.id)
       if (i >= 0) lista[i] = registro
       else lista.push(registro)
     }
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   const { error } = await sb.from(tabela).upsert(registros as never)
@@ -170,9 +169,9 @@ export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promi
 export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
   const sb = clienteNuvem()
   if (!sb) {
-    const db = lerLocal()
+    const db = await lerLocal()
     db[tabela] = (db[tabela] as Registro[]).filter((r) => r.id !== id) as never
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   const { error } = await sb.from(tabela).delete().eq('id', id)
@@ -182,9 +181,9 @@ export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
 export async function removerArquivosDoPedido(pedidoId: ID): Promise<void> {
   const sb = clienteNuvem()
   if (!sb) {
-    const db = lerLocal()
+    const db = await lerLocal()
     db.arquivos = db.arquivos.filter((a) => a.pedido_id !== pedidoId)
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   const { error } = await sb.from('arquivos').delete().eq('pedido_id', pedidoId)
@@ -194,9 +193,9 @@ export async function removerArquivosDoPedido(pedidoId: ID): Promise<void> {
 export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Promise<void> {
   const sb = clienteNuvem()
   if (!sb) {
-    const db = lerLocal()
+    const db = await lerLocal()
     db.configuracoes = { ...db.configuracoes, ...parcial }
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   const atual = (await sb.from('configuracoes').select('*').eq('id', 1).maybeSingle()).data
@@ -209,7 +208,7 @@ export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Prom
 export async function substituirTudo(db: DB): Promise<void> {
   const sb = clienteNuvem()
   if (!sb) {
-    gravarLocal(db)
+    await gravarLocal(db)
     return
   }
   for (const t of TABELAS) {

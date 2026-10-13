@@ -344,13 +344,13 @@ export default function Equipe() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo label="Nome da pessoa" obrigatorio>
-              <Entrada value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Ex.: JESSICA" />
+              <Entrada value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome de quem vai usar o sistema" />
             </Campo>
             <Campo label="Usuário" obrigatorio dica="Só letras, números, ponto, traço e underline.">
               <Entrada
                 value={novoUsuario}
                 onChange={(e) => setNovoUsuario(e.target.value)}
-                placeholder="ex.: jessica"
+                placeholder="Digite o usuário"
                 autoCapitalize="none"
                 autoCorrect="off"
               />
