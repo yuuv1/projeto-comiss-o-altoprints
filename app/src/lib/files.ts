@@ -13,14 +13,32 @@ const IDB_STORE = 'blobs'
 
 const abrirIDB = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NOME, 1)
+    let req: IDBOpenDBRequest
+    try {
+      req = indexedDB.open(IDB_NOME, 1)
+    } catch (e) {
+      reject(e)
+      return
+    }
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: 'id' })
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
+    req.onblocked = () => reject(new Error('O navegador bloqueou o armazenamento local.'))
   })
+
+/**
+ * Aviso usado quando o navegador não deixa guardar anexos: acontece quando o
+ * sistema é aberto como arquivo (Altoprints.html, endereço começando com
+ * "file://"), porque o navegador trata esse modo como mais restrito.
+ */
+const erroDeArmazenamento = () =>
+  new Error(
+    'Este navegador não guarda arquivos de arte quando o sistema é aberto direto do computador (arquivo Altoprints.html). ' +
+      'Use o sistema pelo link publicado ou conecte a nuvem para anexar artes — os pedidos, clientes e impressões continuam funcionando normalmente.',
+  )
 
 const idbPut = async (id: ID, blob: Blob) => {
   const db = await abrirIDB()
@@ -34,15 +52,19 @@ const idbPut = async (id: ID, blob: Blob) => {
 }
 
 const idbGet = async (id: ID): Promise<Blob | null> => {
-  const db = await abrirIDB()
-  const blob = await new Promise<Blob | null>((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readonly')
-    const req = tx.objectStore(IDB_STORE).get(id)
-    req.onsuccess = () => resolve((req.result as { blob?: Blob } | undefined)?.blob ?? null)
-    req.onerror = () => reject(req.error)
-  })
-  db.close()
-  return blob
+  try {
+    const db = await abrirIDB()
+    const blob = await new Promise<Blob | null>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly')
+      const req = tx.objectStore(IDB_STORE).get(id)
+      req.onsuccess = () => resolve((req.result as { blob?: Blob } | undefined)?.blob ?? null)
+      req.onerror = () => reject(req.error)
+    })
+    db.close()
+    return blob
+  } catch {
+    return null
+  }
 }
 
 const idbDel = async (id: ID) => {
@@ -94,7 +116,11 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
     return base
   }
 
-  await idbPut(id, file)
+  try {
+    await idbPut(id, file)
+  } catch {
+    throw erroDeArmazenamento()
+  }
   base.url = ''
   return base
 }

@@ -18,14 +18,26 @@ npm install
 npm run dev      # abre em http://localhost:8080
 ```
 
+### Quer só abrir o sistema para ver e usar? (sem instalar nada)
+
+Rode `npm run publicar` e clique **duas vezes** em **`publicar/Altoprints.html`**.
+É um arquivo único (programa + visual embutidos) que abre no navegador já funcionando,
+sem internet e sem instalar nada — os dados ficam salvos nesse computador.
+
+> ⚠️ **Não abra o `publicar/index.html` com dois cliques** — a tela fica em branco. Esse
+> arquivo serve para **hospedar** (ele busca o programa na pasta `assets/`, e o navegador
+> bloqueia esse carregamento quando o arquivo é aberto direto do disco). Detalhes em
+> [`app/DEPLOY.md`](app/DEPLOY.md).
+
 Outros comandos:
 
 | Comando | O que faz |
 | --- | --- |
-| `npm run dev` | abre o sistema no seu computador (desenvolvimento) |
+| `npm run dev` | abre o sistema no seu computador (desenvolvimento, atualiza ao salvar) |
 | `npm run build` | gera a versão final na pasta `dist/` |
 | `npm run preview` | testa a versão final |
 | `npm run testar` | roda os testes das regras (preço, comissão, senha) e das telas |
+| `npm run publicar` | monta a pasta `publicar/` (site pronto) + o arquivo `Altoprints.html` |
 
 ---
 
@@ -37,10 +49,13 @@ Outros comandos:
 | **Clientes** | `/clientes` | Cadastro de clientes, vendedor responsável, ★ cliente especial e valor especial do metro |
 | **Vendedores** | `/vendedores` | Cadastro simples de vendedores |
 | **Por vendedor** | `/por-vendedor` | Pedidos de um vendedor, filtro de 7/30/90 dias, totais e avisos de impressão |
-| **Para imprimir** | `/para-imprimir` | Só pedidos **pagos e ainda não impressos** |
+| **Para imprimir** | `/para-imprimir` | Só pedidos **pagos e ainda não impressos** (ao marcar, registra metros e quem imprimiu) |
+| **Impressões** | `/impressoes` | Histórico da produção: metros impressos, reimpressões com motivo, filtros, CSV e folha de produção em A4 |
 | **Entregas** | `/entregas` | Aba Correios (rastreio/entrega) e aba Retirada na loja |
-| **Relatório** | `/relatorio` | Somente pagos, comissão de 1,5%, CSV e impressão em A4 |
+| **Relatório** | `/relatorio` | Somente pagos, comissão pelas faixas de metragem, CSV e impressão em A4 |
 | **Cliente especial** | `/relatorio-cliente-especial` | Extrato do cliente especial (pagos e pendentes) em A4 |
+| **Equipe** | `/equipe` | (só o proprietário) contas de acesso, vínculo com o vendedor e quais telas cada um pode abrir |
+| **Configurações** | `/configuracoes` | Comissões, permissões, empresa, nuvem, backup e o próprio acesso do dono |
 
 Extras: janela de **revisão a cada 3 dias** com os pedidos que não estão "DTF pronto"
 e "Pago" ao mesmo tempo, **Importar comprovante** (a IA lê a foto e preenche o pedido)

@@ -1,14 +1,22 @@
 Altoprints — Sistema de Pedidos DTF  (versão 1.0.0)
 
-COMO PUBLICAR (Netlify Drop):
-  1. Abra https://app.netlify.com/drop
-  2. Arraste ESTA PASTA inteira (a pasta "publicar") para a área pontilhada
-  3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu
-  4. Pronto: o endereço aparece no topo da página
+DUAS FORMAS DE USAR:
+
+  A) NO COMPUTADOR, SEM INTERNET (jeito mais rápido de ver o sistema):
+     - Clique DUAS VEZES no arquivo  Altoprints.html  (está nesta pasta)
+     - Ele abre no navegador já funcionando; os dados ficam salvos nesse computador
+     - NÃO abra o "index.html" com dois cliques: ele fica em branco (é só para hospedar)
+
+  B) NO AR, PARA A EQUIPE TODA (Netlify Drop):
+     1. Abra https://app.netlify.com/drop
+     2. Arraste ESTA PASTA inteira (a pasta "publicar") para a área pontilhada
+     3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu
+     4. Pronto: o endereço aparece no topo da página
 
 COMO ATUALIZAR DEPOIS:
   - Rode de novo:  npm run publicar
   - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)
+  - O arquivo Altoprints.html é gerado de novo junto (é só clicar duas vezes nele)
 
 PRIMEIRO ACESSO (proprietário):
   - Endereço:   .../#/administracao   (salve na tela de início do celular)
@@ -24,4 +32,8 @@ CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:
 
 IMPORTANTE:
   - Sem a nuvem conectada, cada aparelho guarda a própria lista de pedidos.
+  - No arquivo Altoprints.html (aberto do computador), os dados ficam no navegador
+    daquele computador; para a equipe trabalhar junta, use a opção B + nuvem.
+  - Anexar arquivos de arte funciona hospedado (opção B) ou com a nuvem conectada;
+    abrindo o arquivo direto do computador, alguns navegadores não guardam os anexos.
   - Faça backup de vez em quando (Configurações → Dados → Baixar backup).

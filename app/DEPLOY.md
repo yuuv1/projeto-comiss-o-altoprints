@@ -4,6 +4,31 @@ O sistema é um site estático (arquivos HTML/JS/CSS). Isso significa que ele po
 hospedado de graça em vários serviços. O banco de dados é separado — e também tem
 opção gratuita (Supabase).
 
+---
+
+## Antes de tudo: como só VER e TESTAR o sistema (sem publicar)
+
+**Forma 1 — arquivo único, dois cliques (não precisa de internet nem instalar nada):**
+
+Rode `npm run publicar` (dentro de `app/`) e clique **duas vezes** no arquivo
+`publicar/Altoprints.html`. Ele abre no navegador já funcionando e guarda os dados nesse
+computador. É o jeito mais fácil de mostrar o sistema para alguém.
+
+> **Não abra o `publicar/index.html` com dois cliques** — ele fica em branco. Esse arquivo
+> é feito para ser **hospedado** (ele carrega o programa da pasta `assets/`, e o navegador
+> bloqueia isso quando o arquivo é aberto direto do disco). O `Altoprints.html` já tem o
+> programa embutido justamente por isso.
+
+**Forma 2 — modo desenvolvimento (atualiza sozinho a cada alteração):**
+
+```bash
+cd app
+npm install
+npm run dev     # abre em http://localhost:8080
+```
+
+---
+
 Você pode fazer em duas etapas:
 
 - **Etapa 1 (5 minutos)** — publicar o site. Nesta etapa os dados ficam salvos no
