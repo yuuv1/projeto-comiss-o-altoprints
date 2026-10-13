@@ -36,6 +36,7 @@ import {
   emVisualizacao,
   idVisualizado,
   MENSAGEM_SO_VISUALIZACAO,
+  registrarAvisoDeBloqueio,
   rotuloVisualizacao,
 } from '../src/lib/visualizacao'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
@@ -213,6 +214,19 @@ igual('em visualização, gravar é bloqueado', (() => {
     return (e as Error).message.includes('ver como funcionário') ? 'bloqueado' : 'outro erro'
   }
 })(), 'bloqueado')
+igual('ao bloquear, a tela recebe o aviso', (() => {
+  let aviso = ''
+  registrarAvisoDeBloqueio((t) => {
+    aviso = t
+  })
+  try {
+    bloquearSeVisualizando()
+  } catch {
+    /* o aviso já foi dado */
+  }
+  registrarAvisoDeBloqueio(null)
+  return aviso === MENSAGEM_SO_VISUALIZACAO
+})(), true)
 definirVisualizacao(null)
 igual('saindo da visualização, tudo volta ao normal', emVisualizacao(), false)
 igual('a mensagem explica como sair', MENSAGEM_SO_VISUALIZACAO.includes('volte ao seu acesso'), true)

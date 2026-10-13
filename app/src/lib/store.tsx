@@ -29,7 +29,7 @@ import {
   limparAvisoDeConexao,
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
-import { bloquearSeVisualizando } from './visualizacao'
+import { bloquearSeVisualizando, registrarAvisoDeBloqueio } from './visualizacao'
 import { gerarDadosDemo, prepararAcessoDemo } from './seed'
 import { gerarHashSenha } from './senha'
 import {
@@ -152,6 +152,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t, { id, texto, tipo }])
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
   }, [])
+
+  /* No modo "ver como funcionário" toda gravação é bloqueada: aqui a pessoa
+     recebe o aviso na tela em vez de o botão simplesmente não fazer nada. */
+  useEffect(() => {
+    registrarAvisoDeBloqueio((texto) => avisar(texto, 'erro'))
+    return () => registrarAvisoDeBloqueio(null)
+  }, [avisar])
 
   const fecharToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
 

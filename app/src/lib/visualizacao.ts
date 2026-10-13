@@ -24,9 +24,22 @@ export const idVisualizado = () => visualizandoId
 export const MENSAGEM_SO_VISUALIZACAO =
   'Você está no modo “ver como funcionário” (só visualização). Para alterar os dados, volte ao seu acesso no botão do topo da tela.'
 
+/**
+ * Quem avisa na tela quando alguém tenta salvar no modo visualização.
+ * O store registra a função de aviso (toast) para que a tentativa não passe
+ * em branco — a pessoa vê o recado e o botão de voltar ao próprio acesso.
+ */
+let avisarNaTela: ((texto: string) => void) | null = null
+
+export const registrarAvisoDeBloqueio = (fn: ((texto: string) => void) | null) => {
+  avisarNaTela = fn
+}
+
 /** usado por toda gravação: no modo visualização, nada é salvo */
 export function bloquearSeVisualizando() {
-  if (emVisualizacao()) throw new Error(MENSAGEM_SO_VISUALIZACAO)
+  if (!emVisualizacao()) return
+  avisarNaTela?.(MENSAGEM_SO_VISUALIZACAO)
+  throw new Error(MENSAGEM_SO_VISUALIZACAO)
 }
 
 /** rótulo curto do modo, usado na faixa do topo */

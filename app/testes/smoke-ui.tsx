@@ -293,6 +293,35 @@ async function main() {
     `  ${bloqueadoNaVisualizacao ? '✅' : '❌'} no modo visualização, telas do dono ficam bloqueadas como para o vendedor`,
   )
 
+  // tentar salvar no modo visualização: nada é gravado e a tela avisa
+  dom.window.location.hash = '#/vendedores'
+  await espera(600)
+  const antesVisualizar = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
+  const abriuFormulario = clicar(raiz, 'Novo vendedor')
+  await espera(400)
+  const campoNome = raiz?.querySelector('form input') as HTMLInputElement | null
+  if (campoNome) {
+    campoNome.value = 'NAO DEVE SALVAR'
+    campoNome.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+  }
+  await espera(200)
+  const formulario = raiz?.querySelector('form') as HTMLFormElement | null
+  formulario?.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }))
+  await espera(600)
+  const depoisVisualizar = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
+  const textoAviso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const nadaGravado =
+    abriuFormulario && antesVisualizar === depoisVisualizar && textoAviso.includes('só visualização')
+  if (!nadaGravado) falhas++
+  console.log(
+    `\n  ${nadaGravado ? '✅' : '❌'} no modo visualização nada é gravado e a tela avisa (${antesVisualizar} → ${depoisVisualizar} vendedores)`,
+  )
+  if (!nadaGravado) {
+    console.log(
+      `     (formulário aberto: ${abriuFormulario} · aviso na tela: ${textoAviso.includes('só visualização')})`,
+    )
+  }
+
   dom.window.location.hash = '#/'
   await espera(500)
   const voltou = clicar(raiz, 'Voltar ao meu acesso')
