@@ -51,6 +51,13 @@ function executar(arquivo) {
 console.log('\n➡️  Regras de negócio (preços, datas, formatação, dados de exemplo)\n')
 executar(await compilar('regras.ts', 'regras.cjs'))
 
+if (existsSync(resolve(raiz, 'node_modules/fake-indexeddb'))) {
+  console.log('\n➡️  Armazenamento do navegador (espaço cheio e migração dos dados)\n')
+  executar(await compilar('armazenamento.ts', 'armazenamento.cjs'))
+} else {
+  console.log('\nℹ️  Teste de armazenamento ignorado (instale com: npm i -D fake-indexeddb)\n')
+}
+
 if (existsSync(resolve(raiz, 'node_modules/jsdom'))) {
   console.log('\n➡️  Login, perfis e permissões\n')
   executar(await compilar('login.tsx', 'login.cjs'))

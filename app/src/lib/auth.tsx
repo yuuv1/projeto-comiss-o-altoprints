@@ -9,6 +9,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
+import { lsGravar, lsLer, lsRemover } from './local'
 import { ACESSO_DEMO, contaDemo } from './seed'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { clienteNuvem, emNuvem } from './supabase'
@@ -54,11 +55,11 @@ interface Sessao {
 
 const lerSessao = (): Sessao | null => {
   try {
-    const bruto = localStorage.getItem(CHAVE_SESSAO)
+    const bruto = lsLer(CHAVE_SESSAO)
     if (!bruto) return null
     const s = JSON.parse(bruto) as Sessao
     if (new Date(s.expira_em).getTime() < Date.now()) {
-      localStorage.removeItem(CHAVE_SESSAO)
+      lsRemover(CHAVE_SESSAO)
       return null
     }
     return s
@@ -73,13 +74,16 @@ interface Tentativas {
 
 const lerTentativas = (): Tentativas => {
   try {
-    return JSON.parse(localStorage.getItem(CHAVE_TENTATIVAS) || '{}') as Tentativas
+    return JSON.parse(lsLer(CHAVE_TENTATIVAS) || '{}') as Tentativas
   } catch {
     return {}
   }
 }
 
-const gravarTentativas = (t: Tentativas) => localStorage.setItem(CHAVE_TENTATIVAS, JSON.stringify(t))
+/** anotar as tentativas é importante, mas nunca pode impedir o login */
+const gravarTentativas = (t: Tentativas) => {
+  lsGravar(CHAVE_TENTATIVAS, JSON.stringify(t))
+}
 
 /* ------------------------------------------------------------------ */
 /* contexto                                                            */
@@ -175,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (sessao) {
           const achou = usuarios.find((u) => u.id === sessao.usuario_id && u.ativo)
           if (achou) setUsuarioId(achou.id)
-          else localStorage.removeItem(CHAVE_SESSAO)
+          else lsRemover(CHAVE_SESSAO)
         } else if (import.meta.env.DEV) {
           // Na prévia (modo de desenvolvimento) o sistema entra sozinho com o
           // acesso de exemplo, uma única vez — para ver o sistema sem passar pelo
@@ -207,7 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const guardarSessao = (id: string, manter: boolean) => {
     const dias = manter ? DIAS_CONECTADO : 1 / 24 // "não manter": 1 hora
     const expira = new Date(Date.now() + dias * 86400000).toISOString()
-    localStorage.setItem(CHAVE_SESSAO, JSON.stringify({ usuario_id: id, expira_em: expira, conectado: manter }))
+    // se o navegador não deixar guardar (anônima / sem espaço), a sessão vale só enquanto a aba estiver aberta
+    lsGravar(CHAVE_SESSAO, JSON.stringify({ usuario_id: id, expira_em: expira, conectado: manter }))
   }
 
   /* ------------------------------ entrar ------------------------------ */
@@ -275,7 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sair = useCallback(async () => {
     const sb = clienteNuvem()
     if (sb) await sb.auth.signOut()
-    localStorage.removeItem(CHAVE_SESSAO)
+    lsRemover(CHAVE_SESSAO)
     setUsuarioId(null)
   }, [])
 

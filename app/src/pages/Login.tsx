@@ -1,31 +1,36 @@
 import {
+  AlertTriangle,
   ArrowRight,
   Eye,
   EyeOff,
   KeyRound,
   Link2,
   LogIn,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
+  TriangleAlert,
   UserPlus,
   Users,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 import { JanelaConexao } from '../components/Nuvem'
 import { Botao, Campo, Entrada, Etiqueta, Selecao, cn } from '../components/ui'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
+import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { normalizarUsuario, useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
+import { VERSAO } from '../lib/versao'
 
 type Tela = 'entrar' | 'criar'
 
 /** tela comum de entrada: só vendedores. Nada aqui fala do proprietário. */
 export default function Login() {
   const { usuario, entrar, criarContaVendedor, nuvem } = useAuth()
-  const { db } = useStore()
+  const { db, medirEspaco, liberarEspaco, comecarLimpoNesteAparelho } = useStore()
   const navegar = useNavigate()
 
   const [tela, setTela] = useState<Tela>('entrar')
@@ -39,6 +44,14 @@ export default function Login() {
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [conexaoAberta, setConexaoAberta] = useState(false)
+  const [armazenamento, setArmazenamento] = useState<DiagnosticoArmazenamento | null>(null)
+
+  // confere se o navegador está deixando salvar os dados (anônima / sem espaço)
+  useEffect(() => {
+    void medirEspaco().then(setArmazenamento)
+  }, [medirEspaco])
+
+  const semArmazenamento = Boolean(armazenamento && !armazenamento.localOk && !armazenamento.idbOk)
 
   // o logo esconde a porta do proprietário: 5 toques seguidos
   const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
@@ -256,6 +269,54 @@ export default function Login() {
           </div>
         </form>
 
+        {semArmazenamento ? (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold">
+              <TriangleAlert className="h-4 w-4" /> Este navegador não está deixando salvar os dados
+            </p>
+            <p className="mb-2">
+              É por isso que aparece um erro ao entrar e nada fica guardado. Isso costuma acontecer em{' '}
+              <b>janela anônima/privada</b> ou com o armazenamento bloqueado pelo navegador. Abra o sistema numa{' '}
+              <b>janela normal</b> para tudo funcionar.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Botao
+                tamanho="sm"
+                variante="secundario"
+                icone={RefreshCw}
+                onClick={async () => setArmazenamento(await medirEspaco())}
+              >
+                Testar de novo
+              </Botao>
+            </div>
+          </div>
+        ) : armazenamento?.onde === 'localStorage' && armazenamento.bytesLocal > 3_500_000 ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold">
+              <AlertTriangle className="h-4 w-4" /> O armazenamento deste navegador está quase cheio
+            </p>
+            <p className="mb-2">
+              Os dados deste aparelho ocupam quase todo o espaço reservado pelo navegador. Clique em{' '}
+              <b>Liberar espaço</b>: os pedidos são movidos para o armazenamento novo e continuam aí.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Botao
+                tamanho="sm"
+                icone={RefreshCw}
+                onClick={async () => {
+                  await liberarEspaco()
+                  setArmazenamento(await medirEspaco())
+                }}
+              >
+                Liberar espaço
+              </Botao>
+              <Botao tamanho="sm" variante="secundario" onClick={() => void comecarLimpoNesteAparelho()}>
+                Baixar backup e começar limpo
+              </Botao>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-2 text-center">
           <p
             className={cn(
@@ -272,6 +333,9 @@ export default function Login() {
           </p>
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
             <Sparkles className="h-3 w-3" /> Esqueceu a senha? Peça para redefinirem para você.
+          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-600">
+            versão {VERSAO}
           </p>
           {!nuvem ? (
             <button

@@ -390,6 +390,17 @@ async function main() {
   if (!naoRevelaPorta) falhas++
   console.log(`  ${naoRevelaPorta ? '✅' : '❌'} tela comum não menciona nem aponta para a administração`)
 
+  // a versão aparece na tela de login (é como conferimos se o aparelho está atualizado)
+  const { VERSAO } = await import('../src/lib/versao')
+  const mostraVersao = textoLogin.includes(`versão ${VERSAO}`)
+  if (!mostraVersao) falhas++
+  console.log(`  ${mostraVersao ? '✅' : '❌'} tela de login mostra a versão ${VERSAO}`)
+
+  // os exemplos de nome de pessoa saíram dos campos de login
+  const semExemplosDeNome = !raiz3.innerHTML.includes('ex.: jessica') && !raiz3.innerHTML.includes('Ex.: JESSICA')
+  if (!semExemplosDeNome) falhas++
+  console.log(`  ${semExemplosDeNome ? '✅' : '❌'} campos de login sem os exemplos com nome de pessoa`)
+
   // porta administrativa com um dono já existente: pede o login do dono
   // (desmonta as telas anteriores: elas continuariam reagindo ao endereço e mudariam a rota)
   root1.unmount()

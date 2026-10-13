@@ -22,10 +22,11 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
 import { useAuth } from '../lib/auth'
-import { type OndeEstaGuardado } from '../lib/armazenamento'
+import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { tamanhoLegivel } from '../lib/files'
 import { dataBR, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
+import { VERSAO } from '../lib/versao'
 import {
   DESCRICAO_PERMISSAO,
   FAIXAS_PADRAO,
@@ -57,7 +58,8 @@ export default function Configuracoes() {
   const [salvando, setSalvando] = useState(false)
 
   /* --------------------------- espaço no aparelho --------------------------- */
-  const [espaco, setEspaco] = useState<{ onde: OndeEstaGuardado; bytes: number }>({ onde: 'nenhum', bytes: 0 })
+  const vazio: DiagnosticoArmazenamento = { localOk: true, idbOk: true, onde: 'nenhum', bytesLocal: 0, ocupantes: [] }
+  const [espaco, setEspaco] = useState<DiagnosticoArmazenamento>(vazio)
   const medir = async () => setEspaco(await medirEspaco())
   useEffect(() => {
     if (aba === 'dados') void medir()
@@ -515,23 +517,67 @@ export default function Configuracoes() {
         <div className="space-y-4">
           <Cartao hover={false}>
             <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
-              <BellRing className="h-4 w-4" /> Revisão de pedidos
+              <Database className="h-4 w-4" /> Onde os dados ficam neste aparelho
             </p>
             <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
-              O sistema abre uma janela de revisão a cada 3 dias com os pedidos que não estão "DTF pronto" e "Pago" ao
-              mesmo tempo. Última revisão: {dataBR(db.configuracoes.revisao_ultima_em)}.
+              {espaco.onde === 'IndexedDB'
+                ? 'Estão no armazenamento novo (IndexedDB), que tem espaço de sobra — o problema de “sem espaço” não volta.'
+                : espaco.onde === 'localStorage'
+                  ? 'Ainda estão no armazenamento antigo, que é pequeno (cerca de 5 MB) e pode encher.'
+                  : 'Nenhum dado guardado neste aparelho ainda.'}
             </p>
-            <Botao
-              tamanho="sm"
-              variante="secundario"
-              icone={BellRing}
-              onClick={async () => {
-                await salvarConfig({ revisao_ultima_em: null })
-                avisar('A revisão vai abrir na próxima tela.')
-              }}
-            >
-              Revisar pedidos incompletos agora
-            </Botao>
+
+            {!espaco.localOk && !espaco.idbOk ? (
+              <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                <b>Este navegador não está deixando salvar nada.</b> Isso acontece em janela anônima/privada ou com o
+                armazenamento bloqueado. Abra o sistema numa janela normal para os dados serem salvos.
+              </div>
+            ) : null}
+
+            <div className="mb-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+              <p>
+                Armazenamento antigo (localStorage): <b>{espaco.localOk ? 'funcionando' : 'bloqueado'}</b> ·{' '}
+                {tamanhoLegivel(espaco.bytesLocal)}
+              </p>
+              <p>
+                Armazenamento novo (IndexedDB): <b>{espaco.idbOk ? 'funcionando' : 'indisponível'}</b>
+              </p>
+              {espaco.ocupantes.length ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Maiores ocupantes: {espaco.ocupantes.map((o) => `${o.chave} (${tamanhoLegivel(o.bytes)})`).join(' · ')}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Botao
+                tamanho="sm"
+                variante="secundario"
+                icone={RefreshCw}
+                onClick={async () => {
+                  await medir()
+                }}
+              >
+                Testar de novo
+              </Botao>
+              {espaco.onde === 'localStorage' ? (
+                <Botao
+                  tamanho="sm"
+                  variante="secundario"
+                  icone={RefreshCw}
+                  onClick={async () => {
+                    await liberarEspaco()
+                    await medir()
+                  }}
+                >
+                  Liberar espaço
+                </Botao>
+              ) : null}
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              “Liberar espaço” passa os dados para o armazenamento novo e tira a cópia antiga — nenhum pedido é
+              apagado.
+            </p>
           </Cartao>
 
           <Cartao hover={false}>
@@ -582,41 +628,6 @@ export default function Configuracoes() {
             </p>
           </Cartao>
 
-          <Cartao hover={false}>
-            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
-              <Database className="h-4 w-4" /> Espaço neste aparelho
-            </p>
-            <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
-              Os dados deste aparelho ficam guardados no próprio navegador.{' '}
-              {espaco.onde === 'IndexedDB'
-                ? 'Estão no armazenamento novo (IndexedDB), que tem espaço de sobra.'
-                : espaco.onde === 'localStorage'
-                  ? 'Ainda estão no armazenamento antigo, que é pequeno (cerca de 5 MB) e pode encher.'
-                  : 'Nenhum dado guardado neste aparelho ainda.'}
-            </p>
-            <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
-              Espaço ocupado pelos dados: <b>{tamanhoLegivel(espaco.bytes)}</b>
-            </p>
-            {espaco.onde === 'localStorage' ? (
-              <>
-                <Botao
-                  tamanho="sm"
-                  variante="secundario"
-                  icone={RefreshCw}
-                  onClick={async () => {
-                    await liberarEspaco()
-                    await medir()
-                  }}
-                >
-                  Liberar espaço
-                </Botao>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  Passa os dados para o armazenamento novo e tira a cópia antiga que ocupava o espaço pequeno — nenhum
-                  pedido é apagado.
-                </p>
-              </>
-            ) : null}
-          </Cartao>
 
           <Cartao hover={false}>
             <p className="mb-1 flex items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-200">
@@ -782,6 +793,10 @@ export default function Configuracoes() {
               </Botao>
             </div>
           </Cartao>
+
+          <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-slate-300 dark:text-slate-600">
+            Sistema Altoprints · versão {VERSAO}
+          </p>
 
           <p className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
             <b>Quem pode mudar o quê:</b> as comissões e as permissões da equipe só aparecem aqui, para o proprietário.

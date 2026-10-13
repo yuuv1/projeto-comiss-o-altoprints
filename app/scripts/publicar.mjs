@@ -138,6 +138,14 @@ await writeFile(
     '    abrindo o arquivo direto do computador, alguns navegadores não guardam os anexos.',
     '  - Faça backup de vez em quando (Configurações → Dados → Baixar backup).',
     '',
+    'SE APARECER UM ERRO DE "SEM ESPAÇO" OU NADA FOR SALVO:',
+    '  - Confira se a janela do navegador não está ANÔNIMA/PRIVADA: nesse modo o',
+    '    navegador não deixa o sistema salvar nada. Abra numa janela normal.',
+    '  - A tela de login avisa quando isso está acontecendo e mostra a versão do',
+    '    sistema no rodapé (ex.: "versão 1.0.1").',
+    '  - Em Configurações → Dados existe o bloco "Onde os dados ficam neste aparelho",',
+    '    com o botão "Liberar espaço" quando o armazenamento antigo estiver cheio.',
+    '',
   ].join('\n'),
 )
 

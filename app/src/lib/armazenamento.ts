@@ -15,6 +15,8 @@
  * migrado para o IndexedDB — a cópia velha é removida, liberando o espaço.
  */
 
+import { consegueGravar, espacoNoLocalStorage, lsLer, lsGravar, lsRemover, maioresOcupantes } from './local'
+
 const LS_KEY = 'altoprints:db:v1'
 const IDB_NOME = 'altoprints-banco'
 const IDB_STORE = 'estado'
@@ -43,6 +45,20 @@ const abrirIDB = (): Promise<IDBDatabase> =>
     req.onblocked = () => reject(new Error('O navegador bloqueou o armazenamento.'))
   })
 
+/** grava e lê uma chave de teste — nunca toca no banco do sistema */
+const idbTeste = async () => {
+  const db = await abrirIDB()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put('ok', 'teste')
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
+  await idbApagar('teste')
+}
+
 const idbLer = async (): Promise<string | null> => {
   const db = await abrirIDB()
   const texto = await new Promise<string | null>((resolve, reject) => {
@@ -67,11 +83,11 @@ const idbGravar = async (texto: string) => {
   db.close()
 }
 
-const idbApagar = async () => {
+const idbApagar = async (chave: string = IDB_CHAVE) => {
   const db = await abrirIDB()
   await new Promise<void>((resolve) => {
     const tx = db.transaction(IDB_STORE, 'readwrite')
-    tx.objectStore(IDB_STORE).delete(IDB_CHAVE)
+    tx.objectStore(IDB_STORE).delete(chave)
     tx.oncomplete = () => resolve()
     tx.onerror = () => resolve()
   })
@@ -105,11 +121,7 @@ export async function lerBancoBruto(): Promise<string | null> {
       idbDisponivel = false
     }
   }
-  try {
-    return localStorage.getItem(LS_KEY)
-  } catch {
-    return null
-  }
+  return lsLer(LS_KEY)
 }
 
 /** grava o banco: IndexedDB quando disponível, senão localStorage */
@@ -131,11 +143,7 @@ export async function gravarBancoBruto(texto: string): Promise<void> {
   }
   // ambiente sem armazenamento nenhum (testes, por exemplo): não há o que guardar
   if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(LS_KEY, texto)
-  } catch (e) {
-    throw new Error(ehErroDeEspaco(e) ? MENSAGEM_SEM_ESPACO : String((e as Error)?.message ?? e))
-  }
+  if (!lsGravar(LS_KEY, texto)) throw new Error(MENSAGEM_SEM_ESPACO)
 }
 
 export async function apagarBancoBruto(): Promise<void> {
@@ -147,32 +155,14 @@ export async function apagarBancoBruto(): Promise<void> {
       idbDisponivel = false
     }
   }
-  try {
-    localStorage.removeItem(LS_KEY)
-  } catch {
-    /* sem problema */
-  }
+  lsRemover(LS_KEY)
 }
 
 /* ------------------------------------------------------------------ */
 /* Espaço usado (mostrado em Configurações → Dados)                    */
 /* ------------------------------------------------------------------ */
 
-/** espaço aproximado, em bytes, que este site ocupa no localStorage */
-export const espacoNoLocalStorage = () => {
-  try {
-    let bytes = 0
-    for (let i = 0; i < localStorage.length; i++) {
-      const chave = localStorage.key(i)
-      if (!chave) continue
-      const valor = localStorage.getItem(chave) ?? ''
-      bytes += (chave.length + valor.length) * 2 // cada caractere ocupa 2 bytes
-    }
-    return bytes
-  } catch {
-    return 0
-  }
-}
+export { espacoNoLocalStorage, maioresOcupantes } from './local'
 
 export type OndeEstaGuardado = 'IndexedDB' | 'localStorage' | 'nenhum'
 
@@ -187,11 +177,7 @@ export async function ondeEstaGuardado(): Promise<OndeEstaGuardado> {
       idbDisponivel = false
     }
   }
-  try {
-    return localStorage.getItem(LS_KEY) ? 'localStorage' : 'nenhum'
-  } catch {
-    return 'nenhum'
-  }
+  return lsLer(LS_KEY) ? 'localStorage' : 'nenhum'
 }
 
 /**
@@ -213,4 +199,60 @@ export async function liberarCopiaAntiga(textoAtual: string): Promise<number> {
   } catch {
     return 0
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Diagnóstico (o que a tela de login e as Configurações mostram)      */
+/* ------------------------------------------------------------------ */
+
+export interface DiagnosticoArmazenamento {
+  /** o navegador deixou gravar uma chave minúscula? */
+  localOk: boolean
+  /** o armazenamento novo (IndexedDB) está funcionando? */
+  idbOk: boolean
+  /** onde o banco está guardado agora */
+  onde: OndeEstaGuardado
+  /** bytes ocupados no localStorage */
+  bytesLocal: number
+  /** maiores ocupantes do localStorage */
+  ocupantes: { chave: string; bytes: number }[]
+}
+
+/**
+ * Testa o armazenamento deste navegador de verdade: tenta gravar uma chave
+ * minúscula no localStorage e abrir/gravar/ler o IndexedDB. É assim que o
+ * sistema percebe a diferença entre "o espaço encheu" e "este navegador não
+ * deixa salvar nada" (janela anônima/privada, por exemplo).
+ */
+export async function testarArmazenamento(): Promise<DiagnosticoArmazenamento> {
+  const localOk = typeof localStorage !== 'undefined' && consegueGravar()
+
+  let idbOk = false
+  if (temIndexedDB()) {
+    try {
+      await idbTeste()
+      idbOk = true
+      idbDisponivel = true
+    } catch {
+      idbOk = false
+      idbDisponivel = false
+    }
+  }
+
+  return {
+    localOk,
+    idbOk,
+    onde: await ondeEstaGuardado(),
+    bytesLocal: espacoNoLocalStorage(),
+    ocupantes: maioresOcupantes(),
+  }
+}
+
+/**
+ * Socorre um navegador sem espaço: tira a cópia antiga do banco do localStorage
+ * (depois de guardá-la no IndexedDB) e devolve os bytes liberados.
+ * Não apaga nenhum dado do sistema.
+ */
+export async function liberarEspacoDoLocalStorage(textoAtual: string): Promise<number> {
+  return liberarCopiaAntiga(textoAtual)
 }

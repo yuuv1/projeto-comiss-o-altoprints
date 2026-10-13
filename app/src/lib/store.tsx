@@ -31,7 +31,15 @@ import {
 import { calcularValor, proximoNumero } from './pricing'
 import { gerarDadosDemo, prepararAcessoDemo } from './seed'
 import { gerarHashSenha } from './senha'
-import { espacoNoLocalStorage, liberarCopiaAntiga, ondeEstaGuardado, type OndeEstaGuardado } from './armazenamento'
+import {
+  espacoNoLocalStorage,
+  liberarCopiaAntiga,
+  ondeEstaGuardado,
+  testarArmazenamento,
+  type DiagnosticoArmazenamento,
+  type OndeEstaGuardado,
+} from './armazenamento'
+import { limparChavesDoSistema, lsGravar, lsLer } from './local'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -100,11 +108,16 @@ interface Ctx {
   nomeVendedor: (id: ID | '' | null | undefined) => string
   proximoNumeroPedido: number
   pedidoPorId: (id: ID | undefined) => Pedido | undefined
-  /* espaço no aparelho (Configurações → Dados) */
-  /** onde os dados estão guardados neste aparelho e quanto espaço ocupam */
-  medirEspaco: () => Promise<{ onde: OndeEstaGuardado; bytes: number }>
+  /* espaço no aparelho (Configurações → Dados e tela de login) */
+  /** testa o armazenamento deste navegador e diz onde os dados estão guardados */
+  medirEspaco: () => Promise<DiagnosticoArmazenamento>
   /** tira do localStorage a cópia antiga do banco (libera o espaço pequeno) */
   liberarEspaco: () => Promise<number>
+  /**
+   * Socorro para navegador sem espaço nenhum: baixa um backup e limpa só os
+   * dados do sistema neste aparelho, para o sistema voltar a funcionar.
+   */
+  comecarLimpoNesteAparelho: () => Promise<void>
 }
 
 const StoreContext = createContext<Ctx | null>(null)
@@ -193,11 +206,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const dados = await carregarTudo()
         const vazio = !dados.pedidos.length && !dados.clientes.length && !dados.vendedores.length
-        const jaCarregouDemo = localStorage.getItem(CHAVE_DEMO) === '1'
+        const jaCarregouDemo = lsLer(CHAVE_DEMO) === '1'
         if (vazio && !jaCarregouDemo && !modoNuvem()) {
           const demo = gerarDadosDemo()
           await substituirTudo(demo)
-          localStorage.setItem(CHAVE_DEMO, '1')
+          lsGravar(CHAVE_DEMO, '1')
           setDb(demo)
         } else {
           setDb(await prepararDemo(dados))
@@ -522,7 +535,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const carregarDemo = useCallback(async () => {
     const demo = await prepararDemo(gerarDadosDemo())
     await substituirTudo(demo)
-    localStorage.setItem(CHAVE_DEMO, '1')
+    lsGravar(CHAVE_DEMO, '1')
     setDb(demo)
     avisar('Dados de demonstração carregados! O acesso de exemplo é o usuário "gui".')
   }, [avisar])
@@ -530,23 +543,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* ------------------------- espaço no aparelho ------------------------- */
 
   const medirEspaco = useCallback(async () => {
-    const onde = await ondeEstaGuardado()
-    // no armazenamento novo o que importa é o tamanho dos dados; no antigo, o total do navegador
-    const bytes =
-      onde === 'localStorage' ? espacoNoLocalStorage() : new Blob([JSON.stringify(db)]).size
-    return { onde, bytes }
-  }, [db])
+    // no armazenamento novo o que interessa é o tamanho dos dados; no antigo, o
+    // total do navegador (que inclui tudo o que este site guardou)
+    return testarArmazenamento()
+  }, [])
 
   const liberarEspaco = useCallback(async () => {
     const liberado = await liberarCopiaAntiga(JSON.stringify(db))
     avisar(
       liberado
         ? `Espaço liberado neste aparelho (${Math.round(liberado / 1024)} KB). Os dados continuam salvos.`
-        : 'Nada a liberar: os dados deste aparelho já estão no armazenamento novo.',
+        : 'Os dados deste aparelho já estão no armazenamento novo: não há o que liberar.',
       'info',
     )
     return liberado
   }, [avisar, db])
+
+  const comecarLimpoNesteAparelho = useCallback(async () => {
+    // 1) backup primeiro (a pessoa pode restaurar depois em Configurações → Dados)
+    baixarBackup()
+    // 2) limpa só as chaves do sistema neste aparelho — apagar sempre funciona,
+    //    mesmo quando o navegador está sem espaço para gravar
+    const liberado = limparChavesDoSistema()
+    // 3) recarrega: sem dados, o sistema volta ao começo (com os exemplos)
+    setTimeout(() => window.location.reload(), 600)
+    avisar(
+      liberado
+        ? `Começando limpo: ${Math.round(liberado / 1024)} KB liberados. O backup foi baixado.`
+        : 'Começando limpo neste aparelho. O backup foi baixado.',
+    )
+  }, [avisar, baixarBackup])
 
   /* ------------------------------ utilidades ---------------------------- */
 
@@ -596,6 +622,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       pedidoPorId,
       medirEspaco,
       liberarEspaco,
+      comecarLimpoNesteAparelho,
     }),
     [
       db,
@@ -629,6 +656,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       pedidoPorId,
       medirEspaco,
       liberarEspaco,
+      comecarLimpoNesteAparelho,
     ],
   )
 
