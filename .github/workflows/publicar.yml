@@ -17,13 +17,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      # "true" quando o GitHub Pages está ligado neste repositório
+      paginas: ${{ steps.paginas.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          # O jsdom 30 (usado nos testes de tela) exige Node 22.22+ — com o Node 20
-          # os testes quebravam com "Promise.withResolvers is not a function".
+          # Os testes de tela usam o jsdom 30, que precisa do Node 22.22+
+          # (Promise.withResolvers). No Node 20 eles quebravam.
           node-version: 22
 
       - name: Instalar dependências
@@ -42,14 +45,45 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
-      - uses: actions/configure-pages@v5
+      # Liga o Pages se ainda não estiver ligado (Settings → Pages →
+      # Source: GitHub Actions). Em repositório PRIVADO o Pages só existe em
+      # conta paga: quando ele não está disponível, esta etapa falha sozinha e
+      # o resto do trabalho (testes e versão de produção) continua valendo.
+      - name: Preparar o GitHub Pages
+        id: paginas
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
+
+      - name: Como publicar quando o GitHub Pages não está disponível
+        if: steps.paginas.outcome != 'success'
+        run: |
+          echo "::warning::O GitHub Pages não está disponível neste repositório (em repositório privado ele exige conta paga). Os testes e a versão de produção passaram: publique a pasta publicar/ no Netlify Drop — o passo a passo está em app/DEPLOY.md."
+          {
+            echo "## O GitHub Pages não está disponível neste repositório"
+            echo ""
+            echo "Os testes e a versão de produção **passaram** — só a publicação no GitHub ficou de fora."
+            echo "Em repositório privado, o GitHub Pages exige conta paga."
+            echo ""
+            echo "Para publicar de graça hoje (5 minutos, sem instalar nada):"
+            echo ""
+            echo "1. Abra <https://app.netlify.com/drop>"
+            echo "2. Arraste a pasta \`publicar/\` para a área pontilhada"
+            echo "3. Espere o deploy terminar e clique em **Claim site**"
+            echo ""
+            echo "Passo a passo completo em [app/DEPLOY.md](app/DEPLOY.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.paginas.outcome == 'success'
         with:
           path: app/dist
 
   deploy:
     needs: build
+    # Publica só quando o Pages está ligado, para o workflow não ficar vermelho
+    if: needs.build.outputs.paginas == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

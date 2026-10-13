@@ -40,7 +40,13 @@ Você pode fazer em duas etapas:
 
 ## Etapa 1 — Publicar o site
 
-### Opção A: GitHub Pages (já está configurado neste repositório)
+### Opção A: GitHub Pages (automático, mas exige conta paga)
+
+> **Atenção:** este repositório é **privado** e, em repositório privado, o GitHub Pages
+> só funciona em conta **paga** (GitHub Pro). Com a conta gratuita o robô de publicação
+> não consegue ligar o Pages e o site não sai do ar — nesse caso use a **Opção B (Netlify)**,
+> que é de graça. O robô não atrapalha: ele testa e gera a versão de produção de qualquer
+> forma e, se o Pages não estiver disponível, apenas avisa e segue em frente.
 
 1. No GitHub, abra o repositório e vá em **Settings → Pages**.
 2. Em **Source**, escolha **GitHub Actions**.
@@ -49,7 +55,9 @@ Você pode fazer em duas etapas:
 4. Em 1 a 2 minutos o link aparece no próprio GitHub
    (algo como `https://seu-usuario.github.io/projeto-comiss-o-altoprints/`).
 
-O arquivo `.github/workflows/publicar.yml` já cuida de instalar, testar e publicar.
+O arquivo `.github/workflows/publicar.yml` cuida de instalar, testar e publicar. Se o
+Pages não estiver ligado, ele mostra no resumo da execução (e num aviso amarelo) o que
+fazer — publicar a pasta `publicar/` no Netlify Drop.
 
 ### Opção B: Netlify
 
@@ -77,6 +85,8 @@ Uma vez conectado, toda alteração enviada ao repositório publica o sistema au
 
 1. No seu computador: `cd app && npm install && npm run build`
 2. Abra <https://app.netlify.com/drop> e arraste a pasta `app/dist`.
+   - Atalho: a pasta [`publicar/`](../publicar) já vem pronta no repositório (gerada por
+     `npm run publicar`) — dá para arrastar essa pasta direto, sem precisar buildar.
 3. ⚠️ **Importante:** o site criado sem login é temporário — ele é apagado se você não
    **reivindicar ("Claim")** ele para uma conta Netlify. Clique no botão de claim e crie a
    conta na hora; depois disso o endereço fica firme.
