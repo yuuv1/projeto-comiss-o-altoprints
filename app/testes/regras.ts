@@ -2,6 +2,7 @@
  * Testes das regras de negócio (preço por metragem, datas, formatação).
  * Rode com:  npm run testar
  */
+import { readFileSync } from 'node:fs'
 import {
   calcularComissao,
   comissaoDoPedido,
@@ -149,9 +150,9 @@ igual('filtro "todas" mostra tudo', combinaFiltro(entregue, 'todas'), true)
 
 /* ------------------------- quem entra na comissão ---------------------- */
 igual('comissão ignora a fila em andamento', filasDaComissao([naFila, concluida]).length, 1)
-igual('comissão com base "pagos" ignora a concluída sem pagamento', filasDaComissao([concluidaSemPagar], 'pagos').length, 0)
-igual('comissão com base "pagos" conta a concluída paga', filasDaComissao([concluida], 'pagos').length, 1)
-igual('comissão com base "todos" conta a concluída sem pagamento', filasDaComissao([concluidaSemPagar]).length, 1)
+igual('comissão ignora a em andamento mesmo paga', filasDaComissao([imprimindo]).length, 0)
+igual('comissão conta a concluída (paga ou não: "pago" é só orientação)', filasDaComissao([concluidaSemPagar]).length, 1)
+igual('comissão conta todas as concluídas do período', filasDaComissao([concluida, concluidaSemPagar, entregue]).length, 3)
 
 /* ------------------------------- semente ------------------------------ */
 const demo = gerarDadosDemo()
@@ -203,6 +204,18 @@ igual(
     filasDaComissao(demo.pedidos).length < demo.pedidos.length,
   true,
 )
+igual(
+  'demo: as filas não pagas continuam contando no relatório',
+  filasDaComissao(demo.pedidos).some((p) => !p.pago) && filasDaComissao(demo.pedidos).length > 0,
+  true,
+)
+
+/* --------------------- impressão (sempre branco no papel) -------------- */
+const css = readFileSync('src/index.css', 'utf8') // o teste roda a partir da pasta app/
+const blocoImpressao = css.slice(css.indexOf('@media print'), css.indexOf('@media print') + 1600)
+igual('impressão: papel branco mesmo no tema noite', /html,\s*body,\s*#root/.test(blocoImpressao), true)
+igual('impressão: fundo degradê não vai para o papel', blocoImpressao.includes('background-image: none !important'), true)
+igual('impressão: texto do papel sai preto', /body \*[\s\S]{0,60}color: #000 !important/.test(blocoImpressao), true)
 
 /* ------------------------- acesso de exemplo --------------------------- */
 igual('demo: vem com um acesso de exemplo', demo.usuarios.length, 1)

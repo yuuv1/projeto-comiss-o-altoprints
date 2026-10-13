@@ -64,7 +64,7 @@ export default function Login() {
         .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
-          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
+          const pagos = filasDaComissao(pedidos)
           return {
             id: v.id,
             nome: v.nome,
@@ -73,7 +73,7 @@ export default function Login() {
           }
         })
         .sort((a, b) => b.pedidos - a.pedidos),
-    [db.configuracoes.comissao_base, db.pedidos, db.usuarios, db.vendedores],
+    [db.pedidos, db.usuarios, db.vendedores],
   )
 
   const escolhido = disponiveis.find((v) => v.id === vendedorId)

@@ -24,7 +24,7 @@ export default function Vendedores({ embutido = false }: { embutido?: boolean } 
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
           const total = pedidos.reduce((s, p) => s + Number(p.valor || 0), 0)
-          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
+          const pagos = filasDaComissao(pedidos)
           return {
             vendedor: v,
             pedidos: pedidos.length,

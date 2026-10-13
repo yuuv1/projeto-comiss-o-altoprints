@@ -237,50 +237,11 @@ export default function Configuracoes() {
       {aba === 'comissoes' ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-            <b>Como funciona:</b> a comissão de cada fila é calculada pela <b>metragem</b> — o percentual da faixa em
-            que ela cai é aplicado sobre o valor da fila. O vendedor vê só a comissão dele; o proprietário vê a de
-            todos, com o total.
+            <b>Como funciona:</b> entram no relatório <b>todas as filas concluídas</b> do período (marcadas como pagas ou
+            não — o "pago" é só orientação da equipe). A comissão de cada fila é calculada pela <b>metragem</b>: o
+            percentual da faixa em que ela cai é aplicado sobre o valor da fila. O vendedor vê só a comissão dele; o
+            proprietário vê a de todos, com o total.
           </div>
-
-          <Cartao hover={false}>
-            <p className="mb-1 text-sm font-extrabold text-slate-700 dark:text-slate-200">Comissão conta quais filas?</p>
-            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              No relatório entram sempre as filas <b>concluídas</b> (as que já saíram da máquina) — fila em andamento
-              não é venda. Aqui você escolhe se, entre as concluídas, contam todas ou só as que você marcou como pagas
-              na tela Pedidos.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  { id: 'todos' as const, label: 'Todas as filas concluídas', dica: 'Mais simples: vale tudo o que foi concluído no período.' },
-                  { id: 'pagos' as const, label: 'Só as filas concluídas e pagas', dica: 'A comissão só entra depois do cliente pagar.' },
-                ]
-              ).map((opcao) => {
-                const ativa = db.configuracoes.comissao_base === opcao.id
-                return (
-                  <button
-                    key={opcao.id}
-                    onClick={async () => {
-                      await salvarConfig({ comissao_base: opcao.id })
-                      avisar(`Comissão agora conta ${opcao.label.toLowerCase()}.`)
-                    }}
-                    className={cn(
-                      'flex-1 rounded-xl border p-3 text-left transition',
-                      ativa
-                        ? 'border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950/40'
-                        : 'border-slate-200 bg-white hover:border-purple-200 dark:border-slate-700 dark:bg-slate-900',
-                    )}
-                  >
-                    <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                      {ativa ? <Check className="h-4 w-4 text-purple-600 dark:text-purple-400" /> : null}
-                      {opcao.label}
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{opcao.dica}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </Cartao>
 
           <Cartao hover={false}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

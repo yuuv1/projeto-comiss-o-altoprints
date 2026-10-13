@@ -143,7 +143,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
         .map((v) => {
           const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
-          const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
+          const pagos = filasDaComissao(pedidos)
           return {
             id: v.id,
             nome: v.nome,
@@ -215,7 +215,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         <div className="space-y-3">
           {contas.map((c) => {
             const pedidos = db.pedidos.filter((p) => p.vendedor_id === c.vendedor_id)
-            const pagos = filasDaComissao(pedidos, db.configuracoes.comissao_base)
+            const pagos = filasDaComissao(pedidos)
             const comissao = calcularComissao(pagos, faixas, semMetragem)
             const vendedor = db.vendedores.find((v) => v.id === c.vendedor_id)
             return (

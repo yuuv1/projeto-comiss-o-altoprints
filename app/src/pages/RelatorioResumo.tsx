@@ -88,13 +88,12 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
 
   /**
    * Filas que entram na conta: SÓ as concluídas (as que já saíram da máquina).
-   * O que ainda está em andamento não é venda e não aparece aqui.
-   * Dentro das concluídas, a escolha do proprietário decide se conta todas
-   * ou só as marcadas como pagas (Configurações → Comissões).
+   * O que ainda está em andamento não é venda e não aparece aqui. A marcação
+   * de "pago" é só orientação da equipe — não tira nem põe fila no relatório.
    */
   const base = useMemo(
-    () => filasDaComissao(db.pedidos, db.configuracoes.comissao_base),
-    [db.configuracoes.comissao_base, db.pedidos],
+    () => filasDaComissao(db.pedidos),
+    [db.pedidos],
   )
 
   const filtrados = useMemo(() => {
@@ -248,14 +247,15 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Entram aqui <b>só as filas concluídas</b> (o que ainda está em andamento não é venda). Para a
-            contabilidade, use sempre <b>Data do pagamento</b>; sem essa data, vale a data do pedido.
+            Entram aqui <b>todas as filas concluídas</b> do período — marcadas como pagas ou não: o "pago" é só
+            orientação da equipe. Para a contabilidade, use <b>Data do pagamento</b>; sem essa data, vale a data do
+            pedido.
           </p>
         </Cartao>
 
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <CartaoResumo
-            titulo={db.configuracoes.comissao_base === 'pagos' ? 'Filas pagas' : 'Filas concluídas'}
+            titulo="Filas concluídas"
             valor={totais.pedidos}
             icone={Receipt}
             gradiente="from-pink-500 to-purple-600"

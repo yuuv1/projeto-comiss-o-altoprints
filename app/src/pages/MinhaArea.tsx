@@ -55,7 +55,7 @@ export default function MinhaArea() {
   )
 
   /** como no relatório: só as filas concluídas no mês contam para a comissão */
-  const naConta = filasDaComissao(doMes, db.configuracoes.comissao_base)
+  const naConta = filasDaComissao(doMes)
   const comissao = calcularComissao(naConta, faixas, semMetragem)
   const aReceber = meusPedidos.filter(pedidoPendenteFinanceiro).reduce((s, p) => s + Number(p.valor || 0), 0)
   /** filas que já saíram da máquina e ainda não foram entregues: é hora de avisar o cliente */

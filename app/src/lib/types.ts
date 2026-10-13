@@ -309,11 +309,6 @@ export interface Configuracoes {
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
   faixas_preco: FaixaPreco[]
-  /**
-   * Base da comissão: 'todos' conta todas as filas do período,
-   * 'pagos' conta só as marcadas como pagas.
-   */
-  comissao_base: 'todos' | 'pagos'
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -325,7 +320,6 @@ export const CONFIG_PADRAO: Configuracoes = {
   comissao_sem_metragem: 0,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
-  comissao_base: 'todos',
 }
 
 /**
@@ -427,16 +421,13 @@ export const naFilaDeImpressao = (p: Pedido) => p.estagio !== 'concluido'
 export const isPedidoCompleto = (p: Pedido) => p.estagio === 'concluido'
 
 /**
- * Filas que entram na comissão e no relatório.
+ * Filas que entram na comissão e no relatório: as CONCLUÍDAS (que já saíram da
+ * máquina). O que ainda está em andamento não é venda.
  *
- * Só entram as filas CONCLUÍDAS (que já saíram da máquina) — o que ainda está
- * em andamento não é venda. Dentro dessas, a escolha do proprietário
- * (Configurações → Comissões) decide se contam todas ou só as marcadas como pagas.
+ * A marcação de "pago" NÃO tira a fila da conta: ela é só orientação para a
+ * equipe saber o que já foi recebido.
  */
-export const filasDaComissao = (pedidos: Pedido[], base: 'todos' | 'pagos' = 'todos') => {
-  const concluidas = pedidos.filter((p) => p.estagio === 'concluido')
-  return base === 'pagos' ? concluidas.filter((p) => p.pago) : concluidas
-}
+export const filasDaComissao = (pedidos: Pedido[]) => pedidos.filter((p) => p.estagio === 'concluido')
 
 /** fila ainda não marcada como paga (controle opcional do dono) */
 export const pedidoPendenteFinanceiro = (p: Pedido) => !p.pago
