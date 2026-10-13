@@ -167,7 +167,7 @@ export default function Equipe() {
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Contas" valor={contas.length} icone={Users} gradiente="from-pink-500 to-purple-600" />
         <CartaoResumo
           titulo="Vendedores com acesso"

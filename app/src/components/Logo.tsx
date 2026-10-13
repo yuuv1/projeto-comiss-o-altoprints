@@ -37,16 +37,16 @@ export function Logo({ compacto = false, className }: { compacto?: boolean; clas
   const personalizada = db.configuracoes.logo_url
 
   return (
-    <div className={cn('flex items-center gap-2.5', className)}>
+    <div className={cn('flex items-center gap-2', className)}>
       {personalizada ? (
         <img
           src={personalizada}
           alt={db.configuracoes.empresa_nome}
-          className="h-10 w-10 rounded-xl bg-white object-contain shadow-soft ring-1 ring-slate-100"
+          className="h-9 w-9 rounded-xl bg-white object-contain shadow-soft ring-1 ring-slate-100"
         />
       ) : (
         <div className="relative">
-          <MarcaLogo tamanho={40} className="drop-shadow-[0_4px_10px_rgba(168,85,247,0.45)]" />
+          <MarcaLogo tamanho={34} className="drop-shadow-[0_4px_10px_rgba(168,85,247,0.45)]" />
           <span className="pointer-events-none absolute inset-0 rounded-[14px] bg-gradient-to-tr from-transparent via-white/40 to-transparent" />
         </div>
       )}

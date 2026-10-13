@@ -14,6 +14,7 @@ export const CHAVES_ALTOPRINTS = [
   'altoprints:sessao',
   'altoprints:tentativas',
   'altoprints:tema',
+  'altoprints:densidade',
   'altoprints:nuvem',
   'altoprints:demo-inicial-carregada',
   'altoprints:entrada-automatica',

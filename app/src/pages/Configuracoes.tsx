@@ -7,13 +7,18 @@ import {
   Download,
   Image as ImageIcon,
   KeyRound,
+  Moon,
+  Palette,
   Percent,
   Plus,
   RefreshCw,
+  Rows3,
+  Rows4,
   Save,
   Settings,
   ShieldCheck,
   Sparkles,
+  Sun,
   Trash2,
   TriangleAlert,
   Upload,
@@ -26,6 +31,7 @@ import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { tamanhoLegivel } from '../lib/files'
 import { dataBR, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
+import { DESCRICAO_DENSIDADE, LABEL_DENSIDADE, useTema } from '../lib/tema'
 import { VERSAO } from '../lib/versao'
 import {
   DESCRICAO_PERMISSAO,
@@ -37,7 +43,7 @@ import {
 import { AbaNuvem } from '../components/Nuvem'
 import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmacao } from '../components/ui'
 
-type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso' | 'nuvem'
+type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso' | 'nuvem' | 'aparencia'
 
 export default function Configuracoes() {
   const {
@@ -53,6 +59,7 @@ export default function Configuracoes() {
     liberarEspaco,
   } = useStore()
   const { usuario, trocarMinhaSenha, trocarMeuUsuario, atualizarMeuPerfil } = useAuth()
+  const { tema, densidade, setTema, definirDensidade } = useTema()
   const { confirmar, dialog } = useConfirmacao()
   const [aba, setAba] = useState<Aba>('comissoes')
   const [salvando, setSalvando] = useState(false)
@@ -141,6 +148,7 @@ export default function Configuracoes() {
     { id: 'dados', label: 'Dados', icone: Database },
     { id: 'nuvem', label: 'Nuvem', icone: Cloud },
     { id: 'acesso', label: 'Meu acesso', icone: KeyRound },
+    { id: 'aparencia', label: 'Aparência', icone: Palette },
   ]
 
   return (
@@ -679,6 +687,70 @@ export default function Configuracoes() {
       {aba === 'nuvem' ? <AbaNuvem /> : null}
 
       {/* ------------------------------ MEU ACESSO ---------------------------- */}
+      {/* ------------------------------ APARÊNCIA ------------------------------ */}
+      {aba === 'aparencia' ? (
+        <div className="space-y-3">
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <Palette className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Tema do sistema
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Claro para o dia a dia, escuro para trabalhar com a luz baixa.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(['claro', 'escuro'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTema(t)}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition',
+                    tema === t
+                      ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                  )}
+                >
+                  {t === 'claro' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {t === 'claro' ? 'Claro' : 'Escuro'}
+                </button>
+              ))}
+            </div>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <Rows4 className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Tamanho dos blocos
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              <b>Compacto</b> deixa tudo mais junto (cabe bem mais coisa na tela de uma vez). <b>Confortável</b> dá mais
+              respiro entre os blocos.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(['compacto', 'confortavel'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => definirDensidade(d)}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition',
+                    densidade === d
+                      ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                  )}
+                >
+                  {d === 'compacto' ? <Rows4 className="h-4 w-4" /> : <Rows3 className="h-4 w-4" />}
+                  {LABEL_DENSIDADE[d]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{DESCRICAO_DENSIDADE[densidade]}</p>
+          </Cartao>
+
+          <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+            A escolha vale só para este aparelho/navegador. O botão do topo da tela também troca o tamanho dos blocos —
+            assim você compara na hora o que fica melhor no seu monitor.
+          </p>
+        </div>
+      ) : null}
+
       {aba === 'acesso' ? (
         <div className="space-y-4">
           <Cartao hover={false}>

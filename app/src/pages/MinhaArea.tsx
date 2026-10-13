@@ -91,7 +91,7 @@ export default function MinhaArea() {
       />
 
       {avisos.length ? (
-        <div className="mb-5 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-soft dark:border-amber-900 dark:from-amber-950/50 dark:to-orange-950/40">
+        <div className="mb-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-soft dark:border-amber-900 dark:from-amber-950/50 dark:to-orange-950/40">
           <p className="mb-2 flex items-center gap-2 text-sm font-extrabold text-amber-900 dark:text-amber-200">
             <BellRing className="h-4 w-4" />
             {avisos.length} pedido(s) seu(s) já {avisos.length === 1 ? 'foi impresso' : 'foram impressos'}!
@@ -115,7 +115,7 @@ export default function MinhaArea() {
         </div>
       ) : null}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Meus pedidos"
           valor={meusPedidos.length}

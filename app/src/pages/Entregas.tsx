@@ -59,7 +59,7 @@ export default function Entregas() {
 
       {aba === 'correios' ? (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <CartaoResumo titulo="Em trânsito" valor={emTransito.length} icone={Truck} gradiente="from-sky-500 to-blue-600" />
             <CartaoResumo titulo="Entregues" valor={entregues.length} icone={CheckCircle2} gradiente="from-emerald-500 to-green-600" />
             <CartaoResumo
@@ -170,7 +170,7 @@ export default function Entregas() {
         </>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <CartaoResumo titulo="Aguardando retirada" valor={aguardando.length} icone={Inbox} gradiente="from-amber-500 to-orange-600" />
             <CartaoResumo titulo="Retirados" valor={retirados.length} icone={CheckCircle2} gradiente="from-emerald-500 to-green-600" />
             <CartaoResumo

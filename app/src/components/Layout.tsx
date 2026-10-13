@@ -7,6 +7,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Rows3,
+  Rows4,
   Moon,
   Printer,
   Settings,
@@ -50,7 +52,7 @@ export function Layout() {
   const { db, nomeVendedor } = useStore()
   const { usuario, ehProprietario, vendedorNome, sair, emVisualizacao, sairDaVisualizacao } = useAuth()
   const telas = telasDoUsuario(usuario)
-  const { escuro, alternar } = useTema()
+  const { escuro, alternar, compacto, alternarDensidade } = useTema()
   const navegar = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
@@ -99,7 +101,7 @@ export function Layout() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-16 transition-colors print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-10 transition-colors print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-100 transition-opacity print:hidden dark:opacity-25">
         <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-pink-300/40 to-purple-300/30 blur-3xl" />
         <div className="absolute -right-24 top-32 h-80 w-80 rounded-full bg-gradient-to-br from-sky-300/40 to-emerald-200/30 blur-3xl" />
@@ -107,7 +109,7 @@ export function Layout() {
       </div>
 
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/80 backdrop-blur-xl print:hidden dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-[1700px] items-center gap-2 px-3 py-2">
           <NavLink to="/" className="shrink-0" onClick={tocarNoLogo}>
             <Logo />
           </NavLink>
@@ -119,7 +121,7 @@ export function Layout() {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'relative inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12.5px] font-bold transition-all duration-200',
+                    'relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-bold transition-all duration-200',
                     isActive
                       ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
                       : 'text-slate-600 hover:bg-white hover:text-purple-700 hover:shadow-soft dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-purple-300',
@@ -140,15 +142,24 @@ export function Layout() {
           <div className="ml-auto flex items-center gap-2 xl:ml-1">
             <button
               onClick={alternar}
-              className="rounded-full border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+              className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
               title={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
             >
               {escuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
             <button
+              onClick={alternarDensidade}
+              className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-bold text-slate-500 shadow-sm transition hover:text-purple-700 sm:inline-flex dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+              title={compacto ? 'Deixar os blocos mais espaçados' : 'Deixar a tela mais compacta'}
+            >
+              {compacto ? <Rows4 className="h-4 w-4" /> : <Rows3 className="h-4 w-4" />}
+              {compacto ? 'Compacto' : 'Confortável'}
+            </button>
+
+            <button
               onClick={() => setPerfilAberto(true)}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 text-left shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-2.5 text-left shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
               title="Meu perfil"
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-[11px] font-black text-white">
@@ -167,7 +178,7 @@ export function Layout() {
               onClick={async () => {
                 await sair()
               }}
-              className="hidden rounded-full border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm transition hover:text-rose-600 sm:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-rose-400"
+              className="hidden rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:text-rose-600 sm:block dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-rose-400"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />
@@ -175,7 +186,7 @@ export function Layout() {
 
             <button
               onClick={() => setMenuAberto((v) => !v)}
-              className="rounded-full border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition hover:text-purple-700 xl:hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:text-purple-700 xl:hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               title="Menu"
             >
               {menuAberto ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -184,8 +195,8 @@ export function Layout() {
         </div>
 
         {menuAberto ? (
-          <div className="animate-fade-in-up border-t border-slate-100 bg-white/95 px-3 pb-3 pt-2 xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
-            <div className="grid grid-cols-2 gap-1.5">
+          <div className="animate-fade-in-up border-t border-slate-100 bg-white/95 px-2 pb-2 pt-1.5 xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
+            <div className="grid grid-cols-2 gap-1">
               {visiveis.map(({ to, label, icone: Icone, badge }) => (
                 <NavLink
                   key={to}
@@ -193,7 +204,7 @@ export function Layout() {
                   onClick={() => setMenuAberto(false)}
                   className={({ isActive }) =>
                     cn(
-                      'inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-bold transition',
+                      'inline-flex items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold transition',
                       isActive
                         ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
                         : 'bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
@@ -215,7 +226,7 @@ export function Layout() {
                 setMenuAberto(false)
                 await sair()
               }}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-2.5 text-[13px] font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+              className="mt-1.5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[13px] font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
             >
               <LogOut className="h-4 w-4" /> Sair do sistema
             </button>
@@ -223,10 +234,10 @@ export function Layout() {
         ) : null}
       </header>
 
-      <main className="relative mx-auto max-w-7xl px-4 py-6">
+      <main className="relative mx-auto max-w-[1700px] px-3 py-3">
         {emVisualizacao && usuario ? (
-          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
               <Eye className="h-5 w-5" />
             </span>
             <p className="min-w-[220px] flex-1 text-sm font-semibold text-amber-900 dark:text-amber-100">
@@ -240,7 +251,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="relative mx-auto max-w-7xl px-4 pb-8 text-center text-xs text-slate-400 print:hidden dark:text-slate-500">
+      <footer className="relative mx-auto max-w-[1700px] px-3 pb-3 text-center text-[11px] text-slate-400 print:hidden dark:text-slate-500">
         {db.configuracoes.empresa_nome || 'Altoprints'} · Sistema de pedidos DTF ·{' '}
         {ehProprietario
           ? `${db.pedidos.length} pedidos • ${db.vendedores.length} vendedores • visão do proprietário`

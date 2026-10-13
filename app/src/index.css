@@ -45,7 +45,7 @@
   /* inputs de data no padrão do sistema */
   input[type='date'],
   input[type='datetime-local'] {
-    min-height: 2.75rem;
+    min-height: calc(2.75rem * var(--espaco, 1));
   }
 }
 
@@ -422,4 +422,23 @@
   .dark .border-white\/60 {
     border-color: rgba(30, 41, 59, 0.8) !important;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Densidade da tela                                                   */
+/*                                                                     */
+/* O sistema abre no modo compacto (--espaco 0.82): todo espaçamento,   */
+/* altura de botão e canto arredondado é multiplicado por essas duas    */
+/* variáveis (veja tailwind.config.js). Configurações → Aparência troca  */
+/* para o modo confortável, que devolve o espaçamento original.         */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --espaco: 0.82;
+  --raio: 0.8;
+}
+
+html.confortavel {
+  --espaco: 1;
+  --raio: 1;
 }

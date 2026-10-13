@@ -43,10 +43,10 @@ const variantes: Record<Variante, string> = {
 }
 
 const tamanhos: Record<Tamanho, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
-  lg: 'h-12 px-6 text-base gap-2',
-  icone: 'h-9 w-9 text-sm',
+  sm: 'h-8 px-2.5 text-xs gap-1.5',
+  md: 'h-9 px-3.5 text-sm gap-1.5',
+  lg: 'h-11 px-5 text-base gap-2',
+  icone: 'h-8 w-8 text-sm',
 }
 
 interface BotaoProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -99,7 +99,7 @@ export function Cartao({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-slate-100 bg-white p-5 shadow-soft transition-all duration-200 dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft',
+        'rounded-2xl border border-slate-100 bg-white p-4 shadow-soft transition-all duration-200 dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft',
         hover && 'hover:-translate-y-0.5 hover:shadow-hover dark:hover:shadow-dark-hover',
         className,
       )}
@@ -123,18 +123,18 @@ export function CartaoResumo({
   sub?: string
 }) {
   return (
-    <Cartao className="flex items-center gap-4">
+    <Cartao className="flex items-center gap-3">
       <div
         className={cn(
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
           gradiente,
         )}
       >
-        <Icone className="h-6 w-6" />
+        <Icone className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
-        <p className="truncate text-2xl font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
+        <p className="truncate text-xl font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
         {sub ? <p className="truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p> : null}
       </div>
     </Cartao>
@@ -189,7 +189,7 @@ export function Campo({
   return (
     <label className={cn('block', className)}>
       {label ? (
-        <span className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <span className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-300">
           {label} {obrigatorio ? <span className="text-rose-500">*</span> : null}
         </span>
       ) : null}
@@ -201,14 +201,14 @@ export function Campo({
 }
 
 const baseCampo =
-  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
 
 export const Entrada = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => (
   <input {...props} className={cn(baseCampo, className)} />
 )
 
 export const AreaTexto = ({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea {...props} className={cn(baseCampo, 'min-h-[92px] resize-y', className)} />
+  <textarea {...props} className={cn(baseCampo, 'min-h-[76px] resize-y', className)} />
 )
 
 export const Selecao = ({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => (
@@ -232,18 +232,18 @@ export function Interruptor({
     <button
       type="button"
       onClick={() => onChange(!ativo)}
-      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+      className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
     >
       <span
         className={cn(
-          'relative h-6 w-11 shrink-0 rounded-full transition',
+          'relative h-[26px] w-[46px] shrink-0 rounded-full transition',
           ativo ? 'bg-gradient-to-r from-pink-500 to-purple-600' : 'bg-slate-300 dark:bg-slate-600',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
-            ativo ? 'left-[22px]' : 'left-0.5',
+            'absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all',
+            ativo ? 'left-[23px]' : 'left-[3px]',
           )}
         />
       </span>
@@ -305,9 +305,9 @@ export function Modal({
           largura,
         )}
       >
-        <div className="flex items-start gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+        <div className="flex items-start gap-3 border-b border-slate-100 p-4 dark:border-slate-800">
           {Icone ? (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft">
               <Icone className="h-5 w-5" />
             </div>
           ) : null}
@@ -323,9 +323,9 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
+        <div className="max-h-[70vh] overflow-y-auto p-4">{children}</div>
         {rodape ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
             {rodape}
           </div>
         ) : null}
@@ -435,15 +435,15 @@ export function TituloPagina({
   icone?: LucideIcon
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div className="flex items-center gap-3">
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-center gap-2.5">
         {Icone ? (
-          <div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
-            <Icone className="h-6 w-6" />
+          <div className="hidden h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
+            <Icone className="h-5 w-5" />
           </div>
         ) : null}
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-3xl">
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-2xl">
             {titulo}
           </h1>
           {subtitulo ? <p className="text-sm text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}

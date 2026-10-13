@@ -47,7 +47,7 @@ export default function ParaImprimir() {
         subtitulo="Somente pedidos com pagamento confirmado que ainda não foram impressos."
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Na fila" valor={fila.length} icone={Printer} gradiente="from-fuchsia-500 to-pink-600" />
         <CartaoResumo
           titulo="Metragem na fila"

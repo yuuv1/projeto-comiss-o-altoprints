@@ -264,6 +264,21 @@ async function main() {
   }
   await esperaErro('bloqueia depois de várias tentativas', pegar().entrar('dona', '1234', true), 'Muitas tentativas')
 
+  /* ---------------------- aparência (tema e densidade) ---------------------- */
+  {
+    const { aplicarAparicao, LABEL_DENSIDADE } = await import('../src/lib/tema')
+    const raiz = dom.window.document.documentElement
+
+    aplicarAparicao({ tema: 'escuro', densidade: 'confortavel' })
+    igual('tema escuro liga a classe no <html>', raiz.classList.contains('dark'), true)
+    igual('modo confortável liga a classe no <html>', raiz.classList.contains('confortavel'), true)
+
+    aplicarAparicao({ tema: 'claro', densidade: 'compacto' })
+    igual('tema claro desliga a classe escura', raiz.classList.contains('dark'), false)
+    igual('modo compacto é o padrão (sem classe)', raiz.classList.contains('confortavel'), false)
+    igual('os dois modos têm nome para a tela', [LABEL_DENSIDADE.compacto, LABEL_DENSIDADE.confortavel].join(' / '), 'Compacto / Confortável')
+  }
+
   console.log(`\n✅ ${ok} verificações passaram`)
   if (falhas.length) {
     console.log(`\n❌ ${falhas.length} falha(s):`)

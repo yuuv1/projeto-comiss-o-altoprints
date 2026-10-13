@@ -93,7 +93,7 @@ export default function Clientes() {
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Clientes" valor={db.clientes.length} icone={Users} gradiente="from-pink-500 to-purple-600" />
         <CartaoResumo titulo="★ Especiais" valor={especiais} icone={Star} gradiente="from-amber-500 to-orange-600" />
         <CartaoResumo
@@ -111,7 +111,7 @@ export default function Clientes() {
       </div>
 
       <BarraBusca
-        className="mb-5"
+        className="mb-3"
         valor={busca}
         onChange={setBusca}
         placeholder="Buscar por nome, telefone ou vendedor..."

@@ -147,7 +147,7 @@ export default function RelatorioClienteEspecial() {
           }
         />
 
-        <Cartao className="mb-5" hover={false}>
+        <Cartao className="mb-3" hover={false}>
           <div className="grid gap-3 lg:grid-cols-4">
             <Campo label="Cliente especial" className="lg:col-span-2">
               <Selecao value={cliente?.id ?? ''} onChange={(e) => setClienteId(e.target.value)}>
@@ -195,7 +195,7 @@ export default function RelatorioClienteEspecial() {
         </Cartao>
 
         {cliente ? (
-          <Cartao className="mb-5" hover={false}>
+          <Cartao className="mb-3" hover={false}>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-lg font-black text-white">
                 {cliente.nome.slice(0, 2).toUpperCase()}
@@ -230,7 +230,7 @@ export default function RelatorioClienteEspecial() {
           </Cartao>
         ) : null}
 
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <CartaoResumo titulo="Pedidos pagos" valor={pagos.length} icone={Wallet} gradiente="from-emerald-500 to-green-600" />
           <CartaoResumo titulo="Total pago" valor={moeda(totalPagos.valor)} icone={Percent} gradiente="from-pink-500 to-purple-600" />
           <CartaoResumo

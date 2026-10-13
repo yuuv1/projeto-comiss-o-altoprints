@@ -113,7 +113,7 @@ export default function Login() {
       </div>
 
       <div className="relative w-full max-w-md">
-        <div className="mb-5 flex flex-col items-center text-center">
+        <div className="mb-3 flex flex-col items-center text-center">
           <button type="button" onClick={tocarNoLogo} className="cursor-default" title="Altoprints">
             <Logo />
           </button>
@@ -124,9 +124,9 @@ export default function Login() {
 
         <form
           onSubmit={enviar}
-          className="rounded-3xl border border-slate-100 bg-white/95 p-6 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+          className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
         >
-          <div className="mb-5">
+          <div className="mb-3">
             <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
               {tela === 'entrar' ? 'Entrar no sistema' : 'Criar meu acesso'}
             </h1>

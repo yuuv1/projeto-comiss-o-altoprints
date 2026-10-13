@@ -65,7 +65,7 @@ export default function Pedidos() {
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Total de pedidos"
           valor={resumo.total}
@@ -88,7 +88,7 @@ export default function Pedidos() {
       </div>
 
       <BarraBusca
-        className="mb-5"
+        className="mb-3"
         valor={busca}
         onChange={setBusca}
         placeholder="Buscar por cliente, nº do pedido, descrição, cidade ou código de rastreio..."

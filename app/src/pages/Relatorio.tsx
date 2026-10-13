@@ -172,7 +172,7 @@ export default function Relatorio() {
           }
         />
 
-        <Cartao className="mb-5" hover={false}>
+        <Cartao className="mb-3" hover={false}>
           <div className="grid gap-3 lg:grid-cols-4">
             <Campo label="Filtrar por">
               <Selecao value={campo} onChange={(e) => setCampo(e.target.value as Campo)}>
@@ -230,7 +230,7 @@ export default function Relatorio() {
           </p>
         </Cartao>
 
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <CartaoResumo titulo="Pedidos pagos" valor={totais.pedidos} icone={Receipt} gradiente="from-pink-500 to-purple-600" />
           <CartaoResumo
             titulo="Metragem total"
@@ -254,7 +254,7 @@ export default function Relatorio() {
         </div>
 
         {/* resumo por vendedor */}
-        <Cartao className="mb-5" hover={false}>
+        <Cartao className="mb-3" hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-extrabold text-slate-800">Resumo por vendedor</h2>
             <span className="text-xs font-semibold text-slate-500">{resumoVendedores.length} vendedor(es)</span>
@@ -326,7 +326,7 @@ export default function Relatorio() {
         </Cartao>
 
         {/* comissão por faixa de metragem */}
-        <Cartao className="mb-5" hover={false}>
+        <Cartao className="mb-3" hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
               Comissão por faixa de metragem

@@ -124,7 +124,7 @@ export default function Painel() {
         ]}
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Pedidos pagos"
           valor={pagos.length}

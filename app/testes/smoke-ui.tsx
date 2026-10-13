@@ -331,6 +331,34 @@ async function main() {
   if (!voltouOk) falhas++
   console.log(`  ${voltouOk ? '✅' : '❌'} “Voltar ao meu acesso” devolve o painel do proprietário`)
 
+  // ---------- o sistema abre compacto e a aba Aparência troca o tamanho ----------
+  const raizHtml = dom.window.document.documentElement
+  const abreCompacto = raizHtml.classList.contains('confortavel') === false
+  if (!abreCompacto) falhas++
+  console.log(`\n  ${abreCompacto ? '✅' : '❌'} o sistema abre no modo compacto (menos espaçamento)`)
+
+  dom.window.location.hash = '#/configuracoes'
+  await espera(600)
+  const abriuAparencia = clicar(raiz, 'Aparência')
+  await espera(400)
+  const textoAparencia = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const temAparencia =
+    abriuAparencia && textoAparencia.includes('Tema do sistema') && textoAparencia.includes('Tamanho dos blocos')
+  if (!temAparencia) falhas++
+  console.log(`  ${temAparencia ? '✅' : '❌'} Configurações → Aparência mostra tema e tamanho dos blocos`)
+
+  const clicouConfortavel = clicarUltimo(raiz, 'Confortável')
+  await espera(300)
+  const virouConfortavel = raizHtml.classList.contains('confortavel')
+  if (!virouConfortavel) falhas++
+  console.log(`  ${virouConfortavel ? '✅' : '❌'} “Confortável” devolve o espaçamento folgado`)
+
+  const clicouCompacto = clicarUltimo(raiz, 'Compacto')
+  await espera(300)
+  const deVoltaAoCompacto = raizHtml.classList.contains('confortavel') === false
+  if (!(clicouCompacto && deVoltaAoCompacto)) falhas++
+  console.log(`  ${clicouCompacto && deVoltaAoCompacto ? '✅' : '❌'} “Compacto” volta a apertar a tela`)
+
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
   await espera(600)
