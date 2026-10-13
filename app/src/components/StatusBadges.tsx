@@ -1,12 +1,5 @@
-import { CheckCircle2, Clock, PackageCheck, Printer, Wallet, type LucideIcon } from 'lucide-react'
-import {
-  LABEL_ESTAGIO,
-  PASSOS_FILA,
-  passoFeito,
-  type EstagioFila,
-  type PassoFila,
-  type Pedido,
-} from '../lib/types'
+import { CheckCircle2, Clock, PackageCheck, Plus, Printer, Wallet, type LucideIcon } from 'lucide-react'
+import { LABEL_ESTAGIO, type EstagioFila } from '../lib/types'
 import { cn, Etiqueta } from './ui'
 
 /** Cores e ícones do estágio da fila (só existem dois: em andamento e concluído) */
@@ -20,31 +13,109 @@ export const ICONE_ESTAGIO: Record<EstagioFila, LucideIcon> = {
   concluido: CheckCircle2,
 }
 
-export function EtiquetaEstagio({ status }: { status: EstagioFila }) {
+/**
+ * Selo do cartão. Sem `onClick` ele é só informação; com `onClick` vira um
+ * botão: o mouse em cima mostra o que o clique faz.
+ */
+function Selo({
+  children,
+  className,
+  icone: Icone,
+  onClick,
+  dica,
+}: {
+  children: string
+  className: string
+  icone: LucideIcon
+  onClick?: () => void
+  dica?: string
+}) {
+  if (!onClick) {
+    return (
+      <Etiqueta className={className} icone={Icone}>
+        {children}
+      </Etiqueta>
+    )
+  }
   return (
-    <Etiqueta className={COR_ESTAGIO[status]} icone={ICONE_ESTAGIO[status]}>
+    <button
+      type="button"
+      title={dica}
+      onClick={onClick}
+      className={cn(
+        'inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide transition hover:shadow-soft active:scale-95 print:hidden',
+        className,
+      )}
+    >
+      <Icone className="h-3 w-3" />
+      {children}
+    </button>
+  )
+}
+
+/** selo de marcação ainda não feita: tracejado, com um "+" na frente */
+const COR_PENDENTE =
+  'border-dashed border-slate-300 bg-white text-slate-400 hover:border-purple-300 hover:text-purple-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-500'
+
+/**
+ * Estágio da fila. Com `onClick` o selo alterna: em andamento → concluído
+ * (saiu da máquina) e concluído → em andamento.
+ */
+export function EtiquetaEstagio({ status, onClick }: { status: EstagioFila; onClick?: () => void }) {
+  const concluido = status === 'concluido'
+  return (
+    <Selo
+      className={COR_ESTAGIO[status]}
+      icone={ICONE_ESTAGIO[status]}
+      onClick={onClick}
+      dica={concluido ? 'Fila concluída — clicar volta para em andamento' : 'Clique quando a fila sair da máquina'}
+    >
       {LABEL_ESTAGIO[status]}
-    </Etiqueta>
+    </Selo>
   )
 }
 
 /** Marcação opcional: a fila já foi entregue ao cliente */
-export function EtiquetaEntrega({ entregue }: { entregue: boolean }) {
-  if (!entregue) return null
+export function EtiquetaEntrega({ entregue, onClick }: { entregue: boolean; onClick?: () => void }) {
+  if (entregue) {
+    return (
+      <Selo
+        className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+        icone={PackageCheck}
+        onClick={onClick}
+        dica="Entregue ao cliente — clicar desfaz"
+      >
+        Entregue
+      </Selo>
+    )
+  }
+  if (!onClick) return null
   return (
-    <Etiqueta className="border-emerald-200 bg-emerald-50 text-emerald-700" icone={PackageCheck}>
+    <Selo className={COR_PENDENTE} icone={Plus} onClick={onClick} dica="Marcar como entregue ao cliente">
       Entregue
-    </Etiqueta>
+    </Selo>
   )
 }
 
 /** Marcação opcional de pagamento (controle do proprietário) */
-export function EtiquetaPago({ pago }: { pago: boolean }) {
-  if (!pago) return null
+export function EtiquetaPago({ pago, onClick }: { pago: boolean; onClick?: () => void }) {
+  if (pago) {
+    return (
+      <Selo
+        className="border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+        icone={Wallet}
+        onClick={onClick}
+        dica="Pago — clicar desfaz"
+      >
+        Pago
+      </Selo>
+    )
+  }
+  if (!onClick) return null
   return (
-    <Etiqueta className="border-teal-200 bg-teal-50 text-teal-700" icone={Wallet}>
+    <Selo className={COR_PENDENTE} icone={Plus} onClick={onClick} dica="Marcar como pago">
       Pago
-    </Etiqueta>
+    </Selo>
   )
 }
 
@@ -59,62 +130,6 @@ export function PassoEstagio({ ativo, children, icone: Icone }: { ativo: boolean
       <Icone className="h-3.5 w-3.5" />
       {children}
     </span>
-  )
-}
-
-/** Cor de cada passo quando ele já foi feito */
-const COR_PASSO: Record<PassoFila, string> = {
-  pago: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
-  imprimindo: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100',
-  concluida: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-  entregue: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',
-}
-
-const ICONE_PASSO: Record<PassoFila, LucideIcon> = {
-  pago: Wallet,
-  imprimindo: Printer,
-  concluida: CheckCircle2,
-  entregue: PackageCheck,
-}
-
-/**
- * Os quatro passos da fila, clicáveis: pago → imprimindo → concluída → entregue.
- * Clicar num passo que já foi feito desfaz (volta atrás).
- */
-export function PassosFila({
-  pedido,
-  onPasso,
-  compacto = false,
-}: {
-  pedido: Pedido
-  onPasso: (passo: PassoFila) => void
-  compacto?: boolean
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1">
-      {PASSOS_FILA.map((passo) => {
-        const feito = passoFeito(pedido, passo.id)
-        const Icone = ICONE_PASSO[passo.id]
-        return (
-          <button
-            key={passo.id}
-            type="button"
-            title={feito ? `${passo.label} — clicar desfaz` : passo.label}
-            onClick={() => onPasso(passo.id)}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full border font-bold transition print:hidden',
-              compacto ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]',
-              feito
-                ? COR_PASSO[passo.id]
-                : 'border-slate-200 bg-white text-slate-400 hover:border-purple-200 hover:text-purple-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500',
-            )}
-          >
-            <Icone className={compacto ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
-            {passo.curto}
-          </button>
-        )
-      })}
-    </div>
   )
 }
 

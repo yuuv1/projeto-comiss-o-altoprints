@@ -12,6 +12,7 @@ export function PedidoCartao({
   pedido,
   acoes,
   extras,
+  onPasso,
   mostrarVendedor = true,
   mostrarEntrega = true,
   mostrarValor = true,
@@ -19,6 +20,8 @@ export function PedidoCartao({
   pedido: Pedido
   acoes?: ReactNode
   extras?: ReactNode
+  /** quando vem, os selos do cartão ficam clicáveis (marcar/desfazer) */
+  onPasso?: (passo: PassoFila) => void
   mostrarVendedor?: boolean
   mostrarEntrega?: boolean
   /** usado nas telas de produção/entrega liberadas para quem não é o proprietário */
@@ -71,9 +74,9 @@ export function PedidoCartao({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <EtiquetaEstagio status={pedido.estagio} />
-        <EtiquetaEntrega entregue={pedido.entregue} />
-        {mostrarValor ? <EtiquetaPago pago={pedido.pago} /> : null}
+        <EtiquetaEstagio status={pedido.estagio} onClick={onPasso ? () => onPasso('concluida') : undefined} />
+        <EtiquetaEntrega entregue={pedido.entregue} onClick={onPasso ? () => onPasso('entregue') : undefined} />
+        {mostrarValor ? <EtiquetaPago pago={pedido.pago} onClick={onPasso ? () => onPasso('pago') : undefined} /> : null}
       </div>
 
       {mostrarValor ? (
@@ -124,9 +127,6 @@ export function useAcoesPedido() {
     if (passo === 'pago') {
       await atualizarPedido(p.id, feito ? { pago: false, data_pagamento: null } : { pago: true, data_pagamento: p.data_pagamento || hojeISO() })
       avisar(feito ? `Fila #${p.numero} voltou para “a pagar”.` : `Pagamento da fila #${p.numero} confirmado!`, voltar)
-    } else if (passo === 'imprimindo') {
-      await atualizarPedido(p.id, feito ? { iniciado_em: null } : { iniciado_em: agora, estagio: 'em_andamento' })
-      avisar(feito ? `Fila #${p.numero} voltou para “a imprimir”.` : `Fila #${p.numero} entrou na impressão!`, voltar)
     } else if (passo === 'concluida') {
       await atualizarPedido(
         p.id,

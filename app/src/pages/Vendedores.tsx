@@ -127,7 +127,7 @@ export default function Vendedores({ embutido = false }: { embutido?: boolean } 
                 </p>
               </div>
               <div className="text-right text-xs">
-                <p className="font-bold text-emerald-600">{moeda(pago)} pagos</p>
+                <p className="font-bold text-emerald-600">{moeda(pago)} em vendas</p>
                 <p className="text-slate-400">comissão {moeda(comissao)}</p>
               </div>
               <div className="flex gap-1.5">

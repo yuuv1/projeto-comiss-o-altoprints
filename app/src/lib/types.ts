@@ -427,11 +427,16 @@ export const naFilaDeImpressao = (p: Pedido) => p.estagio !== 'concluido'
 export const isPedidoCompleto = (p: Pedido) => p.estagio === 'concluido'
 
 /**
- * Filas que entram na comissão: todas as do período, ou só as marcadas como
- * pagas — depende da escolha do proprietário em Configurações → Comissões.
+ * Filas que entram na comissão e no relatório.
+ *
+ * Só entram as filas CONCLUÍDAS (que já saíram da máquina) — o que ainda está
+ * em andamento não é venda. Dentro dessas, a escolha do proprietário
+ * (Configurações → Comissões) decide se contam todas ou só as marcadas como pagas.
  */
-export const filasDaComissao = (pedidos: Pedido[], base: 'todos' | 'pagos' = 'todos') =>
-  base === 'pagos' ? pedidos.filter((p) => p.pago) : pedidos
+export const filasDaComissao = (pedidos: Pedido[], base: 'todos' | 'pagos' = 'todos') => {
+  const concluidas = pedidos.filter((p) => p.estagio === 'concluido')
+  return base === 'pagos' ? concluidas.filter((p) => p.pago) : concluidas
+}
 
 /** fila ainda não marcada como paga (controle opcional do dono) */
 export const pedidoPendenteFinanceiro = (p: Pedido) => !p.pago
@@ -443,51 +448,44 @@ export const dataReferencia = (p: Pedido) => p.data_pagamento || (p.data_pedido 
 /* Passos da fila (os botões que a pessoa clica no cartão)             */
 /* ------------------------------------------------------------------ */
 
-/** os quatro passos, na ordem em que acontecem */
-export type PassoFila = 'pago' | 'imprimindo' | 'concluida' | 'entregue'
+/**
+ * As três marcações do cartão: o pagamento (opcional), o fim da fila (o estágio
+ * concluído) e a entrega ao cliente (opcional). Elas são clicáveis no cartão.
+ */
+export type PassoFila = 'pago' | 'concluida' | 'entregue'
 
 export const PASSOS_FILA: { id: PassoFila; label: string; curto: string }[] = [
   { id: 'pago', label: 'Marcar como pago', curto: 'Pago' },
-  { id: 'imprimindo', label: 'Deu início na impressão', curto: 'Imprimindo' },
-  { id: 'concluida', label: 'Fila concluída (saiu da máquina)', curto: 'Concluída' },
-  { id: 'entregue', label: 'Entregue ao cliente', curto: 'Entregue' },
+  { id: 'concluida', label: 'Concluir a fila (saiu da máquina)', curto: 'Concluída' },
+  { id: 'entregue', label: 'Marcar como entregue ao cliente', curto: 'Entregue' },
 ]
 
-/** o cartão mostra: o passo já está feito? */
+/** o cartão mostra: a marcação já está feita? */
 export const passoFeito = (p: Pedido, passo: PassoFila) =>
-  passo === 'pago'
-    ? p.pago
-    : passo === 'imprimindo'
-      ? Boolean(p.iniciado_em)
-      : passo === 'concluida'
-        ? p.estagio === 'concluido'
-        : p.entregue
+  passo === 'pago' ? p.pago : passo === 'concluida' ? p.estagio === 'concluido' : p.entregue
 
 /* ------------------------------------------------------------------ */
 /* Filtros da tela Pedidos                                             */
 /* ------------------------------------------------------------------ */
 
-export type FiltroFila = 'todas' | 'a_pagar' | 'a_imprimir' | 'imprimindo' | 'concluida' | 'entregue'
+export type FiltroFila = 'todas' | 'em_andamento' | 'a_pagar' | 'concluida' | 'entregue'
 
 export const FILTROS_FILA: { id: FiltroFila; label: string; ajuda: string }[] = [
   { id: 'todas', label: 'Todas', ajuda: 'Todas as filas registradas.' },
+  { id: 'em_andamento', label: 'Em andamento', ajuda: 'Filas que ainda estão na máquina.' },
   { id: 'a_pagar', label: 'A pagar', ajuda: 'Filas que ainda não foram marcadas como pagas.' },
-  { id: 'a_imprimir', label: 'A imprimir', ajuda: 'Filas que ainda não começaram a imprimir.' },
-  { id: 'imprimindo', label: 'Imprimindo', ajuda: 'Filas que já deram início na impressão.' },
-  { id: 'concluida', label: 'Concluídas', ajuda: 'Filas que já saíram da máquina e ainda não foram entregues.' },
+  { id: 'concluida', label: 'Concluídas', ajuda: 'Filas que já saíram da máquina.' },
   { id: 'entregue', label: 'Entregues', ajuda: 'Filas que o cliente já recebeu.' },
 ]
 
 export const combinaFiltro = (p: Pedido, filtro: FiltroFila) => {
   switch (filtro) {
+    case 'em_andamento':
+      return p.estagio !== 'concluido'
     case 'a_pagar':
       return !p.pago
-    case 'a_imprimir':
-      return !p.iniciado_em && p.estagio !== 'concluido'
-    case 'imprimindo':
-      return Boolean(p.iniciado_em) && p.estagio !== 'concluido'
     case 'concluida':
-      return p.estagio === 'concluido' && !p.entregue
+      return p.estagio === 'concluido'
     case 'entregue':
       return p.entregue
     default:

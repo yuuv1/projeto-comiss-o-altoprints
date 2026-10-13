@@ -166,7 +166,7 @@ export default function Login() {
                   </Etiqueta>
                   <span>
                     Você vai continuar de onde parou: <b>{escolhido.pedidos}</b> pedido(s) e{' '}
-                    <b>{moeda(escolhido.faturamento)}</b> já pagos.
+                    <b>{moeda(escolhido.faturamento)}</b> nas filas concluídas.
                   </span>
                 </div>
               ) : (

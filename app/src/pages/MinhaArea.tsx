@@ -23,7 +23,7 @@ import { calcularComissao } from '../lib/comissao'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
-import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro, telasDoUsuario } from '../lib/types'
+import { FAIXAS_PADRAO, filasDaComissao, isPedidoCompleto, pedidoPendenteFinanceiro, telasDoUsuario } from '../lib/types'
 
 /** Área inicial de quem vende: só o que é dele */
 export default function MinhaArea() {
@@ -54,8 +54,9 @@ export default function MinhaArea() {
     [mesAtual, meusPedidos],
   )
 
-  const pagosDoMes = doMes.filter((p) => p.pago)
-  const comissao = calcularComissao(pagosDoMes, faixas, semMetragem)
+  /** como no relatório: só as filas concluídas no mês contam para a comissão */
+  const naConta = filasDaComissao(doMes, db.configuracoes.comissao_base)
+  const comissao = calcularComissao(naConta, faixas, semMetragem)
   const aReceber = meusPedidos.filter(pedidoPendenteFinanceiro).reduce((s, p) => s + Number(p.valor || 0), 0)
   /** filas que já saíram da máquina e ainda não foram entregues: é hora de avisar o cliente */
   const avisos = meusPedidos.filter((p) => p.estagio === 'concluido' && !p.entregue).slice(0, 6)
@@ -123,10 +124,10 @@ export default function MinhaArea() {
         />
         <CartaoResumo
           titulo="Faturamento do mês"
-          valor={moeda(pagosDoMes.reduce((s, p) => s + Number(p.valor || 0), 0))}
+          valor={moeda(naConta.reduce((s, p) => s + Number(p.valor || 0), 0))}
           icone={TrendingUp}
           gradiente="from-emerald-500 to-green-600"
-          sub={`${pagosDoMes.length} pedido(s) pagos`}
+          sub={`${naConta.length} fila(s) concluída(s)`}
         />
         <CartaoResumo
           titulo="Minha comissão"

@@ -87,8 +87,10 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   }, [])
 
   /**
-   * Filas que entram na conta: todas as do período ou só as marcadas como pagas,
-   * conforme a escolha do proprietário em Configurações → Comissões.
+   * Filas que entram na conta: SÓ as concluídas (as que já saíram da máquina).
+   * O que ainda está em andamento não é venda e não aparece aqui.
+   * Dentro das concluídas, a escolha do proprietário decide se conta todas
+   * ou só as marcadas como pagas (Configurações → Comissões).
    */
   const base = useMemo(
     () => filasDaComissao(db.pedidos, db.configuracoes.comissao_base),
@@ -179,7 +181,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <TituloPagina
             icone={BarChart3}
             titulo="Relatório de vendas"
-            subtitulo="Filas do período com a comissão de cada vendedor — pronto para a contabilidade."
+            subtitulo="Filas concluídas no período, com a comissão de cada vendedor — pronto para a contabilidade."
             acoes={
               <>
                 <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
@@ -246,13 +248,18 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Para a contabilidade, use sempre <b>Data do pagamento</b>. Pedidos sem data de pagamento usam a data do
-            pedido.
+            Entram aqui <b>só as filas concluídas</b> (o que ainda está em andamento não é venda). Para a
+            contabilidade, use sempre <b>Data do pagamento</b>; sem essa data, vale a data do pedido.
           </p>
         </Cartao>
 
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <CartaoResumo titulo="Pedidos pagos" valor={totais.pedidos} icone={Receipt} gradiente="from-pink-500 to-purple-600" />
+          <CartaoResumo
+            titulo={db.configuracoes.comissao_base === 'pagos' ? 'Filas pagas' : 'Filas concluídas'}
+            valor={totais.pedidos}
+            icone={Receipt}
+            gradiente="from-pink-500 to-purple-600"
+          />
           <CartaoResumo
             titulo="Metragem total"
             valor={`${numeroBR(totais.metragem)} m`}
@@ -322,7 +329,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 {resumoVendedores.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-3 py-6 text-center text-sm text-slate-400">
-                      Nenhum pedido pago no período selecionado.
+                      Nenhuma fila concluída no período selecionado.
                     </td>
                   </tr>
                 ) : null}
@@ -379,7 +386,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 </div>
               ))}
             {!resultado.porFaixa.some((l) => l.pedidos > 0) && resultado.semMetragem.pedidos === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum pedido pago no período.</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma fila concluída no período.</p>
             ) : null}
           </div>
         </Cartao>
@@ -387,9 +394,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         {/* detalhamento */}
         <Cartao hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-extrabold text-slate-800">Detalhamento dos pedidos</h2>
+            <h2 className="text-base font-extrabold text-slate-800">Detalhamento das filas concluídas</h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">{visiveis.length} pedidos</span>
+              <span className="text-xs font-semibold text-slate-500">{visiveis.length} filas</span>
               {excluidos.length ? (
                 <Botao tamanho="sm" variante="secundario" icone={RotateCcw} onClick={() => setExcluidos([])}>
                   Restaurar todos ({excluidos.length})
@@ -408,8 +415,8 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           {visiveis.length === 0 ? (
             <Vazio
               icone={Receipt}
-              titulo="Nenhum pedido pago no período"
-              descricao="Ajuste o período ou o filtro de vendedor."
+              titulo="Nenhuma fila concluída no período"
+              descricao="Só entram no relatório as filas marcadas como concluídas em Pedidos. Ajuste o período ou o filtro de vendedor."
             />
           ) : (
             <div className="tabela-scroll overflow-x-auto rounded-xl border border-slate-200">

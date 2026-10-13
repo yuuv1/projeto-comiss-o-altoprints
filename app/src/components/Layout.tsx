@@ -132,7 +132,10 @@ export function Layout() {
                 <Icone className="h-4 w-4" />
                 {label}
                 {badge ? (
-                  <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-amber-900">
+                  <span
+                    title={`${badge} ${badge === 1 ? 'fila em andamento' : 'filas em andamento'}`}
+                    className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-amber-900"
+                  >
                     {badge}
                   </span>
                 ) : null}

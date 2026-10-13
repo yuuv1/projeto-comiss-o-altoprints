@@ -6,6 +6,7 @@
  * Rode com:  npm run testar
  */
 import { JSDOM } from 'jsdom'
+import { hojeISO } from '../src/lib/format'
 
 const dom = new JSDOM(`<!doctype html><html><head><title>t</title></head><body><div id="root"></div></body></html>`, {
   url: 'https://exemplo.test/',
@@ -183,55 +184,57 @@ async function main() {
   await espera(800)
   const textoPedidos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
 
-  const filtrosFilaOk = ['Todas', 'A pagar', 'A imprimir', 'Imprimindo', 'Concluídas', 'Entregues'].every((f) =>
+  const filtrosFilaOk = ['Todas', 'Em andamento', 'A pagar', 'Concluídas', 'Entregues'].every((f) =>
     textoPedidos.includes(f),
   )
-  if (!filtrosFilaOk) falhas++
-  console.log(`\n  ${filtrosFilaOk ? '✅' : '❌'} Pedidos traz os filtros da fila (de todas até as entregues)`)
+  const filtrosVelhosFora = ['A imprimir', 'Imprimindo'].every((f) => !textoPedidos.includes(f))
+  if (!filtrosFilaOk || !filtrosVelhosFora) falhas++
+  console.log(
+    `\n  ${filtrosFilaOk && filtrosVelhosFora ? '✅' : '❌'} Pedidos traz só os filtros do fluxo novo (em andamento, a pagar, concluídas, entregues)`,
+  )
 
   const botoesDaTela = () => [...(raiz?.querySelectorAll('button') ?? [])]
-  /** acha o passo que ainda NÃO foi marcado (quando marcado, o título ganha “clicar desfaz”) */
+  /** acha o selo que ainda NÃO foi marcado (quando marcado, o título ganha “clicar desfaz”) */
   const acharPasso = (titulo: string) => botoesDaTela().find((b) => (b.getAttribute('title') ?? '') === titulo)
 
-  const passosOk = [
-    'Marcar como pago',
-    'Deu início na impressão',
-    'Fila concluída (saiu da máquina)',
-    'Entregue ao cliente',
-  ].every((t) => Boolean(acharPasso(t)))
+  const passosOk = ['Marcar como pago', 'Clique quando a fila sair da máquina', 'Marcar como entregue ao cliente'].every(
+    (t) => Boolean(acharPasso(t)),
+  )
   if (!passosOk) falhas++
-  console.log(`  ${passosOk ? '✅' : '❌'} cada fila tem os 4 passos clicáveis no cartão`)
+  console.log(`  ${passosOk ? '✅' : '❌'} cada fila tem os 3 selos clicáveis no cartão (pago, concluída, entregue)`)
 
-  const lerPedidos = (): { estagio: string; iniciado_em: string | null; entregue: boolean }[] =>
+  const lerPedidos = (): { estagio: string; pago: boolean; entregue: boolean }[] =>
     JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).pedidos
 
-  // clicar em "deu início na impressão" grava a data no pedido
-  clicar(raiz, 'A imprimir')
+  // clicar no selo "Pago" marca o pagamento da fila
+  clicar(raiz, 'A pagar')
   await espera(600)
-  const antesInicio = lerPedidos().filter((p) => p.iniciado_em).length
-  const botaoIniciar = acharPasso('Deu início na impressão')
-  botaoIniciar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  const antesPagos = lerPedidos().filter((p) => p.pago).length
+  const botaoPago = acharPasso('Marcar como pago')
+  botaoPago?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
   await espera(900)
-  const depoisInicio = lerPedidos().filter((p) => p.iniciado_em).length
-  const iniciouOk = Boolean(botaoIniciar) && depoisInicio === antesInicio + 1
-  if (!iniciouOk) falhas++
-  console.log(`  ${iniciouOk ? '✅' : '❌'} “deu início na impressão” grava o início (${antesInicio} → ${depoisInicio})`)
+  const depoisPagos = lerPedidos().filter((p) => p.pago).length
+  const pagouOk = Boolean(botaoPago) && depoisPagos === antesPagos + 1
+  if (!pagouOk) falhas++
+  console.log(`  ${pagouOk ? '✅' : '❌'} “Pago” marca o pagamento pela tela Pedidos (${antesPagos} → ${depoisPagos})`)
 
-  // clicar em "fila concluída" muda o estágio do pedido
+  // clicar no selo do estágio conclui a fila
+  clicar(raiz, 'Em andamento')
+  await espera(600)
   const antesConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
-  const botaoConcluir = acharPasso('Fila concluída (saiu da máquina)')
+  const botaoConcluir = acharPasso('Clique quando a fila sair da máquina')
   botaoConcluir?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
   await espera(900)
   const depoisConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
   const concluiuOk = Boolean(botaoConcluir) && depoisConcluidas === antesConcluidas + 1
   if (!concluiuOk) falhas++
-  console.log(`  ${concluiuOk ? '✅' : '❌'} “fila concluída” muda o status pela tela Pedidos (${antesConcluidas} → ${depoisConcluidas})`)
+  console.log(`  ${concluiuOk ? '✅' : '❌'} “sair da máquina” conclui a fila pela tela Pedidos (${antesConcluidas} → ${depoisConcluidas})`)
 
   // entregue é uma marcação separada do estágio
   clicar(raiz, 'Concluídas')
   await espera(600)
   const antesEntregues = lerPedidos().filter((p) => p.entregue).length
-  const botaoEntregar = acharPasso('Entregue ao cliente')
+  const botaoEntregar = acharPasso('Marcar como entregue ao cliente')
   botaoEntregar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
   await espera(900)
   const depoisEntregues = lerPedidos().filter((p) => p.entregue).length
@@ -379,6 +382,24 @@ async function main() {
   const relatorioOk = textoRel.includes('Resumo por vendedor') && textoRel.includes('Comissão por faixa')
   if (!relatorioOk) falhas++
   console.log(`\n  ${relatorioOk ? '✅' : '❌'} Relatório traz o resumo por vendedor e a comissão por faixa`)
+
+  // o relatório do período (este mês, o padrão) só pode contar as filas CONCLUÍDAS
+  const pedidosNoBanco = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).pedidos as {
+    estagio: string
+    data_pedido: string
+  }[]
+  const mesAtual = new Date().toISOString().slice(0, 7)
+  const diaDoMes = (p: { data_pedido: string }) => (p.data_pedido || '').slice(0, 10)
+  const noMesAtual = (p: { data_pedido: string }) => diaDoMes(p) >= `${mesAtual}-01` && diaDoMes(p) <= hojeISO()
+  const concluidasDoMes = pedidosNoBanco.filter((p) => p.estagio === 'concluido' && noMesAtual(p)).length
+  const emAndamentoDoMes = pedidosNoBanco.filter((p) => p.estagio !== 'concluido' && noMesAtual(p)).length
+  // no HTML o rótulo e o número ficam colados: "Filas concluídas13"
+  const contagemDoRelatorio = Number(textoRel.match(/Filas concluídas\s*(\d+)/)?.[1] ?? -1)
+  const soConcluidasNoRelatorio = emAndamentoDoMes > 0 && contagemDoRelatorio === concluidasDoMes
+  if (!soConcluidasNoRelatorio) falhas++
+  console.log(
+    `  ${soConcluidasNoRelatorio ? '✅' : '❌'} o relatório conta só as filas concluídas (${concluidasDoMes} concluídas · ${emAndamentoDoMes} em andamento fora da conta · relatório mostrou ${contagemDoRelatorio})`,
+  )
 
   const semTelaDeImpressoes = !textoRel.includes('Filas registradas') && !textoRel.includes('Quem imprimiu')
   if (!semTelaDeImpressoes) falhas++

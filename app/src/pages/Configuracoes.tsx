@@ -245,14 +245,15 @@ export default function Configuracoes() {
           <Cartao hover={false}>
             <p className="mb-1 text-sm font-extrabold text-slate-700 dark:text-slate-200">Comissão conta quais filas?</p>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              Escolha se a comissão do período sai de todas as filas registradas ou só das que você marcou como pagas na
-              tela Pedidos.
+              No relatório entram sempre as filas <b>concluídas</b> (as que já saíram da máquina) — fila em andamento
+              não é venda. Aqui você escolhe se, entre as concluídas, contam todas ou só as que você marcou como pagas
+              na tela Pedidos.
             </p>
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  { id: 'todos' as const, label: 'Todas as filas registradas', dica: 'Mais simples: vale o que foi lançado no período.' },
-                  { id: 'pagos' as const, label: 'Só as filas marcadas como pagas', dica: 'A comissão só entra depois do cliente pagar.' },
+                  { id: 'todos' as const, label: 'Todas as filas concluídas', dica: 'Mais simples: vale tudo o que foi concluído no período.' },
+                  { id: 'pagos' as const, label: 'Só as filas concluídas e pagas', dica: 'A comissão só entra depois do cliente pagar.' },
                 ]
               ).map((opcao) => {
                 const ativa = db.configuracoes.comissao_base === opcao.id

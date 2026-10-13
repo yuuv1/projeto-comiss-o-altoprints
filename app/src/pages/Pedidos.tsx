@@ -2,7 +2,6 @@ import { CheckCircle2, ClipboardList, PackageCheck, Pencil, Plus, RotateCcw, Tra
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
-import { PassosFila } from '../components/StatusBadges'
 import { BarraBusca, Botao, CartaoResumo, Pilulas, TituloPagina, Vazio, cn } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { telasDoUsuario } from '../lib/types'
@@ -115,7 +114,7 @@ export default function Pedidos() {
       <TituloPagina
         icone={ClipboardList}
         titulo={ehProprietario ? 'Pedidos' : 'Meus pedidos'}
-        subtitulo="Cada pedido é uma fila de impressão: cliente, metragem, valor automático e os passos até a entrega."
+        subtitulo="Cada pedido é uma fila de impressão: cliente, metragem, valor automático e os dois estágios — em andamento e concluído."
         acoes={
           <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
             Registrar fila
@@ -126,13 +125,14 @@ export default function Pedidos() {
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Em andamento"
-          valor={contagem.a_imprimir + contagem.imprimindo}
+          valor={contagem.em_andamento}
           icone={RotateCcw}
           gradiente="from-sky-500 to-blue-600"
-          sub={`${contagem.imprimindo} imprimindo`}
+          sub="ainda na máquina"
         />
         <CartaoResumo titulo="A pagar" valor={contagem.a_pagar} icone={Wallet} gradiente="from-amber-500 to-orange-600" />
         <CartaoResumo titulo="Concluídas" valor={contagem.concluida} icone={CheckCircle2} gradiente="from-emerald-500 to-green-600" />
+
         <CartaoResumo titulo="Entregues" valor={contagem.entregue} icone={PackageCheck} gradiente="from-violet-500 to-indigo-600" />
       </div>
 
@@ -184,7 +184,7 @@ export default function Pedidos() {
               pedido={p}
               mostrarVendedor={veTodas}
               mostrarValor={ehProprietario || p.vendedor_id === usuario?.vendedor_id}
-              extras={<PassosFila pedido={p} onPasso={(passo) => aoPasso(p, passo)} />}
+              onPasso={(passo) => aoPasso(p, passo)}
               acoes={acoesDoCartao(p)}
             />
           ))}

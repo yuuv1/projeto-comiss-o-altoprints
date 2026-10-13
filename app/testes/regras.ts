@@ -44,6 +44,7 @@ import {
   combinaFiltro,
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
+  filasDaComissao,
   isPedidoCompleto,
   naFilaDeImpressao,
   PASSOS_FILA,
@@ -117,6 +118,7 @@ const naFila: Pedido = { ...base, estagio: 'em_andamento', iniciado_em: null, en
 const imprimindo: Pedido = { ...naFila, iniciado_em: new Date().toISOString(), pago: true }
 const concluida: Pedido = { ...imprimindo, estagio: 'concluido' }
 const entregue: Pedido = { ...concluida, entregue: true }
+const concluidaSemPagar: Pedido = { ...concluida, pago: false, data_pagamento: null }
 
 igual('fila em andamento não está completa', isPedidoCompleto(naFila), false)
 igual('fila concluída está completa', isPedidoCompleto(concluida), true)
@@ -125,24 +127,31 @@ igual('fila concluída sai da fila de impressão', naFilaDeImpressao(concluida),
 igual('fila sem pagamento é pendente financeiro', pedidoPendenteFinanceiro(naFila), true)
 igual('fila paga não é pendente financeiro', pedidoPendenteFinanceiro(concluida), false)
 
-/* ------------------------------ passos da fila ------------------------ */
-igual('fila nova: nada feito', PASSOS_FILA.map((p) => passoFeito(naFila, p.id)), [false, false, false, false])
+/* ------------------ os três cliques do cartão (o fluxo) --------------- */
+igual('passos da fila: pago, concluída e entregue', PASSOS_FILA.map((p) => p.id), ['pago', 'concluida', 'entregue'])
+igual('fila nova: nada marcado', PASSOS_FILA.map((p) => passoFeito(naFila, p.id)), [false, false, false])
 igual('fila paga: só o pagamento', passoFeito(imprimindo, 'pago'), true)
-igual('fila imprimindo: deu início', passoFeito(imprimindo, 'imprimindo'), true)
-igual('fila imprimindo ainda não concluiu', passoFeito(imprimindo, 'concluida'), false)
+igual('fila paga ainda não concluiu', passoFeito(imprimindo, 'concluida'), false)
 igual('fila concluída marca o passo', passoFeito(concluida, 'concluida'), true)
 igual('fila entregue marca o passo', passoFeito(entregue, 'entregue'), true)
 
 /* ---------------------------- filtros da tela -------------------------- */
+igual('filtro "em andamento" pega a que está na máquina', combinaFiltro(naFila, 'em_andamento'), true)
+igual('filtro "em andamento" ignora a concluída', combinaFiltro(concluida, 'em_andamento'), false)
 igual('filtro "a pagar" pega a fila sem pagamento', combinaFiltro(naFila, 'a_pagar'), true)
 igual('filtro "a pagar" ignora a paga', combinaFiltro(imprimindo, 'a_pagar'), false)
-igual('filtro "a imprimir" pega a que não começou', combinaFiltro(naFila, 'a_imprimir'), true)
-igual('filtro "a imprimir" ignora a que já começou', combinaFiltro(imprimindo, 'a_imprimir'), false)
-igual('filtro "imprimindo" pega a que começou', combinaFiltro(imprimindo, 'imprimindo'), true)
-igual('filtro "imprimindo" ignora a concluída', combinaFiltro(concluida, 'imprimindo'), false)
 igual('filtro "concluída" pega a pronta', combinaFiltro(concluida, 'concluida'), true)
+igual('filtro "concluída" também pega a já entregue', combinaFiltro(entregue, 'concluida'), true)
+igual('filtro "concluída" ignora a que está na máquina', combinaFiltro(imprimindo, 'concluida'), false)
 igual('filtro "entregue" pega a entregue', combinaFiltro(entregue, 'entregue'), true)
+igual('filtro "entregue" ignora a não entregue', combinaFiltro(concluida, 'entregue'), false)
 igual('filtro "todas" mostra tudo', combinaFiltro(entregue, 'todas'), true)
+
+/* ------------------------- quem entra na comissão ---------------------- */
+igual('comissão ignora a fila em andamento', filasDaComissao([naFila, concluida]).length, 1)
+igual('comissão com base "pagos" ignora a concluída sem pagamento', filasDaComissao([concluidaSemPagar], 'pagos').length, 0)
+igual('comissão com base "pagos" conta a concluída paga', filasDaComissao([concluida], 'pagos').length, 1)
+igual('comissão com base "todos" conta a concluída sem pagamento', filasDaComissao([concluidaSemPagar]).length, 1)
 
 /* ------------------------------- semente ------------------------------ */
 const demo = gerarDadosDemo()
@@ -181,6 +190,17 @@ igual(
 igual(
   'demo: filas concluídas batem com o histórico',
   demo.pedidos.every((p) => (p.estagio === 'concluido' ? demo.impressoes.some((i) => i.pedido_id === p.id) : true)),
+  true,
+)
+igual(
+  'demo: tem fila em andamento (que NÃO entra no relatório)',
+  demo.pedidos.some((p) => p.estagio === 'em_andamento'),
+  true,
+)
+igual(
+  'demo: o relatório só conta filas concluídas',
+  filasDaComissao(demo.pedidos).every((p) => p.estagio === 'concluido') &&
+    filasDaComissao(demo.pedidos).length < demo.pedidos.length,
   true,
 )
 

@@ -254,7 +254,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                   <div className="text-right text-xs">
                     <p className="font-bold text-emerald-600 dark:text-emerald-400">{moeda(comissao.total)} de comissão</p>
                     <p className="text-slate-400 dark:text-slate-500">
-                      {pagos.length} pagos • {pedidos.length} pedidos
+                      {pagos.length} na conta • {pedidos.length} pedidos
                     </p>
                     <p className="mt-0.5 text-[10px] text-sky-600 dark:text-sky-400">
                       {(() => {
@@ -418,7 +418,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
               {escolhido ? (
                 <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
                   Esta conta vai entrar vendo <b>{escolhido.pedidos}</b> pedido(s) de {escolhido.nome} —{' '}
-                  <b>{moeda(escolhido.faturamento)}</b> já pagos.
+                  <b>{moeda(escolhido.faturamento)}</b> nas filas concluídas.
                 </p>
               ) : (
                 <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
