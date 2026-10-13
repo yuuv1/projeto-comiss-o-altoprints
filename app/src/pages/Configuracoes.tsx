@@ -23,6 +23,7 @@ import {
   TriangleAlert,
   Upload,
   UserCog,
+  UsersRound,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
@@ -41,9 +42,21 @@ import {
   type PermissaoVendedor,
 } from '../lib/types'
 import { AbaNuvem } from '../components/Nuvem'
+import Equipe from './Equipe'
+import Vendedores from './Vendedores'
 import { Botao, Campo, Cartao, Entrada, Etiqueta, TituloPagina, cn, useConfirmacao } from '../components/ui'
 
-type Aba = 'comissoes' | 'permissoes' | 'empresa' | 'ia' | 'dados' | 'acesso' | 'nuvem' | 'aparencia'
+type Aba =
+  | 'comissoes'
+  | 'permissoes'
+  | 'equipe'
+  | 'vendedores'
+  | 'empresa'
+  | 'ia'
+  | 'dados'
+  | 'acesso'
+  | 'nuvem'
+  | 'aparencia'
 
 export default function Configuracoes() {
   const {
@@ -143,6 +156,8 @@ export default function Configuracoes() {
   const abas: { id: Aba; label: string; icone: typeof Percent }[] = [
     { id: 'comissoes', label: 'Comissões', icone: Percent },
     { id: 'permissoes', label: 'Permissões', icone: UserCog },
+    { id: 'equipe', label: 'Equipe', icone: UsersRound },
+    { id: 'vendedores', label: 'Vendedores', icone: UsersRound },
     { id: 'empresa', label: 'Empresa', icone: ImageIcon },
     { id: 'ia', label: 'Comprovantes (IA)', icone: Sparkles },
     { id: 'dados', label: 'Dados', icone: Database },
@@ -687,6 +702,12 @@ export default function Configuracoes() {
       {aba === 'nuvem' ? <AbaNuvem /> : null}
 
       {/* ------------------------------ MEU ACESSO ---------------------------- */}
+      {/* -------------------------------- EQUIPE -------------------------------- */}
+      {aba === 'equipe' ? <Equipe embutido /> : null}
+
+      {/* ------------------------------ VENDEDORES ------------------------------ */}
+      {aba === 'vendedores' ? <Vendedores embutido /> : null}
+
       {/* ------------------------------ APARÊNCIA ------------------------------ */}
       {aba === 'aparencia' ? (
         <div className="space-y-3">

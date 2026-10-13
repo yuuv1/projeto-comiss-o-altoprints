@@ -21,7 +21,8 @@ function CampoRetirada({ pedido, onSalvar }: { pedido: Pedido; onSalvar: (quem: 
   )
 }
 
-export default function Entregas() {
+/** Entregas também pode aparecer como aba dentro de Pedidos */
+export default function Entregas({ embutido = false }: { embutido?: boolean } = {}) {
   const { db } = useStore()
   const { ehProprietario } = useAuth()
   /** sem valores em dinheiro para quem não é o proprietário */
@@ -46,7 +47,9 @@ export default function Entregas() {
 
   return (
     <>
-      <TituloPagina icone={Truck} titulo="Entregas" subtitulo="Acompanhe os envios pelos Correios e as retiradas na loja." />
+      {embutido ? null : (
+        <TituloPagina icone={Truck} titulo="Entregas" subtitulo="Acompanhe os envios pelos Correios e as retiradas na loja." />
+      )}
 
       <Abas
         ativa={aba}

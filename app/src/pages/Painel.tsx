@@ -100,7 +100,7 @@ export default function Painel() {
         subtitulo={`Visão geral de tudo — ${usuario?.nome ?? ''} • hoje é ${dataBR(hojeISO())}`}
         acoes={
           <>
-            <Botao variante="secundario" icone={Users} onClick={() => navegar('/equipe')}>
+            <Botao variante="secundario" icone={Users} onClick={() => navegar('/configuracoes')}>
               Equipe
             </Botao>
             <Botao variante="secundario" icone={BarChart3} onClick={() => navegar('/relatorio')}>
@@ -288,7 +288,7 @@ export default function Painel() {
               {db.usuarios.length} acesso(s)
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Botao tamanho="sm" variante="secundario" icone={Users} onClick={() => navegar('/equipe')}>
+              <Botao tamanho="sm" variante="secundario" icone={Users} onClick={() => navegar('/configuracoes')}>
                 Gerenciar equipe
               </Botao>
               <Botao tamanho="sm" variante="secundario" icone={Settings} onClick={() => navegar('/configuracoes')}>

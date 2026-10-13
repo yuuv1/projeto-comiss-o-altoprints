@@ -2,11 +2,12 @@ import { ClipboardList, Package, Pencil, Plus, Store, Trash2, Truck, Wallet } fr
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
-import { BarraBusca, Botao, CartaoResumo, TituloPagina, Vazio, cn } from '../components/ui'
+import { Abas, BarraBusca, Botao, CartaoResumo, TituloPagina, Vazio, cn } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
-import { pedidoPendenteFinanceiro, podeEditarPedidos, podeExcluirPedidos } from '../lib/types'
+import { pedidoPendenteFinanceiro, podeEditarPedidos, podeExcluirPedidos, telasDoUsuario } from '../lib/types'
+import Entregas from './Entregas'
 
 export default function Pedidos() {
   const { db } = useStore()
@@ -14,6 +15,9 @@ export default function Pedidos() {
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
   const [busca, setBusca] = useState('')
+  const [aba, setAba] = useState<'pedidos' | 'entregas'>('pedidos')
+  /** entregas fica aqui dentro; cada acesso só vê se o dono liberar */
+  const verEntregas = ehProprietario || telasDoUsuario(usuario).entregas
 
   // o vendedor enxerga apenas os pedidos dele
   const meus = useMemo(
@@ -59,12 +63,29 @@ export default function Pedidos() {
             : 'Aqui aparecem somente os seus pedidos.'
         }
         acoes={
-          <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
-            Novo pedido
-          </Botao>
+          aba === 'pedidos' ? (
+            <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
+              Novo pedido
+            </Botao>
+          ) : undefined
         }
       />
 
+      {verEntregas ? (
+        <Abas<'pedidos' | 'entregas'>
+          ativa={aba}
+          onChange={setAba}
+          abas={[
+            { id: 'pedidos', label: ehProprietario ? 'Pedidos' : 'Meus pedidos', icone: ClipboardList, contador: pedidos.length },
+            { id: 'entregas', label: 'Entregas', icone: Truck },
+          ]}
+        />
+      ) : null}
+
+      {aba === 'entregas' && verEntregas ? (
+        <Entregas embutido />
+      ) : (
+        <>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
           titulo="Total de pedidos"
@@ -147,6 +168,9 @@ export default function Pedidos() {
           ))}
         </div>
       )}
+        </>
+      )}
+
       {acoes.dialog}
     </>
   )

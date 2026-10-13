@@ -111,12 +111,28 @@ export const filtrarImpressoes = (lista: Impressao[], f: FiltrosImpressoes, agor
 }
 
 /** Linhas do CSV/Excel da tela de impressões */
-export const linhasCSVImpressoes = (lista: Impressao[]): (string | number)[][] => [
-  ['Data/hora', 'Pedido', 'Cliente', 'Arte', 'Metros', 'Quem imprimiu', 'Tipo', 'Motivo', 'Observação'],
+export const linhasCSVImpressoes = (
+  lista: Impressao[],
+  /** opcional: devolve o nome do vendedor a partir do id do pedido (visão do dono) */
+  vendedorDoPedido?: (pedidoId: string) => string,
+): (string | number)[][] => [
+  [
+    'Data/hora',
+    'Pedido',
+    'Cliente',
+    ...(vendedorDoPedido ? ['Vendedor'] : []),
+    'Arte',
+    'Metros',
+    'Quem imprimiu',
+    'Tipo',
+    'Motivo',
+    'Observação',
+  ],
   ...lista.map((i) => [
     dataHoraBR(i.quando),
     `#${i.pedido_numero}`,
     i.cliente_nome,
+    ...(vendedorDoPedido ? [vendedorDoPedido(i.pedido_id)] : []),
     i.arquivo_nome,
     numeroBR(i.metros),
     i.quem,

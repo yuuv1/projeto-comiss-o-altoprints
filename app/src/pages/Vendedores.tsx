@@ -1,12 +1,13 @@
 import { Pencil, Plus, Trash2, UserPlus, UsersRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Botao, Campo, CartaoResumo, Entrada, Modal, TituloPagina, Vazio, useConfirmacao } from '../components/ui'
+import { BarraAcoes, Botao, Campo, CartaoResumo, Entrada, Modal, TituloPagina, Vazio, useConfirmacao } from '../components/ui'
 import { calcularComissao } from '../lib/comissao'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
 import { FAIXAS_PADRAO, type Vendedor } from '../lib/types'
 
-export default function Vendedores() {
+/** Vendedores também pode aparecer como aba dentro de Configurações */
+export default function Vendedores({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, salvarVendedor, excluirVendedor } = useStore()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
@@ -57,16 +58,24 @@ export default function Vendedores() {
 
   return (
     <>
-      <TituloPagina
-        icone={UsersRound}
-        titulo="Vendedores"
-        subtitulo="Quem vende aparece como opção nos cadastros de cliente e de pedido."
-        acoes={
+      {embutido ? (
+        <BarraAcoes>
           <Botao icone={Plus} onClick={abrirNovo}>
             Novo vendedor
           </Botao>
-        }
-      />
+        </BarraAcoes>
+      ) : (
+        <TituloPagina
+          icone={UsersRound}
+          titulo="Vendedores"
+          subtitulo="Quem vende aparece como opção nos cadastros de cliente e de pedido."
+          acoes={
+            <Botao icone={Plus} onClick={abrirNovo}>
+              Novo vendedor
+            </Botao>
+          }
+        />
+      )}
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Vendedores" valor={db.vendedores.length} icone={UsersRound} gradiente="from-pink-500 to-purple-600" />

@@ -20,6 +20,7 @@ import PedidoForm from './pages/PedidoForm'
 import Pedidos from './pages/Pedidos'
 import PorVendedor from './pages/PorVendedor'
 import Relatorio from './pages/Relatorio'
+import RelatorioResumo from './pages/RelatorioResumo'
 import RelatorioClienteEspecial from './pages/RelatorioClienteEspecial'
 import Vendedores from './pages/Vendedores'
 
@@ -160,6 +161,14 @@ export default function App() {
             element={
               <Permitido tela="relatorio">
                 <Relatorio />
+              </Permitido>
+            }
+          />
+          <Route
+            path="/relatorio-resumo"
+            element={
+              <Permitido tela="relatorio">
+                <RelatorioResumo />
               </Permitido>
             }
           />

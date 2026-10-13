@@ -16,6 +16,7 @@ import {
   type Usuario,
 } from '../lib/types'
 import {
+  BarraAcoes,
   Botao,
   Campo,
   CartaoResumo,
@@ -28,7 +29,8 @@ import {
   useConfirmacao,
 } from '../components/ui'
 
-export default function Equipe() {
+/** Equipe também pode aparecer como aba dentro de Configurações */
+export default function Equipe({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, avisar } = useStore()
   const navegar = useNavigate()
   const {
@@ -156,16 +158,24 @@ export default function Equipe() {
 
   return (
     <>
-      <TituloPagina
-        icone={Users}
-        titulo="Equipe"
-        subtitulo="Contas de acesso, vínculo com o vendedor, senhas e liberação."
-        acoes={
+      {embutido ? (
+        <BarraAcoes>
           <Botao icone={UserPlus} onClick={abrirNovaConta}>
             Nova conta
           </Botao>
-        }
-      />
+        </BarraAcoes>
+      ) : (
+        <TituloPagina
+          icone={Users}
+          titulo="Equipe"
+          subtitulo="Contas de acesso, vínculo com o vendedor, senhas e liberação."
+          acoes={
+            <Botao icone={UserPlus} onClick={abrirNovaConta}>
+              Nova conta
+            </Botao>
+          }
+        />
+      )}
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Contas" valor={contas.length} icone={Users} gradiente="from-pink-500 to-purple-600" />

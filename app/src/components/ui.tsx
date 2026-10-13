@@ -454,6 +454,14 @@ export function TituloPagina({
   )
 }
 
+/**
+ * Linha de botões usada no lugar do título quando a tela está embutida numa
+ * aba de outra tela (ex.: Impressões dentro de Relatório).
+ */
+export function BarraAcoes({ children }: { children: ReactNode }) {
+  return <div className="mb-3 flex flex-wrap items-center justify-end gap-2 print:hidden">{children}</div>
+}
+
 export function Abas<T extends string>({
   abas,
   ativa,

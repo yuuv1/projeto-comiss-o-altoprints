@@ -359,7 +359,7 @@ async function main() {
   if (!(clicouCompacto && deVoltaAoCompacto)) falhas++
   console.log(`  ${clicouCompacto && deVoltaAoCompacto ? '✅' : '❌'} “Compacto” volta a apertar a tela`)
 
-  // ---------- barra de cima enxuta: só os atalhos + "Mais" ----------
+  // ---------- barra de cima: só os 5 atalhos do dia a dia ----------
   dom.window.location.hash = '#/'
   await espera(700)
   const navTopo = raiz?.querySelector('header nav') ?? null
@@ -368,37 +368,67 @@ async function main() {
     textoNav.includes('Pedidos') &&
     textoNav.includes('Clientes') &&
     textoNav.includes('Para imprimir') &&
-    textoNav.includes('Mais') &&
+    textoNav.includes('Relatório') &&
     !textoNav.includes('Configurações') &&
     !textoNav.includes('Entregas') &&
-    !textoNav.includes('Relatório')
+    !textoNav.includes('Impressões') &&
+    !textoNav.includes('Vendedores') &&
+    !textoNav.includes('Mais')
   if (!barraEnxuta) falhas++
-  console.log(`\n  ${barraEnxuta ? '✅' : '❌'} barra de cima só com os atalhos do dia a dia + “Mais”`)
+  console.log(`\n  ${barraEnxuta ? '✅' : '❌'} barra de cima só com os atalhos do dia a dia (5)`)
 
-  const abriuMais = clicar(navTopo, 'Mais')
-  await espera(400)
-  const textoMais = (navTopo?.textContent ?? '').replace(/\s+/g, ' ')
-  const escondidosOk =
-    abriuMais &&
-    textoMais.includes('Produção') &&
-    textoMais.includes('Relatórios') &&
-    textoMais.includes('Administração') &&
-    textoMais.includes('Configurações') &&
-    textoMais.includes('Entregas')
-  if (!escondidosOk) falhas++
-  console.log(`  ${escondidosOk ? '✅' : '❌'} “Mais” abre o resto das telas, agrupadas por assunto`)
+  const engrenagem = [...(raiz?.querySelectorAll('header a') ?? [])].find((a) =>
+    (a.getAttribute('href') ?? '').includes('/configuracoes'),
+  )
+  if (!engrenagem) falhas++
+  console.log(`  ${engrenagem ? '✅' : '❌'} engrenagem no canto leva a Configurações (Equipe e Vendedores lá dentro)`)
 
-  dom.window.location.hash = '#/entregas'
+  // ---------- o que passou a morar dentro das abas ----------
+  dom.window.location.hash = '#/relatorio'
   await espera(700)
-  const textoEntregas = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const botaoMaisMarcado = [...(navTopo?.querySelectorAll('button') ?? [])].some(
-    (b) => (b.textContent ?? '').includes('Mais') && b.className.includes('from-pink-500'),
-  )
-  const entregasOk = botaoMaisMarcado && textoEntregas.includes('Entregas')
+  const textoRel = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const relatorioComAbas = textoRel.includes('Filas registradas') && textoRel.includes('Resumo e comissões')
+  if (!relatorioComAbas) falhas++
+  console.log(`  ${relatorioComAbas ? '✅' : '❌'} Relatório tem as abas "Filas registradas" e "Resumo e comissões"`)
+
+  const textoFilas = textoRel.includes('Registrar impressão') && textoRel.includes('Vendedor')
+  if (!textoFilas) falhas++
+  console.log(`  ${textoFilas ? '✅' : '❌'} dentro de Relatório dá para registrar a fila e filtrar por vendedor`)
+
+  const trocouResumo = clicar(raiz, 'Resumo e comissões')
+  await espera(600)
+  const textoResumo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const resumoOk = trocouResumo && textoResumo.includes('Resumo por vendedor') && textoResumo.includes('Comissão por faixa')
+  if (!resumoOk) falhas++
+  console.log(`  ${resumoOk ? '✅' : '❌'} a aba de resumo continua com faturamento e comissões`)
+
+  dom.window.location.hash = '#/clientes'
+  await espera(700)
+  const clicouEspeciais = clicar(raiz, '★ Especiais')
+  await espera(600)
+  const textoEspeciais = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const especiaisOk =
+    clicouEspeciais && (textoEspeciais.includes('Total pago') || textoEspeciais.includes('Nenhum cliente especial'))
+  if (!especiaisOk) falhas++
+  console.log(`  ${especiaisOk ? '✅' : '❌'} o cliente especial virou uma aba dentro de Clientes`)
+
+  dom.window.location.hash = '#/pedidos'
+  await espera(700)
+  const clicouEntregas = clicar(raiz, 'Entregas')
+  await espera(600)
+  const textoEntregas2 = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const entregasOk = clicouEntregas && textoEntregas2.includes('Correios') && textoEntregas2.includes('Retirada')
   if (!entregasOk) falhas++
-  console.log(
-    `  ${entregasOk ? '✅' : '❌'} telas do “Mais” continuam acessíveis e o botão fica marcado quando você está numa delas`,
-  )
+  console.log(`  ${entregasOk ? '✅' : '❌'} Entregas virou uma aba dentro de Pedidos`)
+
+  dom.window.location.hash = '#/configuracoes'
+  await espera(700)
+  const clicouEquipe = clicar(raiz, 'Equipe')
+  await espera(600)
+  const textoEquipeAba = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const equipeOk = clicouEquipe && textoEquipeAba.includes('Nova conta') && textoEquipeAba.includes('Contas')
+  if (!equipeOk) falhas++
+  console.log(`  ${equipeOk ? '✅' : '❌'} Equipe é uma aba dentro de Configurações`)
 
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
@@ -531,6 +561,8 @@ async function main() {
   // o relatório do vendedor só mostra os pedidos dele (sem citar o outro vendedor)
   dom.window.location.hash = '#/relatorio'
   await espera(700)
+  clicar(raiz2, 'Meu desempenho')
+  await espera(500)
   const textoRelatorioVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
   const relatorioSoDele =
     textoRelatorioVendedor.includes(nomeDoVinculo) && !textoRelatorioVendedor.includes(outroVendedor)

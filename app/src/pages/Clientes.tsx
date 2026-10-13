@@ -1,8 +1,23 @@
 import { Mail, Pencil, Phone, Plus, Star, Trash2, UserPlus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { AreaTexto, BarraBusca, Botao, Campo, CartaoResumo, Entrada, Interruptor, Modal, Selecao, TituloPagina, Vazio, useConfirmacao } from '../components/ui'
+import {
+  Abas,
+  AreaTexto,
+  BarraBusca,
+  Botao,
+  Campo,
+  CartaoResumo,
+  Entrada,
+  Interruptor,
+  Modal,
+  Selecao,
+  TituloPagina,
+  Vazio,
+  useConfirmacao,
+} from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
+import RelatorioClienteEspecial from './RelatorioClienteEspecial'
 import { useStore } from '../lib/store'
 import type { Cliente } from '../lib/types'
 
@@ -21,6 +36,7 @@ export default function Clientes() {
   const { usuario, ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const [busca, setBusca] = useState('')
+  const [aba, setAba] = useState<'clientes' | 'especiais'>('clientes')
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Cliente | null>(null)
   const [form, setForm] = useState(clienteEmBranco())
@@ -87,12 +103,27 @@ export default function Clientes() {
             : 'Aqui aparecem somente os clientes ligados a você.'
         }
         acoes={
-          <Botao icone={Plus} onClick={abrirNovo}>
-            Novo cliente
-          </Botao>
+          aba === 'clientes' ? (
+            <Botao icone={Plus} onClick={abrirNovo}>
+              Novo cliente
+            </Botao>
+          ) : undefined
         }
       />
 
+      <Abas<'clientes' | 'especiais'>
+        ativa={aba}
+        onChange={setAba}
+        abas={[
+          { id: 'clientes', label: 'Clientes', icone: Users, contador: db.clientes.length },
+          { id: 'especiais', label: '★ Especiais', icone: Star, contador: especiais },
+        ]}
+      />
+
+      {aba === 'especiais' ? (
+        <RelatorioClienteEspecial embutido />
+      ) : (
+        <>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo titulo="Clientes" valor={db.clientes.length} icone={Users} gradiente="from-pink-500 to-purple-600" />
         <CartaoResumo titulo="★ Especiais" valor={especiais} icone={Star} gradiente="from-amber-500 to-orange-600" />
@@ -288,6 +319,9 @@ export default function Clientes() {
           {preenchido ? null : null}
         </form>
       </Modal>
+        </>
+      )}
+
       {dialog}
     </>
   )

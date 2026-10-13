@@ -226,7 +226,7 @@ export default function MinhaArea() {
                   className="mt-2 justify-start"
                   variante="secundario"
                   icone={History}
-                  onClick={() => navegar('/impressoes')}
+                  onClick={() => navegar('/relatorio')}
                 >
                   Ver as impressões registradas
                 </Botao>

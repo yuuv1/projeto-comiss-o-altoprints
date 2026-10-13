@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  ChevronDown,
   ClipboardList,
   Crown,
   Eye,
@@ -25,7 +24,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { useAuth } from '../lib/auth'
@@ -34,34 +33,22 @@ import { rotuloVisualizacao } from '../lib/visualizacao'
 import { type TelasAcesso, telasDoUsuario } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useTema } from '../lib/tema'
+import { VERSAO } from '../lib/versao'
 import { Logo } from './Logo'
 import { PerfilDialog } from './PerfilDialog'
 import { ReviewModal } from './ReviewModal'
 import { Botao, cn } from './ui'
-
-/** como o item aparece no menu "Mais" quando não é um dos atalhos de cima */
-type GrupoMenu = 'Producao' | 'Relatorios' | 'Administracao'
 
 interface ItemMenu {
   to: string
   label: string
   icone: LucideIcon
   badge?: number
-  /** só o proprietário vê (Equipe, Configurações, Vendedores...) */
+  /** só o proprietário vê (Vendedores, Equipe...) */
   soProprietario?: boolean
   /** tela extra que o proprietário pode liberar para um vendedor */
   tela?: keyof TelasAcesso
-  /** seção do menu "Mais" (os atalhos de cima não precisam) */
-  grupo?: GrupoMenu
 }
-
-/**
- * Atalhos que ficam sempre à vista na barra de cima. Todo o resto continua a
- * um clique de distância, dentro de "Mais" — a ideia é quem está começando
- * enxergar só o essencial do dia a dia.
- */
-const ATALHOS_DONO = ['/', '/pedidos', '/clientes', '/para-imprimir']
-const ATALHOS_VENDEDOR = ['/', '/pedidos', '/clientes', '/por-vendedor', '/para-imprimir']
 
 export function Layout() {
   const { db, nomeVendedor } = useStore()
@@ -71,34 +58,12 @@ export function Layout() {
   const navegar = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
-  const [maisAberto, setMaisAberto] = useState(false)
-  const [maisCelular, setMaisCelular] = useState(false)
-  const refMais = useRef<HTMLDivElement | null>(null)
   const local = useLocation()
 
-  // trocar de tela fecha os menus abertos
+  // trocar de tela fecha o menu do celular
   useEffect(() => {
-    setMaisAberto(false)
-    setMaisCelular(false)
     setMenuAberto(false)
   }, [local.pathname])
-
-  // clicar fora (ou apertar Esc) fecha o menu "Mais"
-  useEffect(() => {
-    if (!maisAberto) return
-    const fora = (e: MouseEvent) => {
-      if (!refMais.current?.contains(e.target as Node)) setMaisAberto(false)
-    }
-    const escapar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMaisAberto(false)
-    }
-    document.addEventListener('mousedown', fora)
-    window.addEventListener('keydown', escapar)
-    return () => {
-      document.removeEventListener('mousedown', fora)
-      window.removeEventListener('keydown', escapar)
-    }
-  }, [maisAberto])
 
   // 5 toques seguidos no logo abrem a porta do proprietário
   const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
@@ -117,31 +82,18 @@ export function Layout() {
     }
   }, [db.pedidos, ehProprietario, meusPedidos])
 
+  /*
+   * A barra de cima tem só os atalhos do dia a dia. O resto do sistema mora
+   * dentro deles: Entregas é uma aba de Pedidos, Cliente especial é uma aba de
+   * Clientes, Filas/Impressões e o resumo de comissões são abas de Relatório,
+   * e Equipe/Vendedores/Configurações ficam na engrenagem do canto.
+   */
   const menu: ItemMenu[] = [
     { to: '/', label: ehProprietario ? 'Painel' : 'Minha área', icone: ehProprietario ? LayoutDashboard : UserCheck },
-    { to: '/pedidos', label: 'Pedidos', icone: ClipboardList },
-    { to: '/clientes', label: 'Clientes', icone: Users },
-    {
-      to: '/por-vendedor',
-      label: ehProprietario ? 'Por vendedor' : 'Meu desempenho',
-      icone: UserCheck,
-      badge: avisos,
-      grupo: 'Relatorios',
-    },
+    { to: '/pedidos', label: ehProprietario ? 'Pedidos' : 'Meus pedidos', icone: ClipboardList },
+    { to: '/clientes', label: ehProprietario ? 'Clientes' : 'Meus clientes', icone: Users },
     { to: '/para-imprimir', label: 'Para imprimir', icone: Printer, badge: paraImprimir, tela: 'paraImprimir' },
-    { to: '/impressoes', label: 'Impressões', icone: History, tela: 'impressoes', grupo: 'Producao' },
-    { to: '/entregas', label: 'Entregas', icone: Truck, tela: 'entregas', grupo: 'Producao' },
-    { to: '/relatorio', label: 'Relatório', icone: BarChart3, tela: 'relatorio', grupo: 'Relatorios' },
-    {
-      to: '/relatorio-cliente-especial',
-      label: 'Cliente especial',
-      icone: Star,
-      tela: 'clienteEspecial',
-      grupo: 'Relatorios',
-    },
-    { to: '/vendedores', label: 'Vendedores', icone: UsersRound, soProprietario: true, grupo: 'Administracao' },
-    { to: '/equipe', label: 'Equipe', icone: UserCog, soProprietario: true, grupo: 'Administracao' },
-    { to: '/configuracoes', label: 'Configurações', icone: Settings, soProprietario: true, grupo: 'Administracao' },
+    { to: '/relatorio', label: 'Relatório', icone: BarChart3, badge: avisos, tela: 'relatorio' },
   ]
 
   const visiveis = menu.filter((m) => {
@@ -150,20 +102,6 @@ export function Layout() {
     return !m.tela || telas[m.tela]
   })
 
-  /* O que fica na barra de cima e o que vai para o menu "Mais". */
-  const atalhos = ehProprietario ? ATALHOS_DONO : ATALHOS_VENDEDOR
-  const principais = visiveis.filter((m) => atalhos.includes(m.to))
-  const demais = visiveis.filter((m) => !atalhos.includes(m.to))
-  const gruposDoMais = (
-    [
-      { titulo: 'Produção', grupo: 'Producao' as GrupoMenu },
-      { titulo: 'Relatórios', grupo: 'Relatorios' as GrupoMenu },
-      { titulo: 'Administração', grupo: 'Administracao' as GrupoMenu },
-    ] as const
-  )
-    .map(({ titulo, grupo }) => ({ titulo, itens: demais.filter((m) => m.grupo === grupo) }))
-    .filter((g) => g.itens.length > 0)
-  const escondidosComAviso = demais.some((m) => m.badge)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-10 transition-colors print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
@@ -180,7 +118,7 @@ export function Layout() {
           </NavLink>
 
           <nav className="ml-auto hidden flex-wrap items-center gap-1 xl:flex">
-            {principais.map(({ to, label, icone: Icone, badge }) => (
+            {visiveis.map(({ to, label, icone: Icone, badge }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -202,66 +140,6 @@ export function Layout() {
                 ) : null}
               </NavLink>
             ))}
-
-            {gruposDoMais.length ? (
-              <div className="relative" ref={refMais}>
-                <button
-                  type="button"
-                  onClick={() => setMaisAberto((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={maisAberto}
-                  title="Ver as outras telas do sistema"
-                  className={cn(
-                    'relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-bold transition-all duration-200',
-                    maisAberto || demais.some((m) => m.to === local.pathname)
-                      ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                      : 'text-slate-600 hover:bg-white hover:text-purple-700 hover:shadow-soft dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-purple-300',
-                  )}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                  Mais
-                  <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', maisAberto && 'rotate-180')} />
-                  {escondidosComAviso && !maisAberto ? (
-                    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-slate-900" />
-                  ) : null}
-                </button>
-
-                {maisAberto ? (
-                  <div className="absolute right-0 top-full z-50 mt-1.5 w-60 animate-pop-in rounded-2xl border border-slate-100 bg-white p-1.5 shadow-hover dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-hover">
-                    {gruposDoMais.map(({ titulo, itens }) => (
-                      <div key={titulo} className="py-0.5">
-                        <p className="px-2.5 pb-1 pt-1 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                          {titulo}
-                        </p>
-                        {itens.map(({ to, label, icone: Icone, badge }) => (
-                          <NavLink
-                            key={to}
-                            to={to}
-                            onClick={() => setMaisAberto(false)}
-                            className={({ isActive }) =>
-                              cn(
-                                'flex items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold transition',
-                                isActive
-                                  ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-                              )
-                            }
-                          >
-                            <Icone className="h-4 w-4" />
-                            <span className="flex-1 truncate">{label}</span>
-                            {badge ? (
-                              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-amber-900">
-                                {badge}
-                              </span>
-                            ) : null}
-                          </NavLink>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
           </nav>
 
           <div className="ml-auto flex items-center gap-2 xl:ml-1">
@@ -281,6 +159,23 @@ export function Layout() {
               {compacto ? <Rows4 className="h-4 w-4" /> : <Rows3 className="h-4 w-4" />}
               {compacto ? 'Compacto' : 'Confortável'}
             </button>
+
+            {ehProprietario ? (
+              <NavLink
+                to="/configuracoes"
+                title="Configurações, Equipe e Vendedores"
+                className={({ isActive }) =>
+                  cn(
+                    'hidden rounded-full border p-2 shadow-sm transition sm:inline-flex',
+                    isActive
+                      ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-500 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300',
+                  )
+                }
+              >
+                <Settings className="h-4 w-4" />
+              </NavLink>
+            ) : null}
 
             <button
               onClick={() => setPerfilAberto(true)}
@@ -322,7 +217,7 @@ export function Layout() {
         {menuAberto ? (
           <div className="animate-fade-in-up border-t border-slate-100 bg-white/95 px-2 pb-2 pt-1.5 xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
             <div className="grid grid-cols-2 gap-1">
-              {principais.map(({ to, label, icone: Icone, badge }) => (
+              {visiveis.map(({ to, label, icone: Icone, badge }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -347,56 +242,14 @@ export function Layout() {
               ))}
             </div>
 
-            {gruposDoMais.length ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setMaisCelular((v) => !v)}
-                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-2 text-[13px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                  {maisCelular ? 'Menos opções' : 'Mais opções'}
-                  <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', maisCelular && 'rotate-180')} />
-                  {escondidosComAviso && !maisCelular ? <span className="h-2 w-2 rounded-full bg-amber-400" /> : null}
-                </button>
-
-                {maisCelular ? (
-                  <div className="mt-1 space-y-1.5">
-                    {gruposDoMais.map(({ titulo, itens }) => (
-                      <div key={titulo}>
-                        <p className="px-1 pb-1 pt-1 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                          {titulo}
-                        </p>
-                        <div className="grid grid-cols-2 gap-1">
-                          {itens.map(({ to, label, icone: Icone, badge }) => (
-                            <NavLink
-                              key={to}
-                              to={to}
-                              onClick={() => setMenuAberto(false)}
-                              className={({ isActive }) =>
-                                cn(
-                                  'inline-flex items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold transition',
-                                  isActive
-                                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                                    : 'bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-                                )
-                              }
-                            >
-                              <Icone className="h-4 w-4" />
-                              <span className="truncate">{label}</span>
-                              {badge ? (
-                                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-amber-900">
-                                  {badge}
-                                </span>
-                              ) : null}
-                            </NavLink>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </>
+            {ehProprietario ? (
+              <NavLink
+                to="/configuracoes"
+                onClick={() => setMenuAberto(false)}
+                className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-50 px-2.5 py-2 text-[13px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
+                <Settings className="h-4 w-4" /> Configurações, Equipe e Vendedores
+              </NavLink>
             ) : null}
 
             <button
@@ -410,6 +263,7 @@ export function Layout() {
             </button>
           </div>
         ) : null}
+
       </header>
 
       <main className="relative mx-auto max-w-[1700px] px-3 py-3">
@@ -433,7 +287,8 @@ export function Layout() {
         {db.configuracoes.empresa_nome || 'Altoprints'} · Sistema de pedidos DTF ·{' '}
         {ehProprietario
           ? `${db.pedidos.length} pedidos • ${db.vendedores.length} vendedores • visão do proprietário`
-          : `você está vendo apenas os pedidos de ${nomeVendedor(usuario?.vendedor_id)}`}
+          : `você está vendo apenas os pedidos de ${nomeVendedor(usuario?.vendedor_id)}`}{' '}
+        · v{VERSAO}
       </footer>
 
       <PerfilDialog aberto={perfilAberto} onFechar={() => setPerfilAberto(false)} />

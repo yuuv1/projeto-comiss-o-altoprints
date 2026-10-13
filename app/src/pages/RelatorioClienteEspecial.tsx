@@ -1,7 +1,7 @@
 import { CalendarClock, Mail, Percent, Phone, Printer, Ruler, Star, User, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
-import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio } from '../components/ui'
+import { BarraAcoes, Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio } from '../components/ui'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
@@ -12,7 +12,8 @@ const primeiroDiaDoMes = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-export default function RelatorioClienteEspecial() {
+/** Extrato do cliente especial — também aparece como aba dentro de Clientes */
+export default function RelatorioClienteEspecial({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, nomeVendedor } = useStore()
   const { usuario, ehProprietario } = useAuth()
   // vendedor com a tela liberada vê só os clientes especiais dele
@@ -60,11 +61,13 @@ export default function RelatorioClienteEspecial() {
   if (!especiais.length) {
     return (
       <>
-        <TituloPagina
-          icone={Star}
-          titulo="Relatório cliente especial"
-          subtitulo="Escolha um cliente marcado como ★ especial."
-        />
+        {embutido ? null : (
+          <TituloPagina
+            icone={Star}
+            titulo="Relatório cliente especial"
+            subtitulo="Escolha um cliente marcado como ★ especial."
+          />
+        )}
         <Vazio
           icone={Star}
           titulo="Nenhum cliente especial cadastrado"
@@ -136,16 +139,24 @@ export default function RelatorioClienteEspecial() {
   return (
     <>
       <div className="print:hidden">
-        <TituloPagina
-          icone={Star}
-          titulo="Relatório cliente especial"
-          subtitulo="Extrato do cliente com pedidos pagos e pendentes — pronto para enviar."
-          acoes={
+        {embutido ? (
+          <BarraAcoes>
             <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
               Imprimir / PDF
             </Botao>
-          }
-        />
+          </BarraAcoes>
+        ) : (
+          <TituloPagina
+            icone={Star}
+            titulo="Relatório cliente especial"
+            subtitulo="Extrato do cliente com pedidos pagos e pendentes — pronto para enviar."
+            acoes={
+              <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
+                Imprimir / PDF
+              </Botao>
+            }
+          />
+        )}
 
         <Cartao className="mb-3" hover={false}>
           <div className="grid gap-3 lg:grid-cols-4">

@@ -17,6 +17,7 @@ import { useRegistrarImpressao } from '../components/impressao'
 import { LogoImpressao } from '../components/Logo'
 import {
   Abas,
+  BarraAcoes,
   Botao,
   Campo,
   CartaoResumo,
@@ -41,34 +42,44 @@ import {
 import { useStore } from '../lib/store'
 import { type Impressao, LABEL_TIPO_IMPRESSAO } from '../lib/types'
 
-export default function Impressoes() {
-  const { db, excluirImpressao, avisar } = useStore()
+export default function Impressoes({ embutido = false }: { embutido?: boolean } = {}) {
+  const { db, excluirImpressao, avisar, nomeVendedor } = useStore()
   const { ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const impressao = useRegistrarImpressao()
 
   const [periodo, setPeriodo] = useState<PeriodoImpressoes>('hoje')
   const [quem, setQuem] = useState('todos')
+  const [vendedor, setVendedor] = useState('todos')
   const [busca, setBusca] = useState('')
   const [soReimpressoes, setSoReimpressoes] = useState(false)
 
   const nomes = useMemo(() => quemImprimiu(db.impressoes), [db.impressoes])
 
-  const filtradas = useMemo(
-    () =>
-      filtrarImpressoes(db.impressoes, {
-        periodo,
-        quem: quem === 'todos' ? '' : quem,
-        busca,
-        soReimpressoes,
-      }),
-    [busca, db.impressoes, periodo, quem, soReimpressoes],
-  )
+  /** de qual vendedor é cada pedido — é o que permite olhar as filas por vendedor */
+  const vendedorDoPedido = useMemo(() => new Map(db.pedidos.map((p) => [p.id, p.vendedor_id])), [db.pedidos])
+
+  const filtradas = useMemo(() => {
+    const base = filtrarImpressoes(db.impressoes, {
+      periodo,
+      quem: quem === 'todos' ? '' : quem,
+      busca,
+      soReimpressoes,
+    })
+    if (vendedor === 'todos') return base
+    return base.filter((i) => (vendedorDoPedido.get(i.pedido_id) ?? '') === vendedor)
+  }, [busca, db.impressoes, periodo, quem, soReimpressoes, vendedor, vendedorDoPedido])
 
   const resumo = resumirImpressoes(filtradas)
 
   const exportarCSV = () => {
-    baixarCSV(`impressoes-altoprints-${hojeISO()}`, linhasCSVImpressoes(filtradas))
+    baixarCSV(
+      `impressoes-altoprints-${hojeISO()}`,
+      linhasCSVImpressoes(
+        filtradas,
+        ehProprietario ? (pedidoId) => nomeVendedor(vendedorDoPedido.get(pedidoId)) : undefined,
+      ),
+    )
     avisar('CSV gerado! O arquivo abre no Excel com os acentos corretos.')
   }
 
@@ -87,29 +98,38 @@ export default function Impressoes() {
 
   return (
     <>
-      <TituloPagina
-        icone={History}
-        titulo="Impressões"
-        subtitulo="Tudo o que saiu da máquina: metros, quem imprimiu, reimpressões e o motivo."
-        acoes={
-          <>
-            <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
-              Registrar impressão
-            </Botao>
-            <Botao
-              variante="secundario"
-              icone={Printer}
-              onClick={() => window.print()}
-              disabled={!filtradas.length}
-            >
-              Imprimir / PDF
-            </Botao>
-            <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV} disabled={!filtradas.length}>
-              Exportar CSV
-            </Botao>
-          </>
-        }
-      />
+      {embutido ? (
+        <BarraAcoes>
+          <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
+            Registrar impressão
+          </Botao>
+          <Botao variante="secundario" icone={Printer} onClick={() => window.print()} disabled={!filtradas.length}>
+            Imprimir / PDF
+          </Botao>
+          <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV} disabled={!filtradas.length}>
+            Exportar CSV
+          </Botao>
+        </BarraAcoes>
+      ) : (
+        <TituloPagina
+          icone={History}
+          titulo="Impressões"
+          subtitulo="Tudo o que saiu da máquina: metros, quem imprimiu, reimpressões e o motivo."
+          acoes={
+            <>
+              <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
+                Registrar impressão
+              </Botao>
+              <Botao variante="secundario" icone={Printer} onClick={() => window.print()} disabled={!filtradas.length}>
+                Imprimir / PDF
+              </Botao>
+              <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV} disabled={!filtradas.length}>
+                Exportar CSV
+              </Botao>
+            </>
+          }
+        />
+      )}
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
@@ -171,6 +191,18 @@ export default function Impressoes() {
               ))}
             </Selecao>
           </Campo>
+          {ehProprietario ? (
+            <Campo label="Vendedor" dica="As filas dos pedidos de cada vendedor.">
+              <Selecao value={vendedor} onChange={(e) => setVendedor(e.target.value)}>
+                <option value="todos">Todos os vendedores</option>
+                {db.vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                  </option>
+                ))}
+              </Selecao>
+            </Campo>
+          ) : null}
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
             <input
               type="checkbox"
@@ -200,6 +232,7 @@ export default function Impressoes() {
                   <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-bold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:bg-slate-900">
                     <th className="px-4 py-3">Quando</th>
                     <th className="px-4 py-3">Pedido</th>
+                    {ehProprietario ? <th className="px-4 py-3">Vendedor</th> : null}
                     <th className="px-4 py-3">Arte</th>
                     <th className="px-4 py-3">Metros</th>
                     <th className="px-4 py-3">Quem imprimiu</th>
@@ -232,6 +265,11 @@ export default function Impressoes() {
                         </Link>
                         <div className="text-xs text-slate-500 dark:text-slate-400">{i.cliente_nome}</div>
                       </td>
+                      {ehProprietario ? (
+                        <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          {nomeVendedor(vendedorDoPedido.get(i.pedido_id))}
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
                         {i.arquivo_nome || '—'}
                       </td>
