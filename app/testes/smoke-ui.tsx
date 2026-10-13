@@ -421,6 +421,23 @@ async function main() {
     `\n  ${impressoComComissoes ? '✅' : '❌'} relatório impresso do dono traz a comissão de cada vendedor (com total)`,
   )
 
+  const tabelasImpressas = Array.from(areaImpressa?.querySelectorAll('table') ?? [])
+  const tabelaDetalhamento = tabelasImpressas[tabelasImpressas.length - 1]
+  const cabecalhosDetalhamento = Array.from(tabelaDetalhamento?.querySelectorAll('thead th') ?? []).map((th) =>
+    (th.textContent ?? '').trim(),
+  )
+  const linhasDetalhamento = Array.from(tabelaDetalhamento?.querySelectorAll('tbody tr') ?? [])
+  const detalheDoPedidoOk =
+    cabecalhosDetalhamento.join('|') === 'Nº|Cliente|Vendedor|Metragem|Valor|Comissão|Pagamento' &&
+    linhasDetalhamento.length > 0 &&
+    linhasDetalhamento.every((linha) => linha.cells[5]?.textContent?.includes('R$')) &&
+    !tabelaDetalhamento?.querySelector('tfoot') &&
+    !textoImpresso.includes('TOTAL GERAL')
+  if (!detalheDoPedidoOk) falhas++
+  console.log(
+    `  ${detalheDoPedidoOk ? '✅' : '❌'} detalhamento impresso remove observação/total geral e mostra comissão após o valor em cada pedido`,
+  )
+
   dom.window.location.hash = '#/clientes'
   await espera(700)
   const clicouEspeciais = clicar(raiz, '★ Especiais')

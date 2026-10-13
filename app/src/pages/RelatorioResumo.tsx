@@ -139,23 +139,21 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
 
   const exportarCSV = () => {
     const linhas: (string | number)[][] = [
-      ['Nº', 'Cliente', 'Vendedor', 'Observação', 'Metragem', 'Valor', 'Data do pagamento', '% comissão', 'Comissão'],
+      ['Nº', 'Cliente', 'Vendedor', 'Metragem', 'Valor', 'Comissão', 'Data do pagamento', '% comissão'],
       ...visiveis.map((p) => [
         p.numero,
         p.cliente_nome,
         nomeVendedor(p.vendedor_id),
-        p.descricao || p.observacoes || '',
         numeroBR(p.metragem),
         numeroBR(p.valor),
+        numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
         p.data_pagamento ? dataBR(p.data_pagamento) : '',
         `${numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 2)}%`,
-        numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
       ]),
       [],
-      ['TOTAL', '', '', '', numeroBR(totais.metragem), numeroBR(totais.faturamento), '', '', numeroBR(totais.comissao)],
       ...resultado.porFaixa
         .filter((l) => l.pedidos > 0)
-        .map((l) => [`COMISSÃO ${l.rotulo} (${numeroBR(l.percentual, 2)}%)`, '', '', '', '', '', '', '', numeroBR(l.comissao)]),
+        .map((l) => [`COMISSÃO ${l.rotulo} (${numeroBR(l.percentual, 2)}%)`, '', '', '', '', numeroBR(l.comissao), '', '']),
     ]
     baixarCSV(`relatorio-altoprints-${inicio}-a-${fim}`, linhas)
     avisar('CSV gerado! O arquivo abre no Excel com os acentos corretos.')
@@ -426,12 +424,11 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                     <th className="border border-slate-200 px-3 py-2">Nº</th>
                     <th className="border border-slate-200 px-3 py-2">Cliente</th>
                     <th className="border border-slate-200 px-3 py-2">Vendedor</th>
-                    <th className="border border-slate-200 px-3 py-2">Observação</th>
                     <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
                     <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
+                    <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
                     <th className="border border-slate-200 px-3 py-2">Pagamento</th>
                     <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
-                    <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
                     <th className="border border-slate-200 px-3 py-2 text-center">Ações</th>
                   </tr>
                 </thead>
@@ -444,21 +441,18 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         {p.descricao ? <span className="block text-xs text-slate-400">{p.descricao}</span> : null}
                       </td>
                       <td className="border border-slate-200 px-3 py-2">{nomeVendedor(p.vendedor_id)}</td>
-                      <td className="border border-slate-200 px-3 py-2 text-xs text-slate-500">
-                        {p.observacoes || '—'}
-                      </td>
                       <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
                         {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
                       </td>
                       <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
                         {moeda(p.valor)}
                       </td>
+                      <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
+                        {moeda(comissaoDoPedido(p, faixas, semMetragem))}
+                      </td>
                       <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">{dataBR(p.data_pagamento)}</td>
                       <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
                         {numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 1)}%
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
-                        {moeda(comissaoDoPedido(p, faixas, semMetragem))}
                       </td>
                       <td className="border border-slate-200 px-3 py-2 text-center">
                         <button
@@ -472,25 +466,6 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-slate-100 font-extrabold text-slate-800">
-                    <td className="border border-slate-200 px-3 py-2" colSpan={4}>
-                      TOTAL GERAL
-                    </td>
-                    <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
-                      {numeroBR(totais.metragem)} m
-                    </td>
-                    <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-emerald-700">
-                      {moeda(totais.faturamento)}
-                    </td>
-                    <td className="border border-slate-200 px-3 py-2" colSpan={3}>
-                      Comissão: {moeda(totais.comissao)} ({numeroBR(
-                        totais.faturamento ? (totais.comissao / totais.faturamento) * 100 : 0,
-                        2,
-                      )}% médio)
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
           )}
@@ -583,9 +558,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               <th>Nº</th>
               <th>Cliente</th>
               <th>Vendedor</th>
-              <th>Observação</th>
               <th className="num">Metragem</th>
               <th className="num">Valor</th>
+              <th className="num">Comissão</th>
               <th>Pagamento</th>
             </tr>
           </thead>
@@ -598,21 +573,13 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   {p.descricao ? <div style={{ fontSize: '11px' }}>{p.descricao}</div> : null}
                 </td>
                 <td>{nomeVendedor(p.vendedor_id)}</td>
-                <td>{p.observacoes || '—'}</td>
                 <td className="num">{p.metragem ? `${numeroBR(p.metragem)} m` : '—'}</td>
                 <td className="num">{moeda(p.valor)}</td>
+                <td className="num">{moeda(comissaoDoPedido(p, faixas, semMetragem))}</td>
                 <td>{dataBR(p.data_pagamento)}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={4}>TOTAL GERAL</td>
-              <td className="num">{numeroBR(totais.metragem)} m</td>
-              <td className="num">{moeda(totais.faturamento)}</td>
-              <td className="num">Comissão: {moeda(totais.comissao)}</td>
-            </tr>
-          </tfoot>
         </table>
         <p className="mt-3 text-[11px]">
           Documento gerado pelo sistema {db.configuracoes.empresa_nome || 'Altoprints'} em{' '}
