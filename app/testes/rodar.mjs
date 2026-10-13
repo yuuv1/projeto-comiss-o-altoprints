@@ -12,6 +12,13 @@ import { fileURLToPath } from 'node:url'
 const aqui = dirname(fileURLToPath(import.meta.url))
 const raiz = resolve(aqui, '..')
 
+/**
+ * O jsdom 30 dos testes de tela precisa do Node 22.22 ou mais novo
+ * (ele usa Promise.withResolvers, que só existe do Node 22 em diante).
+ */
+const [nodeMaior, nodeMenor] = process.versions.node.split('.').map(Number)
+const nodeAntigo = nodeMaior < 22 || (nodeMaior === 22 && nodeMenor < 22)
+
 /** faz o esbuild entender as importações "?raw" do Vite (usadas para embutir o SQL) */
 const pluginBruto = {
   name: 'texto-bruto',
@@ -58,12 +65,17 @@ if (existsSync(resolve(raiz, 'node_modules/fake-indexeddb'))) {
   console.log('\nℹ️  Teste de armazenamento ignorado (instale com: npm i -D fake-indexeddb)\n')
 }
 
-if (existsSync(resolve(raiz, 'node_modules/jsdom'))) {
+if (existsSync(resolve(raiz, 'node_modules/jsdom')) && !nodeAntigo) {
   console.log('\n➡️  Login, perfis e permissões\n')
   executar(await compilar('login.tsx', 'login.cjs'))
 
   console.log('\n➡️  Interface (renderização de todas as telas)\n')
   executar(await compilar('smoke-ui.tsx', 'smoke-ui.cjs'))
+} else if (nodeAntigo) {
+  console.log(
+    `\nℹ️  Testes de tela ignorados: você está no Node ${process.versions.node}, e eles precisam do Node 22.22 ou mais novo.\n` +
+      '    Atualize em https://nodejs.org/pt-br (ou rode "nvm use" na pasta app) e rode os testes de novo.\n',
+  )
 } else {
   console.log('\nℹ️  Teste de interface ignorado (instale o jsdom com: npm i -D jsdom)\n')
 }
