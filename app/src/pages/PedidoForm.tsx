@@ -4,11 +4,14 @@ import {
   Calculator,
   Download,
   FileText,
+  History,
   Image as ImageIcon,
   Package,
   Paperclip,
   Pencil,
   Plus,
+  PrinterCheck,
+  RotateCcw,
   Save,
   ScanLine,
   Sparkles,
@@ -32,9 +35,11 @@ import {
   cn,
   useConfirmacao,
 } from '../components/ui'
+import { useRegistrarImpressao } from '../components/impressao'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
-import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
+import { dataBR, dataHoraBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
+import { doPedido, resumirImpressoes } from '../lib/impressoes'
 import { FAIXAS, calcularValor, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
@@ -47,6 +52,7 @@ import {
   STATUS_PAGAMENTO,
   STATUS_PRODUCAO,
   pedidoVazio,
+  telasDoUsuario,
   type Arquivo,
   type Pedido,
   type StatusPagamento,
@@ -119,8 +125,11 @@ export default function PedidoForm() {
   const { db, salvarPedido, excluirPedido, excluirArquivoDoPedido, avisar, nomeVendedor } = useStore()
   const { usuario, ehProprietario, vendedorNome } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
+  const impressao = useRegistrarImpressao()
   const novo = !id
   const existente = useMemo(() => db.pedidos.find((p) => p.id === id), [db.pedidos, id])
+  /** quem registra impressão é quem tem a fila de impressão liberada (ou o dono) */
+  const podeRegistrarImpressao = ehProprietario || telasDoUsuario(usuario).paraImprimir
 
   const permissao = db.configuracoes.permissao_vendedor
   /** o vendedor só mexe no que é dele, e conforme a permissão definida pelo dono */
@@ -184,6 +193,12 @@ export default function PedidoForm() {
     () => db.arquivos.filter((a) => a.pedido_id === existente?.id),
     [db.arquivos, existente?.id],
   )
+
+  const historicoImpressoes = useMemo(
+    () => (existente ? doPedido(db.impressoes, existente.id) : []),
+    [db.impressoes, existente],
+  )
+  const resumoImpressoes = resumirImpressoes(historicoImpressoes)
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -587,6 +602,91 @@ export default function PedidoForm() {
               </p>
             ) : null}
           </Cartao>
+
+          {/* --------------------------- impressões --------------------------- */}
+          <Cartao>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
+                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Impressões (produção)
+              </h3>
+              {existente && podeRegistrarImpressao ? (
+                <div className="flex flex-wrap gap-2">
+                  <Botao
+                    type="button"
+                    tamanho="sm"
+                    variante="sucesso"
+                    icone={PrinterCheck}
+                    onClick={() => impressao.imprimir(existente)}
+                  >
+                    Registrar impressão
+                  </Botao>
+                  <Botao
+                    type="button"
+                    tamanho="sm"
+                    variante="secundario"
+                    icone={RotateCcw}
+                    onClick={() => impressao.reimprimir(existente)}
+                  >
+                    Reimpressão
+                  </Botao>
+                </div>
+              ) : null}
+            </div>
+
+            {!existente ? (
+              <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400 dark:border-slate-700">
+                Salve o pedido para registrar as impressões dele.
+              </p>
+            ) : historicoImpressoes.length ? (
+              <>
+                <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">
+                  {historicoImpressoes.length}× impresso · {numeroBR(resumoImpressoes.metros)} m no total
+                  {resumoImpressoes.reimpressoes
+                    ? ` · ${numeroBR(resumoImpressoes.metrosPerdidos)} m em reimpressão`
+                    : ''}
+                </p>
+                <div className="space-y-2">
+                  {historicoImpressoes.map((i) => (
+                    <div
+                      key={i.id}
+                      className={cn(
+                        'rounded-xl border p-3 text-sm',
+                        i.tipo === 'reimpressao'
+                          ? 'border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/30'
+                          : 'border-slate-100 dark:border-slate-800',
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        {i.tipo === 'reimpressao' ? (
+                          <Etiqueta className="border-amber-200 bg-amber-100 text-amber-800" icone={RotateCcw}>
+                            Reimpressão{i.motivo ? ` — ${i.motivo}` : ''}
+                          </Etiqueta>
+                        ) : (
+                          <Etiqueta className="border-emerald-200 bg-emerald-50 text-emerald-700" icone={PrinterCheck}>
+                            Impressão
+                          </Etiqueta>
+                        )}
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{numeroBR(i.metros)} m</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {dataHoraBR(i.quando)} · {i.quem || '—'}
+                        </span>
+                      </div>
+                      {i.arquivo_nome ? (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Arte: {i.arquivo_nome}</p>
+                      ) : null}
+                      {i.observacao ? (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{i.observacao}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400 dark:border-slate-700">
+                Este pedido ainda não tem impressão registrada.
+              </p>
+            )}
+          </Cartao>
         </div>
 
         {/* --------------------------- coluna lateral ------------------------- */}
@@ -814,6 +914,7 @@ export default function PedidoForm() {
       </div>
 
       {dialog}
+      {impressao.janela}
     </form>
   )
 }

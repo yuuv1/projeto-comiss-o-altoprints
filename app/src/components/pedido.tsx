@@ -112,17 +112,6 @@ export function useAcoesPedido() {
     if (ok) await excluirPedido(p.id)
   }
 
-  const marcarImpresso = async (p: Pedido) => {
-    const agora = new Date().toISOString()
-    await atualizarPedido(p.id, {
-      impresso: true,
-      impresso_em: agora,
-      status_producao: 'dtf_pronto',
-      aviso_visto: false,
-    })
-    avisar(`Pedido #${p.numero} marcado como impresso. ${nomeVendedor(p.vendedor_id)} será avisado!`)
-  }
-
   const marcarPago = async (p: Pedido) => {
     await atualizarPedido(p.id, {
       status_pagamento: 'pago',
@@ -169,7 +158,6 @@ export function useAcoesPedido() {
   return {
     editar,
     pedirExclusao,
-    marcarImpresso,
     marcarPago,
     marcarEntregue,
     marcarRetirado,

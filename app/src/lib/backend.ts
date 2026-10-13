@@ -8,13 +8,17 @@ import {
   type Configuracoes,
   type DB,
   type ID,
+  type Impressao,
   type Pedido,
   type Usuario,
   type Vendedor,
 } from './types'
 
-export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos' | 'usuarios'
-export type Registro = Vendedor | Cliente | Pedido | Arquivo | Usuario
+export type Tabela = 'vendedores' | 'clientes' | 'pedidos' | 'arquivos' | 'impressoes' | 'usuarios'
+export type Registro = Vendedor | Cliente | Pedido | Arquivo | Impressao | Usuario
+
+/** todas as tabelas de dados (usado ao limpar/substituir o banco) */
+const TABELAS: Tabela[] = ['vendedores', 'clientes', 'pedidos', 'arquivos', 'impressoes', 'usuarios']
 
 const LS_KEY = 'altoprints:db:v1'
 
@@ -38,6 +42,7 @@ const dbVazio = (): DB => ({
   clientes: [],
   pedidos: [],
   arquivos: [],
+  impressoes: [],
   usuarios: [],
   configuracoes: { ...CONFIG_PADRAO },
 })
@@ -56,6 +61,7 @@ const lerLocal = (): DB => {
       clientes: parsed.clientes ?? [],
       pedidos: parsed.pedidos ?? [],
       arquivos: parsed.arquivos ?? [],
+      impressoes: parsed.impressoes ?? [],
       usuarios: parsed.usuarios ?? [],
       configuracoes: comConfigAtual({ ...CONFIG_PADRAO, ...(parsed.configuracoes ?? {}) }),
     }
@@ -101,16 +107,17 @@ export async function carregarTudo(): Promise<DB> {
   const sb = clienteNuvem()
   if (!sb) return lerLocal()
 
-  const [vendedores, clientes, pedidos, arquivos, usuarios, config] = await Promise.all([
+  const [vendedores, clientes, pedidos, arquivos, impressoes, usuarios, config] = await Promise.all([
     sb.from('vendedores').select('*').order('nome', { ascending: true }),
     sb.from('clientes').select('*').order('nome', { ascending: true }),
     sb.from('pedidos').select('*').order('numero', { ascending: false }),
     sb.from('arquivos').select('*').order('created_at', { ascending: false }),
+    sb.from('impressoes').select('*').order('quando', { ascending: false }),
     sb.from('usuarios').select('*').order('nome', { ascending: true }),
     sb.from('configuracoes').select('*').eq('id', 1).maybeSingle(),
   ])
 
-  for (const res of [vendedores, clientes, pedidos, arquivos, usuarios, config]) {
+  for (const res of [vendedores, clientes, pedidos, arquivos, impressoes, usuarios, config]) {
     if (res.error) tratarErro('Não foi possível carregar os dados', res.error)
   }
 
@@ -121,6 +128,7 @@ export async function carregarTudo(): Promise<DB> {
     clientes: (clientes.data ?? []) as Cliente[],
     pedidos: (pedidos.data ?? []) as Pedido[],
     arquivos: (arquivos.data ?? []) as Arquivo[],
+    impressoes: (impressoes.data ?? []) as Impressao[],
     usuarios: (usuarios.data ?? []) as Usuario[],
     configuracoes: comConfigAtual({ ...CONFIG_PADRAO, ...cfg }),
   }
@@ -204,11 +212,11 @@ export async function substituirTudo(db: DB): Promise<void> {
     gravarLocal(db)
     return
   }
-  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
+  for (const t of TABELAS) {
     const { error } = await sb.from(t).delete().not('id', 'is', null)
     if (error) tratarErro('Não foi possível limpar os dados', error)
   }
-  for (const t of ['vendedores', 'clientes', 'pedidos', 'arquivos', 'usuarios'] as Tabela[]) {
+  for (const t of TABELAS) {
     const linhas = db[t] as Registro[]
     if (!linhas.length) continue
     const { error } = await sb.from(t).insert(linhas as never)

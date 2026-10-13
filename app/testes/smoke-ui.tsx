@@ -60,8 +60,17 @@ async function prepararAmbiente() {
     papel: 'vendedor' as const,
     vendedor_id: banco.vendedores[0].id,
     ativo: true,
-    telas: { relatorio: true, paraImprimir: true },
+    telas: { relatorio: true, paraImprimir: true, impressoes: true },
     criado_em: new Date().toISOString(),
+  }
+
+  // garante um pedido na fila de impressão (para testar o registro da impressão)
+  const naFila = banco.pedidos.find((p: { vendedor_id: string }) => p.vendedor_id === vendedor.vendedor_id)
+  if (naFila) {
+    naFila.status_pagamento = 'pago'
+    naFila.impresso = false
+    naFila.impresso_em = null
+    naFila.status_producao = 'imprimir'
   }
 
   banco.usuarios = [dono, vendedor]
@@ -148,6 +157,7 @@ async function main() {
     '/vendedores',
     '/por-vendedor',
     '/para-imprimir',
+    '/impressoes',
     '/entregas',
     '/relatorio',
     '/relatorio-cliente-especial',
@@ -157,6 +167,46 @@ async function main() {
     `/pedido/${idPedido}`,
     '/rota-inexistente',
   ])
+
+  // a tela de impressões mostra os totais da produção
+  dom.window.location.hash = '#/impressoes'
+  await espera(700)
+  const textoImpressoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const impressoesOk =
+    textoImpressoes.includes('Metros impressos') &&
+    textoImpressoes.includes('% de reimpressão') &&
+    textoImpressoes.includes('Metros em reimpressão') &&
+    textoImpressoes.includes('Exportar CSV') &&
+    textoImpressoes.includes('Quem imprimiu')
+  if (!impressoesOk) falhas++
+  console.log(`\n  ${impressoesOk ? '✅' : '❌'} tela Impressões mostra totais, filtros e o resumo da produção`)
+
+  // registrar impressão pela fila: abre a janelinha e grava no histórico
+  dom.window.location.hash = '#/para-imprimir'
+  await espera(700)
+  const antesImpressoes = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes
+    .length
+  const abriuJanela = clicar(raiz, 'Marcar como impresso')
+  await espera(500)
+  const textoJanela = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const janelaOk =
+    abriuJanela &&
+    textoJanela.includes('Registrar impressão — pedido') &&
+    textoJanela.includes('Quem imprimiu') &&
+    textoJanela.includes('Metros impressos') &&
+    textoJanela.includes('Reimpressão')
+  if (!janelaOk) falhas++
+  console.log(`  ${janelaOk ? '✅' : '❌'} fila abre a janela de registro (metros, quem imprimiu, reimpressão)`)
+
+  const salvouImpressao = clicar(raiz, 'Registrar impressão')
+  await espera(700)
+  const depoisImpressoes = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes
+    .length
+  const gravouImpressao = salvouImpressao && depoisImpressoes === antesImpressoes + 1
+  if (!gravouImpressao) falhas++
+  console.log(
+    `  ${gravouImpressao ? '✅' : '❌'} registrar impressão grava no histórico de produção (${antesImpressoes} → ${depoisImpressoes})`,
+  )
 
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
@@ -256,6 +306,7 @@ async function main() {
     { rota: '/por-vendedor', esperado: 'liberada' },
     { rota: '/relatorio', esperado: 'liberada' },
     { rota: '/para-imprimir', esperado: 'liberada' },
+    { rota: '/impressoes', esperado: 'liberada' },
     { rota: '/entregas', esperado: 'nao-liberada' },
     { rota: '/equipe', esperado: 'proprietario' },
     { rota: '/configuracoes', esperado: 'proprietario' },
@@ -301,6 +352,15 @@ async function main() {
   const semDinheiro = !textoImpressao.includes('Valor na fila') && !textoImpressao.includes('R$')
   if (!semDinheiro) falhas++
   console.log(`  ${semDinheiro ? '✅' : '❌'} fila de impressão liberada para o vendedor, sem valores em dinheiro`)
+
+  // o histórico de impressões também abre para quem produz, sem valores em dinheiro
+  dom.window.location.hash = '#/impressoes'
+  await espera(700)
+  const textoImpressoesVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const impressoesSemDinheiro =
+    textoImpressoesVendedor.includes('Metros impressos') && !textoImpressoesVendedor.includes('R$')
+  if (!impressoesSemDinheiro) falhas++
+  console.log(`  ${impressoesSemDinheiro ? '✅' : '❌'} histórico de impressões liberado para quem produz, sem valores`)
 
   // tela de login (sem sessão)
   dom.window.localStorage.removeItem('altoprints:sessao')

@@ -35,8 +35,10 @@ import {
   type Arquivo,
   type Cliente,
   type Configuracoes,
+  type DadosImpressao,
   type DB,
   type ID,
+  type Impressao,
   type Pedido,
   type Vendedor,
 } from './types'
@@ -71,6 +73,11 @@ interface Ctx {
   /* arquivos */
   enviarArquivos: (pedidoId: ID, arquivos: File[]) => Promise<void>
   excluirArquivoDoPedido: (arquivo: Arquivo) => Promise<void>
+  /* impressões (produção) */
+  /** registra uma impressão (ou reimpressão) e marca o pedido como impresso */
+  registrarImpressao: (pedido: Pedido, dados: DadosImpressao) => Promise<Impressao>
+  /** apaga um registro de impressão (ajuste de quem se enganou) */
+  excluirImpressao: (id: ID) => Promise<void>
   /* configurações */
   salvarConfig: (parcial: Partial<Configuracoes>) => Promise<void>
   /** apaga tudo; com `manterContaId`, o acesso do proprietário atual é preservado */
@@ -100,6 +107,7 @@ const dbVazio = (): DB => ({
   clientes: [],
   pedidos: [],
   arquivos: [],
+  impressoes: [],
   usuarios: [],
   configuracoes: { ...CONFIG_PADRAO },
 })
@@ -339,15 +347,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const arquivos = db.arquivos.filter((a) => a.pedido_id === id)
       await apagarVariosArquivos(arquivos)
       await removerArquivosDoPedido(id)
+      // o histórico de impressões do pedido vai junto (na nuvem isso é automático)
+      for (const i of db.impressoes.filter((i) => i.pedido_id === id)) await removerRegistro('impressoes', i.id)
       await removerRegistro('pedidos', id)
       setDb((atual) => ({
         ...atual,
         pedidos: atual.pedidos.filter((p) => p.id !== id),
         arquivos: atual.arquivos.filter((a) => a.pedido_id !== id),
+        impressoes: atual.impressoes.filter((i) => i.pedido_id !== id),
       }))
       avisar('Pedido excluído.', 'info')
     },
-    [avisar, db.arquivos],
+    [avisar, db.arquivos, db.impressoes],
   )
 
   const excluirArquivoDoPedido = useCallback(
@@ -358,6 +369,70 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       avisar('Arquivo excluído.', 'info')
     },
     [avisar],
+  )
+
+  /* ----------------------------- impressões ----------------------------- */
+
+  const registrarImpressao = useCallback(async (pedido: Pedido, dados: DadosImpressao) => {
+    const quando = dados.quando ?? new Date().toISOString()
+    const registro: Impressao = {
+      id: novoId(),
+      pedido_id: pedido.id,
+      pedido_numero: pedido.numero,
+      cliente_nome: pedido.cliente_nome,
+      arquivo_id: dados.arquivo_id ?? '',
+      arquivo_nome: dados.arquivo_nome ?? '',
+      metros: Number(dados.metros) || 0,
+      quem: dados.quem.trim(),
+      usuario_id: dados.usuario_id ?? '',
+      tipo: dados.tipo,
+      motivo: dados.tipo === 'reimpressao' ? (dados.motivo ?? '').trim() : '',
+      observacao: (dados.observacao ?? '').trim(),
+      quando,
+      created_at: new Date().toISOString(),
+    }
+    // o pedido passa a contar como impresso (também na reimpressão: já saiu da fila)
+    const atualizado: Pedido = {
+      ...pedido,
+      impresso: true,
+      impresso_em: quando,
+      status_producao: 'dtf_pronto',
+      aviso_visto: false,
+      updated_at: quando,
+    }
+    await salvarRegistro('impressoes', registro)
+    await salvarRegistro('pedidos', atualizado)
+    setDb((atual) => ({
+      ...atual,
+      impressoes: [registro, ...atual.impressoes],
+      pedidos: atual.pedidos.map((p) => (p.id === pedido.id ? atualizado : p)),
+    }))
+    return registro
+  }, [])
+
+  const excluirImpressao = useCallback(
+    async (id: ID) => {
+      const alvo = db.impressoes.find((i) => i.id === id)
+      await removerRegistro('impressoes', id)
+      const restantes = db.impressoes.filter((i) => i.id !== id)
+      // se era a única impressão do pedido, ele volta para a fila de impressão
+      const pedido = alvo ? db.pedidos.find((p) => p.id === alvo.pedido_id) : undefined
+      let pedidos = db.pedidos
+      if (pedido) {
+        const ultima = restantes
+          .filter((i) => i.pedido_id === pedido.id)
+          .sort((a, b) => String(a.quando).localeCompare(String(b.quando)))
+          .pop()
+        const atualizado: Pedido = ultima
+          ? { ...pedido, impresso: true, impresso_em: ultima.quando }
+          : { ...pedido, impresso: false, impresso_em: null }
+        await salvarRegistro('pedidos', atualizado)
+        pedidos = db.pedidos.map((p) => (p.id === pedido.id ? atualizado : p))
+      }
+      setDb((atual) => ({ ...atual, impressoes: restantes, pedidos }))
+      avisar('Registro de impressão excluído.', 'info')
+    },
+    [avisar, db.impressoes, db.pedidos],
   )
 
   /* ---------------------------- configurações --------------------------- */
@@ -415,6 +490,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         clientes: dados.clientes ?? [],
         pedidos: dados.pedidos ?? [],
         arquivos: dados.arquivos ?? [],
+        impressoes: dados.impressoes ?? [],
         usuarios: dados.usuarios ?? [],
         configuracoes: { ...CONFIG_PADRAO, ...(dados.configuracoes ?? {}) },
       }
@@ -465,6 +541,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       excluirPedido,
       enviarArquivos,
       excluirArquivoDoPedido,
+      registrarImpressao,
+      excluirImpressao,
       salvarConfig,
       resetarDados,
       carregarDemo,
@@ -503,6 +581,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
+      registrarImpressao,
+      excluirImpressao,
       vendedorPorId,
       nomeVendedor,
       pedidoPorId,

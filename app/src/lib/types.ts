@@ -113,6 +113,68 @@ export interface Arquivo {
   created_at: string
 }
 
+/* ------------------------------------------------------------------ */
+/* Impressões (produção)                                               */
+/* ------------------------------------------------------------------ */
+
+export type TipoImpressao = 'impressao' | 'reimpressao'
+
+export const LABEL_TIPO_IMPRESSAO: Record<TipoImpressao, string> = {
+  impressao: 'Impressão',
+  reimpressao: 'Reimpressão',
+}
+
+/** Sugestões de motivo de reimpressão (o campo aceita outro texto) */
+export const MOTIVOS_REIMPRESSAO = [
+  'Arte errada',
+  'Defeito na impressão',
+  'Tamanho errado',
+  'Cor errada',
+  'Ajuste pedido pelo cliente',
+  'Outro',
+] as const
+
+/**
+ * Uma impressão registrada na produção: o que realmente saiu da máquina.
+ * É o histórico que diz quantos metros foram impressos, por quem, e quanto
+ * se perdeu em reimpressão.
+ */
+export interface Impressao {
+  id: ID
+  pedido_id: ID
+  /** número do pedido na época (fica no histórico mesmo se o pedido mudar) */
+  pedido_numero: number
+  cliente_nome: string
+  /** arte usada, quando o pedido tem arquivos enviados */
+  arquivo_id: ID | ''
+  arquivo_nome: string
+  /** metros que saíram da máquina nesta impressão */
+  metros: number
+  /** quem imprimiu (já vem com o nome do acesso, pode ser trocado) */
+  quem: string
+  usuario_id: ID | ''
+  tipo: TipoImpressao
+  /** motivo, quando for reimpressão */
+  motivo: string
+  observacao: string
+  quando: string // ISO
+  created_at: string
+}
+
+/** Campos preenchidos na janela de registrar impressão */
+export interface DadosImpressao {
+  metros: number
+  quem: string
+  usuario_id?: ID | ''
+  arquivo_id?: ID | ''
+  arquivo_nome?: string
+  tipo: TipoImpressao
+  motivo?: string
+  observacao?: string
+  /** usado nos dados de exemplo e ao importar histórico */
+  quando?: string
+}
+
 /** Faixa de metragem que define o percentual de comissão do pedido */
 export interface FaixaComissao {
   id: string
@@ -159,6 +221,8 @@ export interface TelasAcesso {
   relatorio: boolean
   /** Fila de impressão (sem valores em dinheiro) */
   paraImprimir: boolean
+  /** Registro das impressões (produção: metros, quem imprimiu, reimpressões) */
+  impressoes: boolean
   /** Entregas: endereços, retiradas e código de rastreio (sem valores) */
   entregas: boolean
   /** Relatório de cliente especial — só os clientes dele */
@@ -168,6 +232,7 @@ export interface TelasAcesso {
 export const TELAS_PADRAO: TelasAcesso = {
   relatorio: false,
   paraImprimir: false,
+  impressoes: false,
   entregas: false,
   clienteEspecial: false,
 }
@@ -175,6 +240,7 @@ export const TELAS_PADRAO: TelasAcesso = {
 export const LABEL_TELA: Record<keyof TelasAcesso, string> = {
   relatorio: 'Relatório de vendas (só os dados dele)',
   paraImprimir: 'Para imprimir (fila de impressão, sem valores)',
+  impressoes: 'Impressões (o que saiu da máquina, sem valores)',
   entregas: 'Entregas (endereços, retiradas e rastreio, sem valores)',
   clienteEspecial: 'Cliente especial (só os clientes dele)',
 }
@@ -182,6 +248,7 @@ export const LABEL_TELA: Record<keyof TelasAcesso, string> = {
 export const DESCRICAO_TELA: Record<keyof TelasAcesso, string> = {
   relatorio: 'Vê a mesma tela de relatório, mas só com os pedidos, a metragem e a comissão dele.',
   paraImprimir: 'Ajuda na produção: vê a fila do que falta imprimir, sem valores em dinheiro.',
+  impressoes: 'Acompanha a produção: o que foi impresso, os metros e as reimpressões — sem valores.',
   entregas: 'Vê os endereços e códigos de rastreio para ajudar na entrega, sem valores.',
   clienteEspecial: 'Vê os clientes especiais dele (valor especial do metro), sem os dos outros.',
 }
@@ -189,7 +256,7 @@ export const DESCRICAO_TELA: Record<keyof TelasAcesso, string> = {
 /** Telas liberadas para um acesso — o proprietário vê tudo, sempre */
 export const telasDoUsuario = (u: Usuario | null | undefined): TelasAcesso => {
   if (!u || u.papel === 'proprietario')
-    return { relatorio: true, paraImprimir: true, entregas: true, clienteEspecial: true }
+    return { relatorio: true, paraImprimir: true, impressoes: true, entregas: true, clienteEspecial: true }
   return { ...TELAS_PADRAO, ...(u.telas ?? {}) }
 }
 
@@ -268,6 +335,7 @@ export interface DB {
   clientes: Cliente[]
   pedidos: Pedido[]
   arquivos: Arquivo[]
+  impressoes: Impressao[]
   usuarios: Usuario[]
   configuracoes: Configuracoes
 }

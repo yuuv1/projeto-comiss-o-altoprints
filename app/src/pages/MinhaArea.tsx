@@ -3,6 +3,7 @@ import {
   BellRing,
   CalendarDays,
   ClipboardList,
+  History,
   Package,
   Percent,
   Plus,
@@ -20,14 +21,16 @@ import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, Cartao, CartaoResumo, TituloPagina, Vazio, cn } from '../components/ui'
 import { calcularComissao } from '../lib/comissao'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
+import { doDia, resumirImpressoes } from '../lib/impressoes'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
-import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro } from '../lib/types'
+import { FAIXAS_PADRAO, isPedidoCompleto, pedidoPendenteFinanceiro, telasDoUsuario } from '../lib/types'
 
 /** Área inicial de quem vende: só o que é dele */
 export default function MinhaArea() {
   const { db, nomeVendedor } = useStore()
   const { usuario, vendedorNome } = useAuth()
+  const telas = telasDoUsuario(usuario)
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
 
@@ -61,6 +64,19 @@ export default function MinhaArea() {
   ).length
 
   const recentes = meusPedidos.slice(0, 6)
+
+  /** o que esta pessoa imprimiu hoje (pelo id do acesso ou pelo nome) */
+  const meuDia = useMemo(() => {
+    const meuId = usuario?.id ?? ''
+    const meuNome = (usuario?.nome ?? '').trim().toLowerCase()
+    return resumirImpressoes(
+      doDia(
+        db.impressoes.filter(
+          (i) => (meuId && i.usuario_id === meuId) || (i.quem || '').trim().toLowerCase() === meuNome,
+        ),
+      ),
+    )
+  }, [db.impressoes, usuario?.id, usuario?.nome])
 
   return (
     <>
@@ -169,6 +185,55 @@ export default function MinhaArea() {
         </Cartao>
 
         <div className="space-y-4">
+          {telas.paraImprimir || telas.impressoes || meuDia.total > 0 ? (
+            <Cartao hover={false}>
+              <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
+                <History className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Meu dia na produção
+              </h2>
+              {meuDia.total ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <span className="text-slate-600 dark:text-slate-300">Impressões hoje</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">{meuDia.total}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <span className="text-slate-600 dark:text-slate-300">Metros impressos</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100">{numeroBR(meuDia.metros)} m</span>
+                  </div>
+                  {meuDia.reimpressoes ? (
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                      {meuDia.reimpressoes} reimpressão(ões) · {numeroBR(meuDia.metrosPerdidos)} m refeitos
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  Você ainda não registrou impressões hoje.
+                </p>
+              )}
+              {telas.paraImprimir ? (
+                <Botao
+                  className="mt-3 justify-start"
+                  variante="secundario"
+                  icone={Printer}
+                  onClick={() => navegar('/para-imprimir')}
+                >
+                  Abrir a fila de impressão
+                </Botao>
+              ) : null}
+              {telas.impressoes ? (
+                <Botao
+                  className="mt-2 justify-start"
+                  variante="secundario"
+                  icone={History}
+                  onClick={() => navegar('/impressoes')}
+                >
+                  Ver as impressões registradas
+                </Botao>
+              ) : null}
+            </Cartao>
+          ) : null}
+
           <Cartao hover={false}>
             <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
               <Percent className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Comissão do mês por faixa

@@ -87,6 +87,28 @@ create table if not exists public.arquivos (
 );
 create index if not exists arquivos_pedido_idx on public.arquivos (pedido_id);
 
+-- ------------------------------- impressões --------------------------------
+-- o histórico da produção: cada impressão registrada (metros que saíram, quem
+-- imprimiu, a arte usada e, nas reimpressões, o motivo).
+create table if not exists public.impressoes (
+  id            text primary key,
+  pedido_id     text not null references public.pedidos (id) on delete cascade,
+  pedido_numero integer default 0,
+  cliente_nome  text default '',
+  arquivo_id    text default '',
+  arquivo_nome  text default '',
+  metros        double precision default 0,
+  quem          text default '',
+  usuario_id    text default '',
+  tipo          text default 'impressao',
+  motivo        text default '',
+  observacao    text default '',
+  quando        text not null default now()::text,
+  created_at    text not null default now()::text
+);
+create index if not exists impressoes_pedido_idx on public.impressoes (pedido_id);
+create index if not exists impressoes_quando_idx on public.impressoes (quando desc);
+
 -- -------------------------------- usuários ---------------------------------
 -- contas de acesso ao sistema: uma conta de proprietário (vê tudo) e as contas
 -- dos vendedores (veem apenas os pedidos/clientes ligados a eles).
@@ -120,6 +142,8 @@ insert into public.configuracoes (id, valor) values (1, '{}'::jsonb)
 alter table public.usuarios add column if not exists telas   jsonb default '{}'::jsonb;
 alter table public.usuarios add column if not exists auth_id text;
 alter table public.pedidos  add column if not exists aviso_visto boolean default true;
+-- (a tabela "impressoes" entrou numa versão nova do sistema: quem já tinha o
+--  banco criado a recebe agora, sem perder nenhum pedido)
 
 -- --------------------------- acesso (RLS) ----------------------------------
 -- O sistema é de uso interno e o login é o do próprio sistema (nome de usuário
@@ -130,13 +154,14 @@ alter table public.vendedores    enable row level security;
 alter table public.clientes      enable row level security;
 alter table public.pedidos       enable row level security;
 alter table public.arquivos      enable row level security;
+alter table public.impressoes    enable row level security;
 alter table public.configuracoes enable row level security;
 alter table public.usuarios      enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['vendedores','clientes','pedidos','arquivos','configuracoes','usuarios'] loop
+  foreach t in array array['vendedores','clientes','pedidos','arquivos','impressoes','configuracoes','usuarios'] loop
     execute format('drop policy if exists "%1$s_acesso_total" on public.%1$I', t);
     execute format(
       'create policy "%1$s_acesso_total" on public.%1$I for all to anon, authenticated using (true) with check (true)',

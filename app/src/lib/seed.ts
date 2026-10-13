@@ -5,6 +5,8 @@ import {
   CONFIG_PADRAO,
   type Cliente,
   type DB,
+  type Impressao,
+  MOTIVOS_REIMPRESSAO,
   type Pedido,
   type StatusPagamento,
   type StatusProducao,
@@ -144,11 +146,66 @@ export function gerarDadosDemo(): DB {
     })
   }
 
+  /* ------------------------- impressões de exemplo ------------------------ */
+  // Todo pedido já impresso ganha o registro de produção (metros, quem imprimiu)
+  // e alguns levam reimpressão com motivo — assim a tela já nasce com dados.
+  const impressoes: Impressao[] = []
+  const impressos = pedidos.filter((p) => p.impresso && p.impresso_em).sort((a, b) => b.numero - a.numero)
+
+  impressos.forEach((p, indice) => {
+    const quem = vendedores[indice % vendedores.length].nome
+    const metrosPedido = Number(p.metragem || 0)
+    // as primeiras impressões ficam com data de hoje (a tela abre com movimento)
+    const quando =
+      indice < 4
+        ? new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 8 + indice * 2, 15 + indice * 7, 0).toISOString()
+        : String(p.impresso_em)
+    if (indice < 4) p.impresso_em = quando
+
+    impressoes.push({
+      id: novoId(),
+      pedido_id: p.id,
+      pedido_numero: p.numero,
+      cliente_nome: p.cliente_nome,
+      arquivo_id: '',
+      arquivo_nome: '',
+      metros: Number((metrosPedido * (0.95 + rnd() * 0.1)).toFixed(2)),
+      quem,
+      usuario_id: '',
+      tipo: 'impressao',
+      motivo: '',
+      observacao: rnd() < 0.1 ? 'O filme acabou no meio — completado na sequência.' : '',
+      quando,
+      created_at: quando,
+    })
+
+    if (rnd() < 0.12) {
+      const quandoReimpressao = new Date(new Date(quando).getTime() + 3600000 * (1 + Math.floor(rnd() * 5))).toISOString()
+      impressoes.push({
+        id: novoId(),
+        pedido_id: p.id,
+        pedido_numero: p.numero,
+        cliente_nome: p.cliente_nome,
+        arquivo_id: '',
+        arquivo_nome: '',
+        metros: Number((metrosPedido * (0.9 + rnd() * 0.2)).toFixed(2)),
+        quem,
+        usuario_id: '',
+        tipo: 'reimpressao',
+        motivo: MOTIVOS_REIMPRESSAO[Math.floor(rnd() * (MOTIVOS_REIMPRESSAO.length - 1))],
+        observacao: '',
+        quando: quandoReimpressao,
+        created_at: quandoReimpressao,
+      })
+    }
+  })
+
   return {
     vendedores,
     clientes,
     pedidos: pedidos.sort((a, b) => b.numero - a.numero),
     arquivos: [],
+    impressoes: impressoes.sort((a, b) => b.quando.localeCompare(a.quando)),
     usuarios: [],
     configuracoes: { ...CONFIG_PADRAO, revisao_ultima_em: new Date().toISOString() },
   }

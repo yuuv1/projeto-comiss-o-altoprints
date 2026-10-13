@@ -20,6 +20,15 @@ import {
   validarConexao,
 } from '../src/lib/supabase'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
+import {
+  doDia,
+  filtrarImpressoes,
+  inicioDoPeriodo,
+  linhasCSVImpressoes,
+  quemImprimiu,
+  resumirImpressoes,
+  resumoDoPedido,
+} from '../src/lib/impressoes'
 import { gerarDadosDemo } from '../src/lib/seed'
 import {
   CONFIG_PADRAO,
@@ -28,6 +37,7 @@ import {
   pedidoPendenteFinanceiro,
   podeVerTela,
   telasDoUsuario,
+  type Impressao,
   type Pedido,
 } from '../src/lib/types'
 
@@ -112,6 +122,97 @@ igual(
   demo.pedidos.every((p) => p.valor > 0),
   true,
 )
+igual('demo: tem histórico de impressões', demo.impressoes.length > 20, true)
+igual(
+  'demo: toda impressão pertence a um pedido existente',
+  demo.impressoes.every((i) => demo.pedidos.some((p) => p.id === i.pedido_id)),
+  true,
+)
+igual('demo: toda impressão tem metros e quem imprimiu', demo.impressoes.every((i) => i.metros > 0 && Boolean(i.quem)), true)
+igual('demo: já existe reimpressão registrada', demo.impressoes.some((i) => i.tipo === 'reimpressao'), true)
+igual(
+  'demo: toda reimpressão tem motivo',
+  demo.impressoes.filter((i) => i.tipo === 'reimpressao').every((i) => Boolean(i.motivo)),
+  true,
+)
+igual(
+  'demo: tem impressão de hoje (a tela abre com movimento)',
+  demo.impressoes.some((i) => new Date(i.quando).toDateString() === new Date().toDateString()),
+  true,
+)
+igual(
+  'demo: pedidos impressos batem com o histórico',
+  demo.pedidos.every((p) => (p.impresso ? demo.impressoes.some((i) => i.pedido_id === p.id) : true)),
+  true,
+)
+
+/* ------------------------------ impressões ----------------------------- */
+const agoraImpressao = new Date()
+const hojeZero = new Date(agoraImpressao.getFullYear(), agoraImpressao.getMonth(), agoraImpressao.getDate())
+const impressaoFalsa = (
+  quando: Date,
+  tipo: Impressao['tipo'],
+  metros: number,
+  extra: Partial<Impressao> = {},
+): Impressao => ({
+  id: `i-${quando.getTime()}-${tipo}-${metros}`,
+  pedido_id: 'pedido-1',
+  pedido_numero: 10,
+  cliente_nome: 'BRUNO',
+  arquivo_id: '',
+  arquivo_nome: '',
+  metros,
+  quem: 'JESSICA',
+  usuario_id: '',
+  tipo,
+  motivo: tipo === 'reimpressao' ? 'Defeito na impressão' : '',
+  observacao: '',
+  quando: quando.toISOString(),
+  created_at: quando.toISOString(),
+  ...extra,
+})
+const quandoHoje = new Date(hojeZero.getTime() + 9 * 3600000) // hoje, 09:00
+const listaImpressoes: Impressao[] = [
+  impressaoFalsa(quandoHoje, 'impressao', 2),
+  impressaoFalsa(quandoHoje, 'impressao', 3.5, {
+    id: 'i-pedido-2',
+    pedido_id: 'pedido-2',
+    pedido_numero: 11,
+    cliente_nome: 'TELMA',
+    quem: 'RAISSA',
+  }),
+  impressaoFalsa(new Date(quandoHoje.getTime() - 26 * 3600000), 'reimpressao', 1.5),
+  impressaoFalsa(new Date(quandoHoje.getTime() - 10 * 86400000), 'impressao', 4, {
+    id: 'i-pedido-3',
+    pedido_id: 'pedido-3',
+    pedido_numero: 12,
+    cliente_nome: 'MURILO',
+  }),
+]
+
+const resumoImpresso = resumirImpressoes(listaImpressoes)
+igual('impressões: total', resumoImpresso.total, 4)
+igual('impressões: soma dos metros', resumoImpresso.metros, 11)
+igual('impressões: quantas reimpressões', resumoImpresso.reimpressoes, 1)
+igual('impressões: metros perdidos na reimpressão', resumoImpresso.metrosPerdidos, 1.5)
+igual('impressões: % de reimpressão', Math.round(resumoImpresso.percentualReimpressao), 25)
+igual('impressões: sem registros, o % é zero', resumirImpressoes([]).percentualReimpressao, 0)
+igual('impressões de hoje', doDia(listaImpressoes).length, 2)
+igual('período “hoje” filtra', filtrarImpressoes(listaImpressoes, { periodo: 'hoje', quem: '', busca: '', soReimpressoes: false }).length, 2)
+igual('período “últimos 7 dias” pega a de ontem', filtrarImpressoes(listaImpressoes, { periodo: 'semana', quem: '', busca: '', soReimpressoes: false }).length, 3)
+igual('período “tudo” traz as 4', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: '', busca: '', soReimpressoes: false }).length, 4)
+igual('filtro “só reimpressões”', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: '', busca: '', soReimpressoes: true }).length, 1)
+igual('filtro por quem imprimiu', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: 'RAISSA', busca: '', soReimpressoes: false }).length, 1)
+igual('busca pelo cliente', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: '', busca: 'bruno', soReimpressoes: false }).length, 2)
+igual('busca pelo motivo da reimpressão', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: '', busca: 'defeito', soReimpressoes: false }).length, 1)
+igual('busca pelo número do pedido', filtrarImpressoes(listaImpressoes, { periodo: 'tudo', quem: '', busca: '#12', soReimpressoes: false }).length, 1)
+igual('nomes de quem imprimiu, sem repetir', quemImprimiu(listaImpressoes), ['JESSICA', 'RAISSA'])
+igual('resumo do pedido no histórico', resumoDoPedido(listaImpressoes, 'pedido-1').includes('2× · 3,50 m no total · por JESSICA'), true)
+igual('resumo de pedido sem impressão fica vazio', resumoDoPedido(listaImpressoes, 'pedido-9'), '')
+igual('CSV: cabeçalho + uma linha por impressão', linhasCSVImpressoes(listaImpressoes).length, 5)
+igual('CSV: reimpressão identificada', linhasCSVImpressoes(listaImpressoes).some((l) => l[6] === 'Reimpressão'), true)
+igual('período “hoje” começa à meia-noite', inicioDoPeriodo('hoje')?.getHours(), 0)
+igual('período “tudo” não tem início', inicioDoPeriodo('tudo'), null)
 
 /* ------------------------------ comissão ------------------------------ */
 const pedidoCom = (metragem: number | null, valor: number): Pedido =>
@@ -209,12 +310,15 @@ const donoTeste = { ...vendedorTeste, papel: 'proprietario' as const, vendedor_i
 igual('proprietário vê todas as telas', telasDoUsuario(donoTeste), {
   relatorio: true,
   paraImprimir: true,
+  impressoes: true,
   entregas: true,
   clienteEspecial: true,
 })
 igual('vendedor começa sem telas extras', telasDoUsuario(vendedorTeste).paraImprimir, false)
 igual('tela liberada pelo dono é respeitada', podeVerTela(vendedorTeste, 'relatorio'), true)
 igual('tela não liberada fica bloqueada', podeVerTela(vendedorTeste, 'entregas'), false)
+igual('impressões não vêm liberadas por padrão', podeVerTela(vendedorTeste, 'impressoes'), false)
+igual('dono libera as impressões para quem produz', podeVerTela({ ...vendedorTeste, telas: { impressoes: true } }, 'impressoes'), true)
 igual('conta sem telas definidas fica no padrão', podeVerTela({ ...vendedorTeste, telas: undefined }, 'relatorio'), false)
 igual('proprietário nunca é bloqueado', podeVerTela(donoTeste, 'clienteEspecial'), true)
 

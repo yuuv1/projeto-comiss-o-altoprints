@@ -11,6 +11,7 @@ import Clientes from './pages/Clientes'
 import Configuracoes from './pages/Configuracoes'
 import Entregas from './pages/Entregas'
 import Equipe from './pages/Equipe'
+import Impressoes from './pages/Impressoes'
 import Login from './pages/Login'
 import MinhaArea from './pages/MinhaArea'
 import Painel from './pages/Painel'
@@ -135,6 +136,14 @@ export default function App() {
             element={
               <Permitido tela="paraImprimir">
                 <ParaImprimir />
+              </Permitido>
+            }
+          />
+          <Route
+            path="/impressoes"
+            element={
+              <Permitido tela="impressoes">
+                <Impressoes />
               </Permitido>
             }
           />

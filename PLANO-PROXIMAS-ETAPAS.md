@@ -5,8 +5,11 @@
 
 - **Frente A (logins com opções de relatórios): IMPLEMENTADA** — as caixinhas por acesso estão
   na tela **Equipe**, e as telas liberadas saem filtradas só com os dados do vendedor.
-- **Frente C (catalogar as impressões): decidida como registro completo** — próxima a fazer.
-- **Frente B (experiência do chefe):** depois da Frente C.
+- **Frente C (catalogar as impressões): IMPLEMENTADA na parte principal** — janela de registrar
+  impressão (metros, quem imprimiu, arte, observação, reimpressão com motivo), tela **Impressões**
+  com totais e filtros, histórico dentro do pedido e o cartão “Meu dia na produção”. Falta só o
+  **catálogo de artes** (segunda aba da tela Impressões), que é uma melhoria em cima do que já existe.
+- **Frente B (experiência do chefe):** próxima.
 - **Publicação:** decidido publicar primeiro a pasta `publicar/` no Netlify Drop (sem nuvem) e
   conectar o Supabase depois, para a equipe toda compartilhar os mesmos dados.
 >
@@ -67,7 +70,16 @@ fábrica: igual ao que é hoje (só Minha área, Pedidos, Clientes e Meu desempe
 
 ---
 
-## Frente C — Catalogar as impressões
+## Frente C — Catalogar as impressões ✅ (parte principal implementada)
+
+> **Feito:** a janela de registrar impressão, a tela **Impressões** (totais, filtros por período /
+> quem imprimiu / busca / só reimpressões, CSV e folha de produção para imprimir), o histórico
+> dentro da ficha do pedido, o cartão **Meu dia na produção** (na Minha área) e a caixinha
+> *Impressões* na tela **Equipe** para liberar a tela a quem produz — sempre sem valores em dinheiro.
+> No banco entrou a tabela `impressoes` (quem já tem banco na nuvem precisa rodar o SQL de novo —
+> o sistema avisa e não apaga nada).
+>
+> **Falta:** o catálogo de artes (item 4 abaixo), que reaproveita os arquivos já enviados.
 
 **O problema:** hoje o pedido só guarda "impresso: sim/não" e a data. Não se sabe **quem imprimiu,
 quantos metros saíram, quantas vezes reimprimiu nem por quê**.

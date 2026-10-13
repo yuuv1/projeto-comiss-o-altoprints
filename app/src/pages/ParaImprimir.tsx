@@ -1,9 +1,11 @@
-import { CheckCircle2, Clock, Pencil, Printer, PrinterCheck, Wallet } from 'lucide-react'
+import { CheckCircle2, Clock, Pencil, Printer, PrinterCheck, RotateCcw, Wallet } from 'lucide-react'
 import { useMemo } from 'react'
+import { ultimaImpressao, useRegistrarImpressao } from '../components/impressao'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { Botao, CartaoResumo, Etiqueta, TituloPagina, Vazio } from '../components/ui'
-import { dataBR, moeda } from '../lib/format'
+import { dataBR, dataHoraBR, moeda, numeroBR } from '../lib/format'
 import { useAuth } from '../lib/auth'
+import { doDia, resumirImpressoes } from '../lib/impressoes'
 import { useStore } from '../lib/store'
 import { LABEL_PRODUCAO } from '../lib/types'
 
@@ -11,6 +13,7 @@ export default function ParaImprimir() {
   const { db, nomeVendedor } = useStore()
   const { ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
+  const impressao = useRegistrarImpressao()
   /** sem valores em dinheiro para quem não é o proprietário */
   const verValores = ehProprietario
 
@@ -22,13 +25,7 @@ export default function ParaImprimir() {
     [db.pedidos],
   )
 
-  const impressosHoje = useMemo(
-    () =>
-      db.pedidos.filter(
-        (p) => p.impresso_em && new Date(p.impresso_em).toDateString() === new Date().toDateString(),
-      ),
-    [db.pedidos],
-  )
+  const hoje = useMemo(() => resumirImpressoes(doDia(db.impressoes)), [db.impressoes])
 
   const ultimos = useMemo(
     () =>
@@ -54,7 +51,7 @@ export default function ParaImprimir() {
         <CartaoResumo titulo="Na fila" valor={fila.length} icone={Printer} gradiente="from-fuchsia-500 to-pink-600" />
         <CartaoResumo
           titulo="Metragem na fila"
-          valor={`${metrosFila.toFixed(2).replace('.', ',')} m`}
+          valor={`${numeroBR(metrosFila)} m`}
           icone={Clock}
           gradiente="from-sky-500 to-blue-600"
         />
@@ -70,7 +67,8 @@ export default function ParaImprimir() {
         )}
         <CartaoResumo
           titulo="Impressos hoje"
-          valor={impressosHoje.length}
+          valor={hoje.total}
+          sub={`${numeroBR(hoje.metros)} m${hoje.reimpressoes ? ` · ${hoje.reimpressoes} reimpressão(ões)` : ''}`}
           icone={CheckCircle2}
           gradiente="from-emerald-500 to-green-600"
         />
@@ -86,7 +84,7 @@ export default function ParaImprimir() {
         <div className="space-y-3">
           {fila.map((p) => (
             <PedidoCartao
-        mostrarValor={verValores}
+              mostrarValor={verValores}
               key={p.id}
               pedido={p}
               extras={
@@ -96,7 +94,7 @@ export default function ParaImprimir() {
               }
               acoes={
                 <>
-                  <Botao tamanho="sm" variante="sucesso" icone={PrinterCheck} onClick={() => acoes.marcarImpresso(p)}>
+                  <Botao tamanho="sm" variante="sucesso" icone={PrinterCheck} onClick={() => impressao.imprimir(p)}>
                     Marcar como impresso
                   </Botao>
                   <Botao tamanho="sm" variante="secundario" icone={Pencil} onClick={() => acoes.editar(p)}>
@@ -113,24 +111,39 @@ export default function ParaImprimir() {
         <div className="mt-8">
           <p className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">Últimos impressos</p>
           <div className="space-y-2">
-            {ultimos.map((p) => (
-              <div
-                key={p.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-white/70 px-4 py-2.5 text-sm text-slate-500"
-              >
-                <span className="font-extrabold text-slate-700">#{p.numero}</span>
-                <span className="font-semibold text-slate-600">{p.cliente_nome}</span>
-                <span className="text-xs">{nomeVendedor(p.vendedor_id)}</span>
-                <span className="ml-auto text-xs">
-                  impresso em {dataBR(p.impresso_em)}
-                  {verValores ? ` • ${moeda(p.valor)}` : ''}
-                </span>
-              </div>
-            ))}
+            {ultimos.map((p) => {
+              const registro = ultimaImpressao(db.impressoes, p.id)
+              return (
+                <div
+                  key={p.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-white/70 px-4 py-2.5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400"
+                >
+                  <span className="font-extrabold text-slate-700 dark:text-slate-200">#{p.numero}</span>
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">{p.cliente_nome}</span>
+                  <span className="text-xs">{nomeVendedor(p.vendedor_id)}</span>
+                  <span className="text-xs">
+                    {registro
+                      ? `${numeroBR(registro.metros)} m · ${registro.quem}${registro.tipo === 'reimpressao' ? ' (reimpressão)' : ''} em ${dataHoraBR(registro.quando)}`
+                      : `impresso em ${dataBR(p.impresso_em)}`}
+                    {verValores ? ` • ${moeda(p.valor)}` : ''}
+                  </span>
+                  <Botao
+                    className="ml-auto"
+                    tamanho="sm"
+                    variante="secundario"
+                    icone={RotateCcw}
+                    onClick={() => impressao.reimprimir(p)}
+                  >
+                    Reimprimir
+                  </Botao>
+                </div>
+              )
+            })}
           </div>
         </div>
       ) : null}
       {acoes.dialog}
+      {impressao.janela}
     </>
   )
 }
