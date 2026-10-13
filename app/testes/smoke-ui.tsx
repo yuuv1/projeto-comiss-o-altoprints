@@ -359,6 +359,47 @@ async function main() {
   if (!(clicouCompacto && deVoltaAoCompacto)) falhas++
   console.log(`  ${clicouCompacto && deVoltaAoCompacto ? '✅' : '❌'} “Compacto” volta a apertar a tela`)
 
+  // ---------- barra de cima enxuta: só os atalhos + "Mais" ----------
+  dom.window.location.hash = '#/'
+  await espera(700)
+  const navTopo = raiz?.querySelector('header nav') ?? null
+  const textoNav = (navTopo?.textContent ?? '').replace(/\s+/g, ' ')
+  const barraEnxuta =
+    textoNav.includes('Pedidos') &&
+    textoNav.includes('Clientes') &&
+    textoNav.includes('Para imprimir') &&
+    textoNav.includes('Mais') &&
+    !textoNav.includes('Configurações') &&
+    !textoNav.includes('Entregas') &&
+    !textoNav.includes('Relatório')
+  if (!barraEnxuta) falhas++
+  console.log(`\n  ${barraEnxuta ? '✅' : '❌'} barra de cima só com os atalhos do dia a dia + “Mais”`)
+
+  const abriuMais = clicar(navTopo, 'Mais')
+  await espera(400)
+  const textoMais = (navTopo?.textContent ?? '').replace(/\s+/g, ' ')
+  const escondidosOk =
+    abriuMais &&
+    textoMais.includes('Produção') &&
+    textoMais.includes('Relatórios') &&
+    textoMais.includes('Administração') &&
+    textoMais.includes('Configurações') &&
+    textoMais.includes('Entregas')
+  if (!escondidosOk) falhas++
+  console.log(`  ${escondidosOk ? '✅' : '❌'} “Mais” abre o resto das telas, agrupadas por assunto`)
+
+  dom.window.location.hash = '#/entregas'
+  await espera(700)
+  const textoEntregas = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const botaoMaisMarcado = [...(navTopo?.querySelectorAll('button') ?? [])].some(
+    (b) => (b.textContent ?? '').includes('Mais') && b.className.includes('from-pink-500'),
+  )
+  const entregasOk = botaoMaisMarcado && textoEntregas.includes('Entregas')
+  if (!entregasOk) falhas++
+  console.log(
+    `  ${entregasOk ? '✅' : '❌'} telas do “Mais” continuam acessíveis e o botão fica marcado quando você está numa delas`,
+  )
+
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
   await espera(600)
