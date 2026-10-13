@@ -132,6 +132,16 @@ async function main() {
     return Boolean(alvo)
   }
 
+  /** clica no ÚLTIMO botão com o trecho (usado quando a janela repete o rótulo da página) */
+  const clicarUltimo = (onde: Element | null, trecho: string) => {
+    const alvos = [...(onde?.querySelectorAll('button') ?? [])].filter((b) =>
+      (b.textContent ?? '').includes(trecho),
+    )
+    const alvo = alvos[alvos.length - 1]
+    alvo?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+    return Boolean(alvo)
+  }
+
   const visitar = async (rotulo: string, rotas: string[], esperaTexto?: string) => {
     console.log(`\n  ${rotulo}`)
     for (const rota of rotas) {
@@ -207,6 +217,90 @@ async function main() {
   console.log(
     `  ${gravouImpressao ? '✅' : '❌'} registrar impressão grava no histórico de produção (${antesImpressoes} → ${depoisImpressoes})`,
   )
+
+  // ---------- catalogar impressão direto pela aba "Impressões" ----------
+  dom.window.location.hash = '#/impressoes'
+  await espera(700)
+  const antesCatalogo = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes.length
+  const abriuCatalogo = clicar(raiz, 'Registrar impressão')
+  await espera(500)
+  const textoEscolha = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const escolhaOk =
+    abriuCatalogo && textoEscolha.includes('escolha o pedido') && textoEscolha.includes('na fila de impressão')
+  if (!escolhaOk) falhas++
+  console.log(`\n  ${escolhaOk ? '✅' : '❌'} aba Impressões → “Registrar impressão” abre a escolha do pedido`)
+
+  const escolheuPedido = clicar(raiz, 'na fila')
+  await espera(500)
+  const textoDepoisEscolha = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const formOk =
+    escolheuPedido &&
+    textoDepoisEscolha.includes('Quem imprimiu') &&
+    textoDepoisEscolha.includes('Metros impressos') &&
+    textoDepoisEscolha.includes('Trocar pedido')
+  if (!formOk) falhas++
+  console.log(`  ${formOk ? '✅' : '❌'} escolhido o pedido, a janela pede metros e quem imprimiu`)
+
+  const salvouCatalogo = clicarUltimo(raiz, 'Registrar impressão')
+  await espera(700)
+  const depoisCatalogo = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).impressoes.length
+  const catalogou = salvouCatalogo && depoisCatalogo === antesCatalogo + 1
+  if (!catalogou) falhas++
+  console.log(
+    `  ${catalogou ? '✅' : '❌'} catalogação pela aba grava no histórico (${antesCatalogo} → ${depoisCatalogo})`,
+  )
+
+  // ---------- formulário de pedido: essenciais na frente, resto em "Mais opções" ----------
+  dom.window.location.hash = '#/pedido/novo'
+  await espera(700)
+  const textoNovo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const enxuto =
+    textoNovo.includes('Mais opções') &&
+    textoNovo.includes('Cliente') &&
+    textoNovo.includes('Metragem') &&
+    !textoNovo.includes('Data da retirada') &&
+    !textoNovo.includes('Retirado por')
+  if (!enxuto) falhas++
+  console.log(`\n  ${enxuto ? '✅' : '❌'} pedido novo começa enxuto (entrega e datas escondidas)`)
+
+  const abriuExtras = clicar(raiz, 'Mais opções')
+  await espera(500)
+  const textoExtras = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const extrasOk = abriuExtras && textoExtras.includes('Data da retirada') && textoExtras.includes('Observações')
+  if (!extrasOk) falhas++
+  console.log(`  ${extrasOk ? '✅' : '❌'} “Mais opções” mostra entrega, datas e observações`)
+
+  // ---------- ver o sistema como funcionário ----------
+  dom.window.location.hash = '#/equipe'
+  await espera(700)
+  const abriuVerComo = clicar(raiz, 'Ver como')
+  await espera(800)
+  const textoVerComo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const verComoOk =
+    abriuVerComo &&
+    textoVerComo.includes('vendo o sistema como') &&
+    textoVerComo.includes('Minha área') &&
+    textoVerComo.includes('Voltar ao meu acesso')
+  if (!verComoOk) falhas++
+  console.log(`\n  ${verComoOk ? '✅' : '❌'} “Ver como” abre o sistema com os olhos do funcionário`)
+
+  dom.window.location.hash = '#/configuracoes'
+  await espera(600)
+  const textoBloqueado = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const bloqueadoNaVisualizacao = textoBloqueado.includes('do proprietário')
+  if (!bloqueadoNaVisualizacao) falhas++
+  console.log(
+    `  ${bloqueadoNaVisualizacao ? '✅' : '❌'} no modo visualização, telas do dono ficam bloqueadas como para o vendedor`,
+  )
+
+  dom.window.location.hash = '#/'
+  await espera(500)
+  const voltou = clicar(raiz, 'Voltar ao meu acesso')
+  await espera(700)
+  const textoVoltou = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const voltouOk = voltou && textoVoltou.includes('Painel do proprietário')
+  if (!voltouOk) falhas++
+  console.log(`  ${voltouOk ? '✅' : '❌'} “Voltar ao meu acesso” devolve o painel do proprietário`)
 
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'

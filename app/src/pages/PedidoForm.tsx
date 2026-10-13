@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Save,
   ScanLine,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Truck,
@@ -144,6 +145,12 @@ export default function PedidoForm() {
   const [arquivosNovos, setArquivosNovos] = useState<File[]>([])
   const [salvando, setSalvando] = useState(false)
   const [lendoComprovante, setLendoComprovante] = useState(false)
+  /**
+   * O formulário mostra só o essencial. Datas, observações, entrega e
+   * comprovante ficam em "Mais opções" — e abrem sozinhos quando o pedido já
+   * tem algum desses dados preenchidos.
+   */
+  const [extrasAberto, setExtrasAberto] = useState(false)
   const inputArquivos = useRef<HTMLInputElement>(null)
   const inputComprovante = useRef<HTMLInputElement>(null)
 
@@ -193,6 +200,18 @@ export default function PedidoForm() {
     () => db.arquivos.filter((a) => a.pedido_id === existente?.id),
     [db.arquivos, existente?.id],
   )
+
+  /** o pedido já tem dados de entrega/observação? então as opções abrem abertas */
+  const temDadosExtras = Boolean(
+    existente &&
+      (existente.endereco ||
+        existente.codigo_rastreio ||
+        existente.retirado_por ||
+        existente.observacoes ||
+        existente.data_envio ||
+        existente.data_entrega),
+  )
+  const mostrarExtras = extrasAberto || temDadosExtras
 
   const historicoImpressoes = useMemo(
     () => (existente ? doPedido(db.impressoes, existente.id) : []),
@@ -340,9 +359,20 @@ export default function PedidoForm() {
         {/* ------------------------- coluna principal ------------------------ */}
         <div className="space-y-4 lg:col-span-2">
           <Cartao>
-            <h3 className="mb-4 flex items-center gap-2 text-base font-extrabold text-slate-800">
-              <Pencil className="h-4 w-4 text-purple-600" /> Dados do pedido
-            </h3>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
+                <Pencil className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Dados do pedido
+              </h3>
+              <button
+                type="button"
+                onClick={() => setExtrasAberto((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 transition hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+                title="Datas, observações, entrega e comprovante"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                {mostrarExtras ? 'Menos opções' : 'Mais opções'}
+              </button>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo
@@ -392,15 +422,17 @@ export default function PedidoForm() {
                 )}
               </Campo>
 
-              <Campo label="Data do pedido">
-                <Entrada
-                  type="datetime-local"
-                  value={paraInputDateTime(form.data_pedido)}
-                  onChange={(e) =>
-                    set({ data_pedido: e.target.value ? new Date(e.target.value).toISOString() : form.data_pedido })
-                  }
-                />
-              </Campo>
+              {mostrarExtras ? (
+                <Campo label="Data do pedido" dica="Em branco = agora.">
+                  <Entrada
+                    type="datetime-local"
+                    value={paraInputDateTime(form.data_pedido)}
+                    onChange={(e) =>
+                      set({ data_pedido: e.target.value ? new Date(e.target.value).toISOString() : form.data_pedido })
+                    }
+                  />
+                </Campo>
+              ) : null}
 
               <Campo label="Descrição" className="sm:col-span-2">
                 <AreaTexto
@@ -488,35 +520,44 @@ export default function PedidoForm() {
                 </Selecao>
               </Campo>
 
-              <Campo label="Forma de pagamento">
-                <Selecao value={form.forma_pagamento} onChange={(e) => set({ forma_pagamento: e.target.value })}>
-                  <option value="">Não informada</option>
-                  {FORMAS_PAGAMENTO.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </Selecao>
-              </Campo>
+              {mostrarExtras ? (
+                <>
+                  <Campo label="Forma de pagamento">
+                    <Selecao value={form.forma_pagamento} onChange={(e) => set({ forma_pagamento: e.target.value })}>
+                      <option value="">Não informada</option>
+                      {FORMAS_PAGAMENTO.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </Selecao>
+                  </Campo>
 
-              <Campo
-                label="Data do pagamento"
-                dica={form.status_pagamento === 'pago' ? 'Preenchida com hoje ao marcar como pago.' : undefined}
-              >
-                <Entrada
-                  type="date"
-                  value={paraInputDate(form.data_pagamento)}
-                  onChange={(e) => set({ data_pagamento: e.target.value || null })}
-                />
-              </Campo>
+                  <Campo
+                    label="Data do pagamento"
+                    dica={form.status_pagamento === 'pago' ? 'Preenchida com hoje ao marcar como pago.' : undefined}
+                  >
+                    <Entrada
+                      type="date"
+                      value={paraInputDate(form.data_pagamento)}
+                      onChange={(e) => set({ data_pagamento: e.target.value || null })}
+                    />
+                  </Campo>
 
-              <Campo label="Observações" className="sm:col-span-2">
-                <AreaTexto
-                  value={form.observacoes}
-                  onChange={(e) => set({ observacoes: e.target.value })}
-                  placeholder="Alguma observação importante sobre este pedido..."
-                />
-              </Campo>
+                  <Campo label="Observações" className="sm:col-span-2">
+                    <AreaTexto
+                      value={form.observacoes}
+                      onChange={(e) => set({ observacoes: e.target.value })}
+                      placeholder="Alguma observação importante sobre este pedido..."
+                    />
+                  </Campo>
+                </>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 sm:col-span-2 dark:border-slate-700">
+                  Forma de pagamento, datas, observações, entrega e comprovante ficam em “Mais opções”, no topo
+                  deste cartão.
+                </p>
+              )}
             </div>
           </Cartao>
 
@@ -758,6 +799,8 @@ export default function PedidoForm() {
             </div>
           </Cartao>
 
+          {mostrarExtras ? (
+            <>
           {/* importar comprovante */}
           <Cartao>
             <h3 className="mb-2 flex items-center gap-2 text-base font-extrabold text-slate-800">
@@ -878,6 +921,8 @@ export default function PedidoForm() {
               </div>
             )}
           </Cartao>
+            </>
+          ) : null}
 
           <Cartao>
             <h3 className="mb-2 flex items-center gap-2 text-base font-extrabold text-slate-800">

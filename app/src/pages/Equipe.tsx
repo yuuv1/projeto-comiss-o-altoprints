@@ -1,5 +1,6 @@
-import { Crown, KeyRound, Pencil, Save, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
+import { Crown, Eye, KeyRound, Pencil, Save, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { dataBR, moeda } from '../lib/format'
@@ -29,6 +30,7 @@ import {
 
 export default function Equipe() {
   const { db, avisar } = useStore()
+  const navegar = useNavigate()
   const {
     usuario: eu,
     redefinirSenha,
@@ -37,6 +39,7 @@ export default function Equipe() {
     alternarAtivo,
     excluirUsuario,
     criarContaComoDono,
+    visualizarComo,
   } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
@@ -256,6 +259,20 @@ export default function Equipe() {
                 ) : null}
 
                 <div className="flex flex-wrap gap-1.5">
+                  {c.papel === 'vendedor' && c.ativo ? (
+                    <Botao
+                      tamanho="sm"
+                      variante="secundario"
+                      icone={Eye}
+                      title={`Abrir o sistema exatamente como ${c.nome} vê (só visualização)`}
+                      onClick={() => {
+                        visualizarComo(c.id)
+                        navegar('/')
+                      }}
+                    >
+                      Ver como
+                    </Botao>
+                  ) : null}
                   <Botao tamanho="sm" variante="secundario" icone={Pencil} onClick={() => abrirEdicao(c)}>
                     Vínculo e senha
                   </Botao>

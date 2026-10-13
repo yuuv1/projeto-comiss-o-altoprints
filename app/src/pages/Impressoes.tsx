@@ -3,6 +3,7 @@ import {
   FileSpreadsheet,
   History,
   Printer,
+  PrinterCheck,
   RotateCcw,
   Ruler,
   Search,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useRegistrarImpressao } from '../components/impressao'
 import { LogoImpressao } from '../components/Logo'
 import {
   Abas,
@@ -43,6 +45,7 @@ export default function Impressoes() {
   const { db, excluirImpressao, avisar } = useStore()
   const { ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
+  const impressao = useRegistrarImpressao()
 
   const [periodo, setPeriodo] = useState<PeriodoImpressoes>('hoje')
   const [quem, setQuem] = useState('todos')
@@ -90,6 +93,9 @@ export default function Impressoes() {
         subtitulo="Tudo o que saiu da máquina: metros, quem imprimiu, reimpressões e o motivo."
         acoes={
           <>
+            <Botao icone={PrinterCheck} onClick={() => impressao.novo()}>
+              Registrar impressão
+            </Botao>
             <Botao
               variante="secundario"
               icone={Printer}
@@ -183,7 +189,7 @@ export default function Impressoes() {
             descricao={
               db.impressoes.length
                 ? 'Tente mudar o período (por exemplo, “Tudo”) ou limpar a busca.'
-                : 'Na tela “Para imprimir”, ao marcar um pedido como impresso, o registro aparece aqui.'
+                : 'Clique em “Registrar impressão” para catalogar o que saiu da máquina — ou marque um pedido na tela “Para imprimir”.'
             }
           />
         ) : (
@@ -327,6 +333,7 @@ export default function Impressoes() {
       </div>
 
       {dialog}
+      {impressao.janela}
     </>
   )
 }

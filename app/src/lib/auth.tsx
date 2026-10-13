@@ -10,6 +10,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { carregarTudo, removerRegistro, salvarRegistro } from './backend'
 import { novoId } from './files'
 import { lsGravar, lsLer, lsRemover } from './local'
+import { definirVisualizacao } from './visualizacao'
 import { ACESSO_DEMO, contaDemo } from './seed'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { clienteNuvem, emNuvem } from './supabase'
@@ -90,12 +91,21 @@ const gravarTentativas = (t: Tentativas) => {
 /* ------------------------------------------------------------------ */
 
 export interface AuthContexto {
+  /** o acesso em uso — no modo "ver como funcionário" é o acesso visualizado */
   usuario: Usuario | null
+  /** o acesso de verdade (o proprietário, mesmo quando está visualizando) */
+  usuarioReal: Usuario | null
   /** nome do vendedor vinculado à conta (para travar o campo vendedor nos pedidos) */
   vendedorNome: string
   carregando: boolean
   nuvem: boolean
   ehProprietario: boolean
+  /** o proprietário está vendo o sistema com os olhos de alguém da equipe? */
+  emVisualizacao: boolean
+  /** abre o sistema como um acesso da equipe (só o proprietário pode) */
+  visualizarComo: (usuarioId: string) => void
+  /** volta para o acesso do proprietário */
+  sairDaVisualizacao: () => void
   /** já existe alguma conta de proprietário no sistema? */
   temProprietario: boolean
   entrar: (usuario: string, senha: string, manter: boolean) => Promise<void>
@@ -152,8 +162,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true)
 
   const usuarios = db.usuarios ?? []
-  const usuario = useMemo(() => usuarios.find((u) => u.id === usuarioId) ?? null, [usuarioId, usuarios])
+  const usuarioReal = useMemo(() => usuarios.find((u) => u.id === usuarioId) ?? null, [usuarioId, usuarios])
+  /** id do acesso que está sendo "espionado" no modo ver-como-funcionário */
+  const [visualizandoId, setVisualizandoId] = useState<string | null>(null)
+
+  const visualizado = useMemo(
+    () => (visualizandoId ? usuarios.find((u) => u.id === visualizandoId) ?? null : null),
+    [usuarios, visualizandoId],
+  )
+  // só o proprietário de verdade pode entrar no modo, e nunca em cima de outro proprietário
+  const emVisualizacao = Boolean(
+    visualizado && usuarioReal?.papel === 'proprietario' && visualizado.papel !== 'proprietario' && visualizado.ativo,
+  )
+  const usuario = emVisualizacao ? visualizado : usuarioReal
   const temProprietario = useMemo(() => usuarios.some((u) => u.papel === 'proprietario'), [usuarios])
+
+  // a camada de dados usa esta marca para não salvar nada no modo visualização
+  useEffect(() => {
+    definirVisualizacao(emVisualizacao ? visualizado?.id ?? null : null)
+    return () => definirVisualizacao(null)
+  }, [emVisualizacao, visualizado?.id])
 
   // restaura a sessão guardada
   useEffect(() => {
@@ -180,18 +208,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const achou = usuarios.find((u) => u.id === sessao.usuario_id && u.ativo)
           if (achou) setUsuarioId(achou.id)
           else lsRemover(CHAVE_SESSAO)
-        } else if (import.meta.env.DEV) {
+        } else if (import.meta.env.DEV && lsLer(CHAVE_ENTRADA_DEV) !== '1') {
           // Na prévia (modo de desenvolvimento) o sistema entra sozinho com o
           // acesso de exemplo, uma única vez — para ver o sistema sem passar pelo
           // login. A versão publicada nunca faz isso.
-          const demo = usuarios.find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
-          if (demo && localStorage.getItem(CHAVE_ENTRADA_DEV) !== '1') {
+          lsGravar(CHAVE_ENTRADA_DEV, '1')
+          // o StrictMode roda este efeito duas vezes: confere no banco antes de criar
+          const jaExiste = (await lerUsuarios()).find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
+          let demo = jaExiste ?? usuarios.find((u) => u.usuario === ACESSO_DEMO.usuario && u.ativo)
+          if (!demo && !(await lerUsuarios()).some((u) => u.papel === 'proprietario')) {
+            // dados de exemplo de uma versão anterior (sem o acesso pronto): cria agora
+            const conta = { ...contaDemo(), senha_hash: await gerarHashSenha(ACESSO_DEMO.senha) }
             try {
-              localStorage.setItem(CHAVE_ENTRADA_DEV, '1')
-            } catch {
-              /* sem problema: só não vai lembrar que já entrou */
+              await salvarRegistro('usuarios', conta)
+              await recarregar()
+              demo = conta
+            } catch (e) {
+              console.warn('[altoprints] não foi possível criar o acesso de exemplo:', (e as Error).message)
             }
-            localStorage.setItem(
+          }
+          if (demo) {
+            lsGravar(
               CHAVE_SESSAO,
               JSON.stringify({
                 usuario_id: demo.id,
@@ -199,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 conectado: true,
               }),
             )
+            console.info(`[altoprints] prévia: entrando com o acesso de exemplo "${ACESSO_DEMO.usuario}".`)
             setUsuarioId(demo.id)
           }
         }
@@ -271,6 +309,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       delete tentativas[nomeUsuario]
       gravarTentativas(tentativas)
+      setVisualizandoId(null)
+      definirVisualizacao(null)
       setUsuarioId(conta.id)
       guardarSessao(conta.id, manter)
     },
@@ -281,6 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sb = clienteNuvem()
     if (sb) await sb.auth.signOut()
     lsRemover(CHAVE_SESSAO)
+    setVisualizandoId(null)
+    definirVisualizacao(null)
     setUsuarioId(null)
   }, [])
 
@@ -506,8 +548,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return db.vendedores.find((v) => v.id === usuario.vendedor_id)?.nome ?? usuario.nome
   }, [db.vendedores, usuario])
 
+  const visualizarComo = useCallback(
+    (id: string) => {
+      if (usuarioReal?.papel !== 'proprietario') {
+        avisar('Só o proprietário pode ver o sistema como outra pessoa.', 'erro')
+        return
+      }
+      const alvo = usuarios.find((u) => u.id === id)
+      if (!alvo || alvo.papel === 'proprietario') {
+        avisar('Escolha um acesso de vendedor para visualizar.', 'erro')
+        return
+      }
+      setVisualizandoId(id)
+      avisar(`Agora você está vendo o sistema como ${alvo.nome}. Nada será salvo neste modo.`, 'info')
+    },
+    [avisar, usuarioReal?.papel, usuarios],
+  )
+
+  const sairDaVisualizacao = useCallback(() => {
+    setVisualizandoId(null)
+    definirVisualizacao(null)
+    avisar('De volta ao seu acesso de proprietário.', 'info')
+  }, [avisar])
+
   const valor: AuthContexto = {
     usuario,
+    usuarioReal,
+    emVisualizacao,
+    visualizarComo,
+    sairDaVisualizacao,
     vendedorNome,
     carregando: carregando || carregandoDados,
     nuvem: emNuvem(),

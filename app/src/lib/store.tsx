@@ -29,6 +29,7 @@ import {
   limparAvisoDeConexao,
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
+import { bloquearSeVisualizando } from './visualizacao'
 import { gerarDadosDemo, prepararAcessoDemo } from './seed'
 import { gerarHashSenha } from './senha'
 import {
@@ -236,6 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarVendedor = useCallback(
     async (dados: { nome: string }, id?: ID) => {
+      bloquearSeVisualizando()
       const nome = dados.nome.trim()
       if (!nome) throw new Error('Informe o nome do vendedor.')
       const existente = id ? db.vendedores.find((v) => v.id === id) : undefined
@@ -258,6 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirVendedor = useCallback(
     async (id: ID) => {
+      bloquearSeVisualizando()
       await removerRegistro('vendedores', id)
       setDb((atual) => ({ ...atual, vendedores: atual.vendedores.filter((v) => v.id !== id) }))
       avisar('Vendedor excluído.', 'info')
@@ -269,6 +272,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarCliente = useCallback(
     async (dados: Omit<Cliente, 'id' | 'created_at'>, id?: ID) => {
+      bloquearSeVisualizando()
       if (!dados.nome.trim()) throw new Error('O nome do cliente é obrigatório.')
       if (!dados.vendedor_id) throw new Error('Escolha o vendedor responsável.')
       const existente = id ? db.clientes.find((c) => c.id === id) : undefined
@@ -292,6 +296,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirCliente = useCallback(
     async (id: ID) => {
+      bloquearSeVisualizando()
       await removerRegistro('clientes', id)
       setDb((atual) => ({ ...atual, clientes: atual.clientes.filter((c) => c.id !== id) }))
       avisar('Cliente excluído.', 'info')
@@ -303,6 +308,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const enviarArquivos = useCallback(
     async (pedidoId: ID, arquivos: File[]) => {
+      bloquearSeVisualizando()
       if (!arquivos.length) return
       const registros: Arquivo[] = []
       for (const f of arquivos) registros.push(await enviarArquivo(pedidoId, f))
@@ -314,6 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarPedido = useCallback(
     async (dados: Omit<Pedido, 'id'>, id: ID | undefined, arquivosNovos: File[]) => {
+      bloquearSeVisualizando()
       if (!dados.cliente_nome.trim()) throw new Error('Informe o nome do cliente.')
       if (!dados.vendedor_id) throw new Error('Escolha o vendedor responsável.')
 
@@ -364,6 +371,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const atualizarPedido = useCallback(
     async (id: ID, patch: Partial<Pedido>) => {
+      bloquearSeVisualizando()
       const atual = db.pedidos.find((p) => p.id === id)
       if (!atual) return
       const registro: Pedido = { ...atual, ...patch, updated_at: new Date().toISOString() }
@@ -375,6 +383,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirPedido = useCallback(
     async (id: ID) => {
+      bloquearSeVisualizando()
       const arquivos = db.arquivos.filter((a) => a.pedido_id === id)
       await apagarVariosArquivos(arquivos)
       await removerArquivosDoPedido(id)
@@ -394,6 +403,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirArquivoDoPedido = useCallback(
     async (arquivo: Arquivo) => {
+      bloquearSeVisualizando()
       await apagarVariosArquivos([arquivo])
       await removerRegistro('arquivos', arquivo.id)
       setDb((atual) => ({ ...atual, arquivos: atual.arquivos.filter((a) => a.id !== arquivo.id) }))
@@ -405,6 +415,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* ----------------------------- impressões ----------------------------- */
 
   const registrarImpressao = useCallback(async (pedido: Pedido, dados: DadosImpressao) => {
+    bloquearSeVisualizando()
     const quando = dados.quando ?? new Date().toISOString()
     const registro: Impressao = {
       id: novoId(),
@@ -443,6 +454,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirImpressao = useCallback(
     async (id: ID) => {
+      bloquearSeVisualizando()
       const alvo = db.impressoes.find((i) => i.id === id)
       await removerRegistro('impressoes', id)
       const restantes = db.impressoes.filter((i) => i.id !== id)
@@ -470,6 +482,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarConfig = useCallback(
     async (parcial: Partial<Configuracoes>) => {
+      bloquearSeVisualizando()
       await salvarConfiguracoes(parcial)
       setDb((atual) => ({ ...atual, configuracoes: { ...atual.configuracoes, ...parcial } }))
     },
@@ -478,6 +491,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resetarDados = useCallback(
     async (manterContaId?: string) => {
+      bloquearSeVisualizando()
       // guarda o acesso de quem está apagando: sem isso, o proprietário perderia
       // a própria conta e não conseguiria nem entrar no sistema de novo
       const contaMantida = manterContaId ? db.usuarios.find((u) => u.id === manterContaId) : undefined
@@ -512,6 +526,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /** restaura um backup baixado antes (substitui tudo o que está no sistema) */
   const restaurarBackup = useCallback(
     async (arquivo: File) => {
+      bloquearSeVisualizando()
       const texto = await arquivo.text()
       const dados = JSON.parse(texto) as Partial<DB>
       if (!Array.isArray(dados.pedidos) || !Array.isArray(dados.clientes))
@@ -533,6 +548,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const carregarDemo = useCallback(async () => {
+    bloquearSeVisualizando()
     const demo = await prepararDemo(gerarDadosDemo())
     await substituirTudo(demo)
     lsGravar(CHAVE_DEMO, '1')

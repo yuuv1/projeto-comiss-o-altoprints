@@ -1,10 +1,10 @@
-import { Check, PrinterCheck, RotateCcw, Ruler, TriangleAlert, User } from 'lucide-react'
+import { Check, PrinterCheck, RotateCcw, Ruler, Search, TriangleAlert, User } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useAuth } from '../lib/auth'
-import { numeroBR } from '../lib/format'
+import { dataBR, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { type Impressao, MOTIVOS_REIMPRESSAO, type Pedido, type TipoImpressao } from '../lib/types'
-import { AreaTexto, Botao, Campo, Entrada, Modal, Selecao, cn } from './ui'
+import { AreaTexto, Botao, Campo, Entrada, Etiqueta, Modal, Selecao, cn } from './ui'
 
 /**
  * Janela de registrar impressão: ao marcar "impresso" a pessoa confirma os
@@ -24,6 +24,11 @@ export function useRegistrarImpressao() {
   const [observacao, setObservacao] = useState('')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+  /** aberta pela tela Impressões: primeiro escolhe o pedido, depois preenche */
+  const [escolhendo, setEscolhendo] = useState(false)
+  const [busca, setBusca] = useState('')
+  /** arte usada e observação só aparecem quando a pessoa quiser detalhar */
+  const [detalhes, setDetalhes] = useState(false)
 
   const arquivos = useMemo(
     () => (alvo ? db.arquivos.filter((a) => a.pedido_id === alvo.id) : []),
@@ -43,7 +48,34 @@ export function useRegistrarImpressao() {
     [db.usuarios, db.vendedores, usuario?.nome],
   )
 
+  /** abre já com o pedido escolhido (usado pela fila de impressão) */
+  /**
+   * Pedidos que aparecem para escolher: primeiro os que estão na fila de
+   * impressão (pagos e ainda não impressos), depois os mais recentes.
+   */
+  const candidatos = useMemo(() => {
+    const termo = busca.trim().toLowerCase()
+    const daFila = (p: Pedido) => p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto'
+    const alvo = db.pedidos
+      .filter((p) => {
+        if (!termo) return true
+        return [`#${p.numero}`, String(p.numero), p.cliente_nome, p.descricao, p.observacoes]
+          .join(' ')
+          .toLowerCase()
+          .includes(termo)
+      })
+      .sort((a, b) => {
+        const fa = daFila(a) ? 0 : 1
+        const fb = daFila(b) ? 0 : 1
+        return fa - fb || b.numero - a.numero
+      })
+    return alvo.slice(0, 12)
+  }, [busca, db.pedidos])
+
   const abrir = (pedido: Pedido, tipoInicial: TipoImpressao = 'impressao') => {
+    setEscolhendo(false)
+    setBusca('')
+    setDetalhes(false)
     setAlvo(pedido)
     setTipo(tipoInicial)
     setMetros(pedido.metragem ? numeroBR(pedido.metragem) : '')
@@ -54,7 +86,40 @@ export function useRegistrarImpressao() {
     setErro('')
   }
 
-  const fechar = () => setAlvo(null)
+  /** abre sem pedido escolhido: a própria janela tem a busca (tela Impressões) */
+  const abrirNovo = () => {
+    setAlvo(null)
+    setEscolhendo(true)
+    setBusca('')
+    setTipo('impressao')
+    setErro('')
+    setQuem((usuario?.nome ?? '').trim())
+  }
+
+  /** volta para a escolha do pedido sem fechar a janela */
+  const trocarPedido = () => {
+    setAlvo(null)
+    setEscolhendo(true)
+    setErro('')
+  }
+
+  const escolher = (pedido: Pedido) => {
+    setEscolhendo(false)
+    setDetalhes(false)
+    setAlvo(pedido)
+    setMetros(pedido.metragem ? numeroBR(pedido.metragem) : '')
+    setQuem((usuario?.nome ?? '').trim())
+    setArquivoId('')
+    setMotivo('')
+    setObservacao('')
+    setErro('')
+  }
+
+  const fechar = () => {
+    setAlvo(null)
+    setEscolhendo(false)
+    setBusca('')
+  }
 
   const salvar = async () => {
     if (!alvo) return
@@ -98,25 +163,110 @@ export function useRegistrarImpressao() {
     }
   }
 
+  const escolhaDoPedido = (
+    <div className="space-y-3">
+      <p className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 p-3 text-xs text-fuchsia-900 dark:border-fuchsia-900 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
+        Escolha o pedido que saiu da máquina. Os primeiros da lista são os que estão <b>na fila de impressão</b> (pagos e
+        ainda não impressos).
+      </p>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          autoFocus
+          placeholder="Buscar por nº do pedido, cliente ou descrição..."
+          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
+        />
+      </div>
+
+      <div className="max-h-[46vh] space-y-1.5 overflow-y-auto pr-1">
+        {candidatos.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400 dark:border-slate-700">
+            Nenhum pedido encontrado com “{busca}”.
+          </p>
+        ) : (
+          candidatos.map((p) => {
+            const naFila = p.status_pagamento === 'pago' && !p.impresso && p.status_producao !== 'dtf_pronto'
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => escolher(p)}
+                className={cn(
+                  'flex w-full flex-wrap items-center gap-2 rounded-xl border p-3 text-left transition hover:border-purple-300 hover:shadow-soft',
+                  naFila
+                    ? 'border-fuchsia-200 bg-fuchsia-50/60 dark:border-fuchsia-900 dark:bg-fuchsia-950/30'
+                    : 'border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900',
+                )}
+              >
+                <span className="rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-2 py-0.5 text-xs font-black text-white">
+                  #{p.numero}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700 dark:text-slate-200">
+                  {p.cliente_nome}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{numeroBR(p.metragem)} m</span>
+                {naFila ? (
+                  <Etiqueta className="border-fuchsia-200 bg-white text-fuchsia-700">na fila</Etiqueta>
+                ) : p.impresso ? (
+                  <Etiqueta className="border-emerald-200 bg-white text-emerald-700">já impresso</Etiqueta>
+                ) : (
+                  <Etiqueta className="border-slate-200 bg-white text-slate-500">
+                    {p.status_pagamento === 'pago' ? 'pago' : 'não pago'}
+                  </Etiqueta>
+                )}
+                <span className="w-full text-[11px] text-slate-400 sm:w-auto">
+                  {dataBR(p.data_pedido)}
+                  {p.descricao ? ` · ${p.descricao}` : ''}
+                </span>
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+
   const janela = (
     <Modal
-      aberto={Boolean(alvo)}
+      aberto={Boolean(alvo) || escolhendo}
       onFechar={fechar}
-      titulo={alvo ? `Registrar impressão — pedido #${alvo.numero}` : 'Registrar impressão'}
-      subtitulo={alvo ? `${alvo.cliente_nome} · pedido com ${numeroBR(alvo.metragem)} m` : undefined}
+      titulo={
+        alvo
+          ? `Registrar impressão — pedido #${alvo.numero}`
+          : escolhendo
+            ? 'Registrar impressão — escolha o pedido'
+            : 'Registrar impressão'
+      }
+      subtitulo={
+        alvo ? `${alvo.cliente_nome} · pedido com ${numeroBR(alvo.metragem)} m` : 'O que saiu da máquina agora'
+      }
       icone={PrinterCheck}
       largura="max-w-xl"
       rodape={
-        <>
+        alvo ? (
+          <>
+            <Botao variante="ghost" onClick={trocarPedido}>
+              Trocar pedido
+            </Botao>
+            <Botao variante="secundario" onClick={fechar}>
+              Cancelar
+            </Botao>
+            <Botao icone={Check} onClick={salvar} carregando={salvando}>
+              {tipo === 'reimpressao' ? 'Registrar reimpressão' : 'Registrar impressão'}
+            </Botao>
+          </>
+        ) : (
           <Botao variante="secundario" onClick={fechar}>
             Cancelar
           </Botao>
-          <Botao icone={Check} onClick={salvar} carregando={salvando}>
-            {tipo === 'reimpressao' ? 'Registrar reimpressão' : 'Registrar impressão'}
-          </Botao>
-        </>
+        )
       }
     >
+      {!alvo && escolhendo ? escolhaDoPedido : null}
+
       {alvo ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/70 p-3 text-xs text-fuchsia-900 dark:border-fuchsia-900 dark:bg-fuchsia-950/40 dark:text-fuchsia-200">
@@ -165,7 +315,7 @@ export function useRegistrarImpressao() {
             </Campo>
           </div>
 
-          {arquivos.length ? (
+          {detalhes && arquivos.length ? (
             <Campo label="Arte usada" dica="Opcional — ajuda a saber qual arquivo foi para a máquina.">
               <Selecao value={arquivoId} onChange={(e) => setArquivoId(e.target.value)}>
                 <option value="">Não informar a arte</option>
@@ -208,13 +358,23 @@ export function useRegistrarImpressao() {
             </div>
           ) : null}
 
-          <Campo label="Observação" dica="Opcional — ex.: “filme acabou no meio”, “cliente pediu pressa”.">
-            <AreaTexto
-              value={observacao}
-              onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Alguma anotação sobre esta impressão?"
-            />
-          </Campo>
+          {detalhes ? (
+            <Campo label="Observação" dica="Opcional — ex.: “filme acabou no meio”, “cliente pediu pressa”.">
+              <AreaTexto
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                placeholder="Alguma anotação sobre esta impressão?"
+              />
+            </Campo>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDetalhes(true)}
+              className="text-xs font-bold text-purple-700 underline-offset-2 hover:underline dark:text-purple-300"
+            >
+              Mais opções (arte usada e observação)
+            </button>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className="inline-flex items-center gap-1">
@@ -240,7 +400,9 @@ export function useRegistrarImpressao() {
     imprimir: (pedido: Pedido) => abrir(pedido, 'impressao'),
     /** abre a janela já marcada como reimpressão */
     reimprimir: (pedido: Pedido) => abrir(pedido, 'reimpressao'),
-    aberto: Boolean(alvo),
+    /** abre a janela começando pela escolha do pedido (tela Impressões) */
+    novo: abrirNovo,
+    aberto: Boolean(alvo) || escolhendo,
     janela,
   }
 }

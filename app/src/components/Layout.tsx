@@ -2,6 +2,7 @@ import {
   BarChart3,
   ClipboardList,
   Crown,
+  Eye,
   History,
   LayoutDashboard,
   LogOut,
@@ -12,6 +13,7 @@ import {
   Star,
   Sun,
   Truck,
+  Undo2,
   UserCheck,
   UserCog,
   Users,
@@ -23,13 +25,15 @@ import { useMemo, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import { useAuth } from '../lib/auth'
+import { LABEL_PAPEL } from '../lib/types'
+import { rotuloVisualizacao } from '../lib/visualizacao'
 import { type TelasAcesso, telasDoUsuario } from '../lib/types'
 import { useStore } from '../lib/store'
 import { useTema } from '../lib/tema'
 import { Logo } from './Logo'
 import { PerfilDialog } from './PerfilDialog'
 import { ReviewModal } from './ReviewModal'
-import { cn } from './ui'
+import { Botao, cn } from './ui'
 
 interface ItemMenu {
   to: string
@@ -44,7 +48,7 @@ interface ItemMenu {
 
 export function Layout() {
   const { db, nomeVendedor } = useStore()
-  const { usuario, ehProprietario, vendedorNome, sair } = useAuth()
+  const { usuario, ehProprietario, vendedorNome, sair, emVisualizacao, sairDaVisualizacao } = useAuth()
   const telas = telasDoUsuario(usuario)
   const { escuro, alternar } = useTema()
   const navegar = useNavigate()
@@ -220,6 +224,19 @@ export function Layout() {
       </header>
 
       <main className="relative mx-auto max-w-7xl px-4 py-6">
+        {emVisualizacao && usuario ? (
+          <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
+              <Eye className="h-5 w-5" />
+            </span>
+            <p className="min-w-[220px] flex-1 text-sm font-semibold text-amber-900 dark:text-amber-100">
+              {rotuloVisualizacao(usuario.nome, LABEL_PAPEL[usuario.papel])}
+            </p>
+            <Botao tamanho="sm" variante="aviso" icone={Undo2} onClick={sairDaVisualizacao}>
+              Voltar ao meu acesso
+            </Botao>
+          </div>
+        ) : null}
         <Outlet />
       </main>
 
