@@ -402,6 +402,20 @@ async function main() {
   if (!resumoOk) falhas++
   console.log(`  ${resumoOk ? '✅' : '❌'} a aba de resumo continua com faturamento e comissões`)
 
+  // ---------- comissões no relatório impresso (A4) ----------
+  const areaImpressa = raiz?.querySelector('.print-area')
+  const textoImpresso = (areaImpressa?.textContent ?? '').replace(/\s+/g, ' ')
+  const impressoComComissoes =
+    textoImpresso.includes('Comissões da equipe') &&
+    textoImpresso.includes('TOTAL DE COMISSÕES') &&
+    textoImpresso.includes('Comissão por faixa de metragem') &&
+    textoImpresso.includes('JESSICA') &&
+    textoImpresso.includes('RAISSA')
+  if (!impressoComComissoes) falhas++
+  console.log(
+    `\n  ${impressoComComissoes ? '✅' : '❌'} relatório impresso do dono traz a comissão de cada vendedor (com total)`,
+  )
+
   dom.window.location.hash = '#/clientes'
   await espera(700)
   const clicouEspeciais = clicar(raiz, '★ Especiais')
@@ -570,6 +584,17 @@ async function main() {
   console.log(`  ${relatorioSoDele ? '✅' : '❌'} relatório do vendedor mostra só os dados de ${nomeDoVinculo}`)
 
   // a tela de impressão liberada não mostra valores em dinheiro
+  const areaImpressaVendedor = raiz2.querySelector('.print-area')
+  const textoImpressoVendedor = (areaImpressaVendedor?.textContent ?? '').replace(/\s+/g, ' ')
+  const impressoSoDele =
+    textoImpressoVendedor.includes('SUA COMISSÃO NO PERÍODO') &&
+    textoImpressoVendedor.includes(nomeDoVinculo) &&
+    !textoImpressoVendedor.includes(outroVendedor)
+  if (!impressoSoDele) falhas++
+  console.log(
+    `  ${impressoSoDele ? '✅' : '❌'} relatório impresso do funcionário mostra só a comissão de ${nomeDoVinculo}`,
+  )
+
   dom.window.location.hash = '#/para-imprimir'
   await espera(700)
   const textoImpressao = (raiz2.textContent ?? '').replace(/\s+/g, ' ')

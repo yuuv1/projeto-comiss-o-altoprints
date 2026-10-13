@@ -490,14 +490,19 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <LogoImpressao />
           <div className="ml-auto text-right text-[13px] leading-tight">
             <p className="text-lg font-black uppercase">{db.configuracoes.empresa_nome || 'Altoprints'}</p>
-            <p className="font-bold">Relatório de vendas pagas</p>
+            <p className="font-bold">
+              {ehProprietario ? 'Relatório de vendas pagas e comissões da equipe' : 'Minhas vendas e minha comissão'}
+            </p>
             <p>Período ({LABEL_CAMPO[campo].toLowerCase()}): {periodoTexto}</p>
             <p>Emitido em {dataBR(new Date().toISOString())}</p>
           </div>
         </div>
 
+        {/* comissão de cada pessoa da equipe — é o que o dono confere no papel */}
         <div className="sem-quebra mb-4">
-          <p className="mb-1 font-bold">Resumo por vendedor</p>
+          <p className="mb-1 font-bold">
+            {ehProprietario ? 'Comissões da equipe' : `Comissão de ${nomeVendedor(meuVendedorId)}`}
+          </p>
           <table className="tabela-print">
             <thead>
               <tr>
@@ -518,6 +523,42 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   <td className="num">{moeda(l.comissao)}</td>
                 </tr>
               ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={4}>{ehProprietario ? 'TOTAL DE COMISSÕES' : 'SUA COMISSÃO NO PERÍODO'}</td>
+                <td className="num">{moeda(totais.comissao)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="sem-quebra mb-4">
+          <p className="mb-1 font-bold">Comissão por faixa de metragem</p>
+          <table className="tabela-print">
+            <thead>
+              <tr>
+                <th>Faixa</th>
+                <th className="num">%</th>
+                <th className="num">Pedidos</th>
+                <th className="num">Metragem</th>
+                <th className="num">Faturamento</th>
+                <th className="num">Comissão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...resultado.porFaixa, resultado.semMetragem]
+                .filter((l) => l.pedidos > 0)
+                .map((l) => (
+                  <tr key={l.id}>
+                    <td>{l.rotulo}</td>
+                    <td className="num">{numeroBR(l.percentual, 1)}%</td>
+                    <td className="num">{l.pedidos}</td>
+                    <td className="num">{numeroBR(l.metragem)} m</td>
+                    <td className="num">{moeda(l.faturamento)}</td>
+                    <td className="num">{moeda(l.comissao)}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
