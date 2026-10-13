@@ -1,0 +1,56 @@
+Altoprints — Sistema de Pedidos DTF  (versão 1.0.10)
+
+DUAS FORMAS DE USAR:
+
+  A) NO COMPUTADOR, SEM INTERNET (jeito mais rápido de ver o sistema):
+     - Clique DUAS VEZES no arquivo  Altoprints.html  (está nesta pasta)
+     - Ele abre no navegador já funcionando; os dados ficam salvos nesse computador
+     - NÃO abra o "index.html" com dois cliques: ele fica em branco (é só para hospedar)
+
+  B) NO AR, PARA A EQUIPE TODA (Netlify Drop):
+     1. Abra https://app.netlify.com/drop
+     2. Arraste ESTA PASTA inteira (a pasta "publicar") para a área pontilhada
+     3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu
+     4. Pronto: o endereço aparece no topo da página
+
+COMO ATUALIZAR DEPOIS:
+  - Rode de novo:  npm run publicar
+  - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)
+  - O arquivo Altoprints.html é gerado de novo junto (é só clicar duas vezes nele)
+
+PRIMEIRO ACESSO:
+  - Se o sistema ainda estiver com os DADOS DE EXEMPLO, já existe um acesso pronto:
+      usuário: gui        senha: 12345
+    (troque a senha depois em Configurações → Meu acesso)
+  - Para criar o seu próprio acesso de proprietário (quando não houver nenhum):
+      Endereço:   .../#/administracao   (salve na tela de início do celular)
+      Alternativa: 5 toques no logo, ou Ctrl + Alt + D no computador
+
+ONDE OS DADOS FICAM (importante):
+  - Neste aparelho, os dados ficam guardados no próprio navegador, num espaço
+    grande (IndexedDB) — o registro de impressões, pedidos e clientes não
+    esbarra mais no limite pequeno do navegador.
+  - Para a equipe trabalhar junta, conecte a nuvem (Configurações → Nuvem).
+
+CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:
+  - Configurações → Nuvem → siga o assistente: cria o projeto do Supabase,
+    copia o SQL (1 clique), cola a URL e a chave, conecta.
+  - Depois clique em "Copiar link" e mande o link no grupo: quem abrir uma vez
+    fica conectado naquele aparelho.
+  - Guia completo: app/CONECTAR-NUVEM.md
+
+IMPORTANTE:
+  - Sem a nuvem conectada, cada aparelho guarda a própria lista de pedidos.
+  - No arquivo Altoprints.html (aberto do computador), os dados ficam no navegador
+    daquele computador; para a equipe trabalhar junta, use a opção B + nuvem.
+  - Anexar arquivos de arte funciona hospedado (opção B) ou com a nuvem conectada;
+    abrindo o arquivo direto do computador, alguns navegadores não guardam os anexos.
+  - Faça backup de vez em quando (Configurações → Dados → Baixar backup).
+
+SE APARECER UM ERRO DE "SEM ESPAÇO" OU NADA FOR SALVO:
+  - Confira se a janela do navegador não está ANÔNIMA/PRIVADA: nesse modo o
+    navegador não deixa o sistema salvar nada. Abra numa janela normal.
+  - A tela de login avisa quando isso está acontecendo e mostra a versão do
+    sistema no rodapé (ex.: "versão 1.0.10").
+  - Em Configurações → Dados existe o bloco "Onde os dados ficam neste aparelho",
+    com o botão "Liberar espaço" quando o armazenamento antigo estiver cheio.

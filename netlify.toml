@@ -1,0 +1,25 @@
+# Configuração do Netlify
+# Usada quando o site é publicado pelo Netlify conectado ao GitHub (recomendado).
+# No "Netlify Drop" (arrastar a pasta dist) este arquivo não é lido.
+
+[build]
+  # o projeto React fica dentro da pasta app/
+  base = "app"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Garante que qualquer endereço abra o sistema (mesmo com caminhos digitados na mão)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cabeçalhos simples de segurança/desempenho
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
