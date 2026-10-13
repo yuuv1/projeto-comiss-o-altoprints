@@ -22,7 +22,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # O jsdom 30 (usado nos testes de tela) exige Node 22.22+ — com o Node 20
+          # os testes quebravam com "Promise.withResolvers is not a function".
+          node-version: 22
 
       - name: Instalar dependências
         working-directory: app
