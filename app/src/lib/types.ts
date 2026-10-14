@@ -270,6 +270,13 @@ export interface Usuario {
   usuario: string
   /** senha criptografada (SHA-256 + sal) — nunca guardamos a senha em texto puro */
   senha_hash: string
+  /**
+   * `true` nos acessos de funcionário que entram **sem senha**: a pessoa toca no
+   * próprio nome na tela de entrada. Vale só para vendedor — o proprietário
+   * sempre usa senha. Quando o dono define uma senha para a conta
+   * (Equipe → Vínculo e senha), isto volta a `false`.
+   */
+  sem_senha?: boolean
   papel: Papel
   /** vendedor vinculado (usado para saber quais pedidos são "dele") */
   vendedor_id: ID | ''

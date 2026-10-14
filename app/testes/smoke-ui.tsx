@@ -664,6 +664,15 @@ async function main() {
   if (!temLogin) falhas++
   console.log(`\n  ${temLogin ? '✅' : '❌'} sem sessão, o sistema pede login`)
 
+  const mostraListaNomes =
+    textoLogin.includes('Quem está usando?') &&
+    textoLogin.includes('VENDEDOR TESTE') &&
+    !textoLogin.includes('DONO TESTE')
+  if (!mostraListaNomes) falhas++
+  console.log(
+    `  ${mostraListaNomes ? '✅' : '❌'} tela inicial mostra os nomes dos funcionários (sem listar o proprietário)`,
+  )
+
   // a tela comum não pode revelar a porta do proprietário
   const naoRevelaPorta =
     !textoLogin.toLowerCase().includes('proprietário') &&

@@ -16,25 +16,53 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
-import { filasDaComissao } from '../lib/types'
+import { filasDaComissao, type Usuario } from '../lib/types'
 import { JanelaConexao } from '../components/Nuvem'
 import { Botao, Campo, Entrada, Etiqueta, Selecao, cn } from '../components/ui'
 import { ROTA_ADMIN, useCincoToquesNoLogo } from '../lib/admin'
 import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
-import { normalizarUsuario, useAuth } from '../lib/auth'
+import { useAuth } from '../lib/auth'
 import { moeda } from '../lib/format'
 import { useStore } from '../lib/store'
 import { VERSAO } from '../lib/versao'
 
-type Tela = 'entrar' | 'criar'
+/**
+ * Tela comum de entrada — só da equipe. Nada aqui fala do acesso administrativo.
+ *
+ * Como funciona hoje:
+ *  • **nomes**  → a pessoa toca no próprio nome e entra (acesso sem senha)
+ *  • **entrar** → usuário e senha (para quem tem senha definida)
+ *  • **criar**  → funcionário novo cria o próprio acesso (com ou sem senha)
+ */
+type Tela = 'nomes' | 'entrar' | 'criar'
 
-/** tela comum de entrada: só vendedores. Nada aqui fala do proprietário. */
+const iniciais = (nome: string) =>
+  nome
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0] ?? '')
+    .join('')
+    .toUpperCase()
+
 export default function Login() {
-  const { usuario, entrar, criarContaVendedor, nuvem } = useAuth()
+  const { usuario, entrar, entrarSemSenha, criarContaVendedor, nuvem } = useAuth()
   const { db, medirEspaco, liberarEspaco, comecarLimpoNesteAparelho } = useStore()
   const navegar = useNavigate()
 
-  const [tela, setTela] = useState<Tela>('entrar')
+  /** acessos da equipe que aparecem na lista de nomes (ativos e não-admin) */
+  const contasEquipe = useMemo(
+    () =>
+      db.usuarios
+        .filter((u) => u.ativo && u.papel === 'vendedor')
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
+    [db.usuarios],
+  )
+
+  // começa na lista de nomes quando existe equipe cadastrada; senão, no formulário
+  const [tela, setTela] = useState<Tela | null>(null)
+  const telaAtual: Tela = tela ?? (contasEquipe.length ? 'nomes' : 'entrar')
+
   const [login, setLogin] = useState('')
   const [senha, setSenha] = useState('')
   const [mostrar, setMostrar] = useState(false)
@@ -42,6 +70,8 @@ export default function Login() {
   const [nome, setNome] = useState('')
   const [repetir, setRepetir] = useState('')
   const [vendedorId, setVendedorId] = useState('')
+  /** funcionário novo pode entrar sem senha (só pelo nome), como o resto da equipe */
+  const [criarSemSenha, setCriarSemSenha] = useState(true)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [conexaoAberta, setConexaoAberta] = useState(false)
@@ -54,7 +84,7 @@ export default function Login() {
 
   const semArmazenamento = Boolean(armazenamento && !armazenamento.localOk && !armazenamento.idbOk)
 
-  // o logo esconde a porta do proprietário: 5 toques seguidos
+  // o logo esconde a porta administrativa: 5 toques seguidos
   const tocarNoLogo = useCincoToquesNoLogo(() => navegar(ROTA_ADMIN))
 
   /** nomes de vendedores que ainda não têm acesso — para a pessoa "assumir" o dela */
@@ -78,16 +108,40 @@ export default function Login() {
 
   const escolhido = disponiveis.find((v) => v.id === vendedorId)
 
+  /** tocou no nome: entra direto (sem senha) ou pede a senha de quem tem */
+  const escolherConta = async (conta: Usuario) => {
+    setErro('')
+    if (!conta.sem_senha) {
+      setTela('entrar')
+      setLogin(conta.usuario)
+      setSenha('')
+      return
+    }
+    setEnviando(true)
+    try {
+      await entrarSemSenha(conta.id, manter)
+      navegar('/')
+    } catch (err) {
+      setErro((err as Error).message)
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
     setErro('')
     setEnviando(true)
     try {
-      if (tela === 'entrar') {
+      if (telaAtual === 'entrar') {
         await entrar(login, senha, manter)
       } else {
-        if (senha !== repetir) throw new Error('As duas senhas precisam ser iguais.')
-        await criarContaVendedor({ nome, usuario: login, senha, vendedorId })
+        if (criarSemSenha) {
+          await criarContaVendedor({ nome, usuario: login, vendedorId, semSenha: true })
+        } else {
+          if (senha !== repetir) throw new Error('As duas senhas precisam ser iguais.')
+          await criarContaVendedor({ nome, usuario: login, senha, vendedorId })
+        }
       }
     } catch (err) {
       setErro((err as Error).message)
@@ -119,156 +173,256 @@ export default function Login() {
             <Logo />
           </button>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Sistema de pedidos DTF — acesse com o seu usuário
+            {telaAtual === 'nomes' ? 'Toque no seu nome para entrar' : 'Sistema de pedidos DTF'}
           </p>
         </div>
 
-        <form
-          onSubmit={enviar}
-          className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
-        >
-          <div className="mb-3">
-            <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
-              {tela === 'entrar' ? 'Entrar no sistema' : 'Criar meu acesso'}
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              {tela === 'entrar'
-                ? 'Use o seu usuário e senha.'
-                : 'Escolha um usuário, invente a sua senha e comece a lançar seus pedidos agora mesmo.'}
-            </p>
-          </div>
-
-          {tela === 'criar' ? (
-            <>
-              <Campo label="Seu nome" obrigatorio className="mb-3">
-                <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required autoFocus />
-              </Campo>
-
-              <Campo
-                label="Já trabalho aqui?"
-                dica="Escolha o seu nome para continuar vendo os seus pedidos. Se você é novo na equipe, deixe em “sou novo aqui”."
-                className="mb-3"
-              >
-                <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-                  <option value="">Sou novo aqui — criar com o meu nome</option>
-                  {disponiveis.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.nome} · {v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'}
-                    </option>
-                  ))}
-                </Selecao>
-              </Campo>
-
-              {escolhido ? (
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  <Etiqueta className="border-emerald-200 bg-white text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" icone={Users}>
-                    {escolhido.nome}
-                  </Etiqueta>
-                  <span>
-                    Você vai continuar de onde parou: <b>{escolhido.pedidos}</b> pedido(s) e{' '}
-                    <b>{moeda(escolhido.faturamento)}</b> nas filas concluídas.
-                  </span>
-                </div>
-              ) : (
-                <p className="mb-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
-                  Nenhum nome escolhido: vamos criar um cadastro novo com o seu nome.
-                </p>
-              )}
-            </>
-          ) : null}
-
-          <Campo label="Usuário" obrigatorio className="mb-3" dica="Só letras, números, ponto, traço e underline.">
-            <Entrada
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              placeholder="Digite seu usuário"
-              autoCapitalize="none"
-              autoCorrect="off"
-              required
-              autoFocus={tela === 'entrar'}
-            />
-          </Campo>
-
-          <Campo label="Senha" obrigatorio className="mb-3">
-            <div className="relative">
-              <Entrada
-                type={mostrar ? 'text' : 'password'}
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                placeholder="••••••"
-                className="pr-11"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setMostrar((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
-                title={mostrar ? 'Esconder senha' : 'Mostrar senha'}
-              >
-                {mostrar ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+        {/* ------------------------- lista de nomes ------------------------- */}
+        {telaAtual === 'nomes' ? (
+          <div className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+            <div className="mb-3">
+              <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-slate-100">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" /> Quem está usando?
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                Escolha o seu nome — não precisa de senha.
+              </p>
             </div>
-          </Campo>
 
-          {tela === 'criar' ? (
-            <Campo label="Repita a senha" obrigatorio className="mb-3">
-              <Entrada
-                type={mostrar ? 'text' : 'password'}
-                value={repetir}
-                onChange={(e) => setRepetir(e.target.value)}
-                placeholder="••••••"
-                required
-              />
-            </Campo>
-          ) : (
-            <label className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={manter}
-                onChange={(e) => setManter(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
-              />
-              Manter conectado neste aparelho
-            </label>
-          )}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {contasEquipe.map((conta) => (
+                <button
+                  key={conta.id}
+                  type="button"
+                  disabled={enviando}
+                  onClick={() => void escolherConta(conta)}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 text-left transition-all',
+                    'hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-soft disabled:opacity-60',
+                    'dark:border-slate-700 dark:bg-slate-800 dark:hover:border-purple-700',
+                  )}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-sm font-black text-white">
+                    {iniciais(conta.nome)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                      {conta.nome}
+                    </span>
+                    <span className="block text-[11px] text-slate-400 dark:text-slate-500">
+                      {conta.sem_senha ? 'entrar sem senha' : 'pede senha'}
+                    </span>
+                  </span>
+                  {conta.sem_senha ? null : <KeyRound className="h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" />}
+                </button>
+              ))}
+            </div>
 
-          {erro ? (
-            <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-sm font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
-              {erro}
-            </p>
-          ) : null}
+            {erro ? (
+              <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-sm font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
+                {erro}
+              </p>
+            ) : null}
 
-          <Botao
-            type="submit"
-            tamanho="lg"
-            className="w-full"
-            icone={tela === 'entrar' ? LogIn : UserPlus}
-            carregando={enviando}
-          >
-            {tela === 'entrar' ? 'Entrar' : 'Criar meu acesso'}
-            <ArrowRight className="h-4 w-4" />
-          </Botao>
-
-          <div className="mt-4 space-y-2 text-center text-sm">
-            {tela === 'entrar' ? (
-              <button
-                type="button"
-                onClick={() => trocarTela('criar')}
-                className="font-semibold text-purple-700 hover:underline dark:text-purple-300"
-              >
-                Sou funcionário — criar meu acesso
-              </button>
-            ) : (
+            <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-center text-sm dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => trocarTela('entrar')}
-                className="font-semibold text-purple-700 hover:underline dark:text-purple-300"
+                className="block w-full font-semibold text-slate-500 hover:text-purple-700 hover:underline dark:text-slate-400 dark:hover:text-purple-300"
               >
-                Já tenho acesso — entrar
+                Entrar no sistema com usuário e senha
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => trocarTela('criar')}
+                className="block w-full font-semibold text-purple-700 hover:underline dark:text-purple-300"
+              >
+                Sou funcionário novo — criar meu acesso
+              </button>
+            </div>
           </div>
-        </form>
+        ) : null}
+
+        {/* ------------------- formulário (entrar / criar) ------------------ */}
+        {telaAtual !== 'nomes' ? (
+          <form
+            onSubmit={enviar}
+            className="rounded-3xl border border-slate-100 bg-white/95 p-5 shadow-hover backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+          >
+            <div className="mb-3">
+              <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">
+                {telaAtual === 'entrar' ? 'Entrar no sistema' : 'Criar meu acesso'}
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                {telaAtual === 'entrar'
+                  ? 'Use o seu usuário e senha.'
+                  : 'Escolha um usuário e comece a lançar seus pedidos agora mesmo.'}
+              </p>
+            </div>
+
+            {telaAtual === 'criar' ? (
+              <>
+                <Campo label="Seu nome" obrigatorio className="mb-3">
+                  <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required autoFocus />
+                </Campo>
+
+                <Campo
+                  label="Já trabalho aqui?"
+                  dica="Escolha o seu nome para continuar vendo os seus pedidos. Se você é novo na equipe, deixe em “sou novo aqui”."
+                  className="mb-3"
+                >
+                  <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+                    <option value="">Sou novo aqui — criar com o meu nome</option>
+                    {disponiveis.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nome} · {v.pedidos} {v.pedidos === 1 ? 'pedido' : 'pedidos'}
+                      </option>
+                    ))}
+                  </Selecao>
+                </Campo>
+
+                {escolhido ? (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    <Etiqueta className="border-emerald-200 bg-white text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" icone={Users}>
+                      {escolhido.nome}
+                    </Etiqueta>
+                    <span>
+                      Você vai continuar de onde parou: <b>{escolhido.pedidos}</b> pedido(s) e{' '}
+                      <b>{moeda(escolhido.faturamento)}</b> nas filas concluídas.
+                    </span>
+                  </div>
+                ) : (
+                  <p className="mb-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                    Nenhum nome escolhido: vamos criar um cadastro novo com o seu nome.
+                  </p>
+                )}
+
+                <label className="mb-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={criarSemSenha}
+                    onChange={(e) => setCriarSemSenha(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
+                  />
+                  <span>
+                    <b>Entrar sem senha</b> (tocando no meu nome, como o resto da equipe).
+                    <span className="block text-xs text-slate-400 dark:text-slate-500">
+                      Desmarque para criar uma senha sua.
+                    </span>
+                  </span>
+                </label>
+              </>
+            ) : null}
+
+            <Campo label="Usuário" obrigatorio className="mb-3" dica="Só letras, números, ponto, traço e underline.">
+              <Entrada
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="Digite seu usuário"
+                autoCapitalize="none"
+                autoCorrect="off"
+                required
+                autoFocus={telaAtual === 'entrar'}
+              />
+            </Campo>
+
+            {telaAtual === 'criar' && criarSemSenha ? null : (
+              <Campo
+                label="Senha"
+                obrigatorio={telaAtual === 'entrar'}
+                className="mb-3"
+                dica={telaAtual === 'criar' ? 'Deixe em branco para entrar sem senha.' : undefined}
+              >
+                <div className="relative">
+                  <Entrada
+                    type={mostrar ? 'text' : 'password'}
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    placeholder="••••••"
+                    className="pr-11"
+                    required={telaAtual === 'entrar'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrar((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
+                    title={mostrar ? 'Esconder senha' : 'Mostrar senha'}
+                  >
+                    {mostrar ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </Campo>
+            )}
+
+            {telaAtual === 'criar' && !criarSemSenha ? (
+              <Campo label="Repita a senha" obrigatorio className="mb-3">
+                <Entrada
+                  type={mostrar ? 'text' : 'password'}
+                  value={repetir}
+                  onChange={(e) => setRepetir(e.target.value)}
+                  placeholder="••••••"
+                  required
+                />
+              </Campo>
+            ) : telaAtual === 'entrar' ? (
+              <label className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={manter}
+                  onChange={(e) => setManter(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
+                />
+                Manter conectado neste aparelho
+              </label>
+            ) : null}
+
+            {erro ? (
+              <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-sm font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
+                {erro}
+              </p>
+            ) : null}
+
+            <Botao
+              type="submit"
+              tamanho="lg"
+              className="w-full"
+              icone={telaAtual === 'entrar' ? LogIn : UserPlus}
+              carregando={enviando}
+            >
+              {telaAtual === 'entrar' ? 'Entrar' : 'Criar meu acesso'}
+              <ArrowRight className="h-4 w-4" />
+            </Botao>
+
+            <div className="mt-4 space-y-2 text-center text-sm">
+              {contasEquipe.length ? (
+                <button
+                  type="button"
+                  onClick={() => trocarTela('nomes')}
+                  className="block w-full font-semibold text-purple-700 hover:underline dark:text-purple-300"
+                >
+                  Voltar para a lista de nomes
+                </button>
+              ) : null}
+              {telaAtual === 'entrar' ? (
+                <button
+                  type="button"
+                  onClick={() => trocarTela('criar')}
+                  className="block w-full font-semibold text-slate-500 hover:text-purple-700 hover:underline dark:text-slate-400 dark:hover:text-purple-300"
+                >
+                  Sou funcionário novo — criar meu acesso
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => trocarTela('entrar')}
+                  className="block w-full font-semibold text-slate-500 hover:text-purple-700 hover:underline dark:text-slate-400 dark:hover:text-purple-300"
+                >
+                  Já tenho acesso — entrar no sistema
+                </button>
+              )}
+            </div>
+          </form>
+        ) : null}
 
         {semArmazenamento ? (
           <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
@@ -329,8 +483,8 @@ export default function Login() {
           >
             {nuvem ? <ShieldCheck className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
             {nuvem
-              ? 'Contas validadas no Supabase (seguro)'
-              : 'Modo local: as contas ficam neste navegador. Configure o Supabase para usar em vários aparelhos.'}
+              ? 'Dados e contas no banco da empresa (Supabase)'
+              : 'Modo local: os dados ficam neste navegador. Configure o Supabase para usar em vários aparelhos.'}
           </p>
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
             <Sparkles className="h-3 w-3" /> Esqueceu a senha? Peça para redefinirem para você.

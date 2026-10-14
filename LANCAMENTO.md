@@ -22,16 +22,16 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 
 ## Parte 0 — Deixar a versão limpa na `main` (2 min)
 
-A limpeza do sistema (versão **1.1.0**: sem dados de exemplo, sem o acesso antigo
-`gui`/`12345`) está no **Pull Request #5**. Enquanto ele não for aprovado, a `main` ainda
-tem o pacote **antigo**.
+A versão **1.2.0** (sem pedidos de exemplo, sem o acesso antigo `gui`/`12345`, e já com
+**JESSICA, RAISSA e ANDREIA** entrando pelo nome sem senha) está no **Pull Request #5**.
+Enquanto ele não for aprovado, a `main` ainda tem o pacote **antigo**.
 
 1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints/pull/5>
 2. Role até o fim e clique em **Merge pull request** → **Confirm merge**.
    (Ou peça: *“pode fazer o merge do PR 5”* — eu faço.)
 3. **Como conferir que deu certo:** abra o arquivo
    [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam ser
-   `Altoprints — Sistema de Pedidos DTF (versão 1.1.0)` e
+   `Altoprints — Sistema de Pedidos DTF (versão 1.2.0)` e
    `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se ainda aparecer `usuário: gui  senha: 12345`, o
    merge não foi feito.
 
@@ -178,25 +178,23 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 
 ---
 
-## Parte 4 — Contas da equipe + celulares conectados (5 min)
+## Parte 4 — Equipe e celulares (5 min)
 
-### 4.1 Criar as contas de quem já trabalha aqui
+### 4.1 Como a equipe entra (sem senha)
 
-**Equipe → Nova conta** (uma por pessoa):
-
-| Campo | O que colocar |
-| --- | --- |
-| Nome da pessoa | o nome dela (como aparece nos pedidos) |
-| Usuário | o login que ela vai digitar |
-| Senha | a que ela combinou com você |
-| Tipo de acesso | **Vendedor — vê só o que é dele** |
-| Já trabalha aqui? (vínculo) | o vendedor certo — a tela mostra quantos pedidos e quanto essa conta vai ver |
-
-- Sem vínculo escolhido, o sistema cria um vendedor novo com o nome informado.
+- **JESSICA**, **RAISSA** e **ANDREIA** já vêm cadastradas no sistema (com os 3 vendedores
+  criados e sem nenhum pedido ainda).
+- Na tela inicial aparece **“Quem está usando?”**: cada uma só **toca no próprio nome** e já
+  entra na área dela — **sem precisar de senha**.
+- Só o **proprietário** usa senha (pela porta `#/administracao`, 5 toques no logo ou
+  `Ctrl + Alt + D`).
+- **Para adicionar mais alguém depois:** *Equipe → Nova conta* (já vem marcado **“Entrar sem
+  senha”** por padrão) — ou a própria pessoa toca em **“Sou funcionário novo — criar meu
+  acesso”** na tela inicial.
+- **Se no futuro quiser colocar senha em alguém (ou tirar):** *Equipe → Vínculo e senha*.
 - **Permissões:** *Configurações → Permissões* (total / sem excluir / somente criar).
 - **Telas extras por pessoa** (relatório, fila de impressão, cliente especial):
   *Equipe → Vínculo e senha*.
-- **Funcionário novo** pode criar sozinho: na tela de entrada, **“Criar meu acesso”**.
 
 ### 4.2 Conectar os aparelhos da equipe (1 clique para cada um)
 
@@ -211,40 +209,41 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 
 ### 4.3 Testar antes de divulgar
 
+- [ ] Na tela inicial aparecem **ANDREIA**, **JESSICA** e **RAISSA** e tocar num nome entra
+      direto sem pedir senha
 - [ ] Criou um **pedido de teste** no computador → ele apareceu no celular (e vice-versa)
 - [ ] Anexou um **arquivo de arte** no pedido (testa o espaço das artes)
-- [ ] Entrou com uma conta de **vendedor** (aba anônima) e ela viu **só** os pedidos dela
+- [ ] Entrou tocando no nome de uma vendedora (aba anônima) e ela viu **só** os pedidos dela
 - [ ] **Apagou** o pedido de teste
 
 ### 4.4 Mensagem pronta para o grupo
 
-> *Oi, gente! O sistema novo de pedidos está no ar 👇*
+> *Oi, meninas! O sistema novo de pedidos está no ar 👇*
 > *Link: (colocar aqui)*
 > *Abra o link uma vez para conectar o seu celular.*
-> *Você entra com o usuário e a senha que combinamos comigo.*
-> *Para trocar a senha: canto direito → Meu perfil → Trocar minha senha.*
-> *Funcionário novo: toque em “Criar meu acesso” e crie o seu.*
+> *Para entrar é só tocar no seu nome na tela inicial (não precisa de senha).*
+> *Para trocar de pessoa: canto direito → Meu perfil → Sair do sistema.*
 
 ---
 
 ## Parte 5 — Conferência final
 
-- [ ] **PR #5 aprovado** e a `main` com a versão **1.1.0** (Parte 0)
+- [ ] **PR #5 aprovado** e a `main` com a versão **1.2.0** (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
 - [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
-- [ ] Tela de login mostra **“Contas validadas no Supabase”** ou
+- [ ] Tela de login mostra **“Dados e contas no banco da empresa (Supabase)”** ou
       *Configurações → Nuvem* mostra **“Banco na nuvem conectado”**
 - [ ] Seu acesso de **proprietário** criado com **senha forte** + ícone salvo no celular
 - [ ] Segundo proprietário criado, se for o caso (Parte 3C)
-- [ ] Contas da equipe criadas e **ligadas ao vendedor certo** (Parte 4.1)
+- [ ] **JESSICA, RAISSA e ANDREIA** aparecendo na tela inicial (“Quem está usando?”)
 - [ ] **Comissões** e **preços do metro** conferidos em *Configurações*
 - [ ] **Logo da empresa** enviado em *Configurações → Empresa*
 - [ ] **Nenhum dado de exemplo** no sistema (sem a faixa amarela “não são reais”).
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.1.0** aparecendo no rodapé da tela de login
+- [ ] Versão **1.2.0** aparecendo no rodapé da tela de login
 
 ---
 

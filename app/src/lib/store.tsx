@@ -38,7 +38,8 @@ import {
   type DiagnosticoArmazenamento,
   type OndeEstaGuardado,
 } from './armazenamento'
-import { limparChavesDoSistema, lsRemover } from './local'
+import { limparChavesDoSistema, lsGravar, lsLer, lsRemover } from './local'
+import { CHAVE_EQUIPE_INICIAL, registrosEquipeInicial } from './equipe-inicial'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -171,14 +172,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * Cria os acessos da EQUIPE INICIAL (JESSICA, RAISSA, ANDREIA — lista em
+   * `lib/equipe-inicial.ts`) na primeira abertura. São acessos de funcionário
+   * **sem senha**: cada um entra tocando no próprio nome na tela de entrada.
+   *
+   * O acesso do PROPRIETÁRIO nunca vem pronto — ele é criado na porta
+   * administrativa (#/administracao) e exige senha.
+   */
+  const criarEquipeInicial = useCallback(
+    async (dados: DB): Promise<DB> => {
+      if (dados.configuracoes.modo_exemplo || lsLer(CHAVE_EQUIPE_INICIAL) === '1') return dados
+      const { vendedores, usuarios } = registrosEquipeInicial(dados)
+      if (!vendedores.length && !usuarios.length) {
+        lsGravar(CHAVE_EQUIPE_INICIAL, '1')
+        return dados
+      }
+      try {
+        await salvarVarios('vendedores', vendedores)
+        await salvarVarios('usuarios', usuarios)
+        // só marca depois de gravado: se o banco ainda não tiver a coluna nova,
+        // tenta de novo na próxima abertura em vez de desistir para sempre
+        lsGravar(CHAVE_EQUIPE_INICIAL, '1')
+        if (usuarios.length)
+          avisar(
+            `Acessos da equipe prontos: ${usuarios
+              .map((u) => u.nome)
+              .join(', ')} — cada um entra tocando no próprio nome (sem senha).`,
+            'info',
+          )
+        const idsUsuarios = new Set(usuarios.map((u) => u.id))
+        return {
+          ...dados,
+          vendedores: [...dados.vendedores, ...vendedores].sort((a, b) => a.nome.localeCompare(b.nome)),
+          usuarios: [...dados.usuarios.filter((u) => !idsUsuarios.has(u.id)), ...usuarios],
+        }
+      } catch (e) {
+        console.warn('[altoprints] não foi possível criar os acessos da equipe:', (e as Error).message)
+        return dados
+      }
+    },
+    [avisar],
+  )
+
   const conectarNuvem = useCallback(
     async (url: string, chave: string) => {
       conectarSupabase({ url, chave })
       setNuvem(true)
-      await recarregar()
+      lsRemover(CHAVE_EQUIPE_INICIAL)
+      const dados = await recarregar()
+      setDb(await criarEquipeInicial(dados))
       avisar('Banco na nuvem conectado! Os dados agora são iguais em todos os aparelhos.')
     },
-    [avisar, recarregar],
+    [avisar, criarEquipeInicial, recarregar],
   )
 
   const desconectarNuvem = useCallback(() => {
@@ -207,10 +253,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       try {
         const dados = await carregarTudo()
-        // O sistema começa SEMPRE vazio: nenhum dado de exemplo é semeado aqui.
-        // Quem quiser exemplos para treinar pede em Configurações → Dados.
-        setDb(dados)
+        // O sistema começa SEMPRE sem pedidos, clientes ou impressões: nenhum
+        // dado de exemplo é semeado aqui. Quem quiser exemplos para treinar pede
+        // em Configurações → Dados. Só os acessos da equipe são criados (acima).
         lsRemover(CHAVE_DEMO_ANTIGA)
+        setDb(await criarEquipeInicial(dados))
         // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
         // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
         try {
@@ -446,15 +493,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (contaMantida) await salvarRegistro('usuarios', contaMantida)
       const vazio = { ...dbVazio(), usuarios: contaMantida ? [contaMantida] : [] }
       lsRemover(CHAVE_DEMO_ANTIGA)
-      setDb(vazio)
+      lsRemover(CHAVE_EQUIPE_INICIAL)
+      setDb(await criarEquipeInicial(vazio))
       avisar(
         contaMantida
-          ? 'Todos os dados foram apagados (o seu acesso de proprietário foi mantido).'
+          ? 'Todos os dados foram apagados (o seu acesso de proprietário e os nomes da equipe foram mantidos).'
           : 'Todos os dados foram apagados.',
         'info',
       )
     },
-    [avisar, db.usuarios],
+    [avisar, criarEquipeInicial, db.usuarios],
   )
 
   /** baixa um arquivo com todo o banco (o plano grátis do Supabase não tem backup) */

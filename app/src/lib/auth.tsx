@@ -14,30 +14,16 @@ import { definirVisualizacao } from './visualizacao'
 import { gerarHashSenha, senhaConfere } from './senha'
 import { clienteNuvem, emNuvem } from './supabase'
 import { type TelasAcesso, type Usuario, type Vendedor } from './types'
+import { emailInterno, normalizarUsuario, validarSenha, validarUsuario } from './usuario'
 import { useStore } from './store'
+
+/* as regras do nome de usuário ficam em lib/usuario.ts; continuam saindo daqui
+   para não quebrar quem já importa deste módulo */
+export { emailInterno, normalizarUsuario, validarUsuario } from './usuario'
 
 /* ------------------------------------------------------------------ */
 /* utilidades                                                          */
 /* ------------------------------------------------------------------ */
-
-/** normaliza o nome de usuário digitado (sem espaços, acentos, minúsculo) */
-export const normalizarUsuario = (valor: string) =>
-  (valor || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, '')
-    .slice(0, 24)
-
-export const validarUsuario = (valor: string) => {
-  const u = normalizarUsuario(valor)
-  if (u.length < 3) return 'O nome de usuário precisa ter pelo menos 3 letras.'
-  if (/^[._-]/.test(u)) return 'O nome de usuário não pode começar com ponto, traço ou underline.'
-  return ''
-}
-
-/** e-mail interno usado quando o login é por nome de usuário (Supabase Auth precisa de e-mail) */
-export const emailInterno = (usuario: string) => `${normalizarUsuario(usuario)}@altoprints.local`
 
 const CHAVE_SESSAO = 'altoprints:sessao'
 const CHAVE_TENTATIVAS = 'altoprints:tentativas'
@@ -110,22 +96,39 @@ export interface AuthContexto {
   /** já existe alguma conta de proprietário no sistema? */
   temProprietario: boolean
   entrar: (usuario: string, senha: string, manter: boolean) => Promise<void>
+  /**
+   * Entra sem digitar senha: a pessoa tocou no próprio nome na tela de entrada.
+   * Vale apenas para acesso de vendedor marcado como `sem_senha` — o
+   * proprietário sempre precisa da senha.
+   */
+  entrarSemSenha: (usuarioId: string, manter?: boolean) => Promise<void>
   sair: () => Promise<void>
   criarContaProprietario: (dados: { nome: string; usuario: string; senha: string }) => Promise<void>
-  criarContaVendedor: (dados: { nome: string; usuario: string; senha: string; vendedorId?: string }) => Promise<void>
+  criarContaVendedor: (dados: {
+    nome: string
+    usuario: string
+    senha?: string
+    vendedorId?: string
+    /** sem senha: a pessoa entra tocando no próprio nome */
+    semSenha?: boolean
+  }) => Promise<void>
   /** cria a conta pelo painel do proprietário (Equipe → Nova conta) */
   criarContaComoDono: (dados: {
     nome: string
     usuario: string
-    senha: string
+    senha?: string
     vendedorId?: string
     administrador?: boolean
+    /** sem senha (só para vendedor): a pessoa entra tocando no próprio nome */
+    semSenha?: boolean
   }) => Promise<void>
   trocarMinhaSenha: (senhaAtual: string, nova: string) => Promise<void>
   atualizarMeuPerfil: (dados: { nome: string }) => Promise<void>
   /** troca o próprio nome de usuário (login) — no modo nuvem fica bloqueado */
   trocarMeuUsuario: (novoUsuario: string) => Promise<void>
   redefinirSenha: (usuarioId: string, novaSenha: string) => Promise<void>
+  /** tira a senha de um acesso de vendedor: ele volta a entrar pelo nome */
+  removerSenha: (usuarioId: string) => Promise<void>
   atualizarVinculo: (usuarioId: string, vendedorId: string) => Promise<void>
   /** libera/bloqueia as telas de relatório de um acesso de vendedor */
   salvarTelas: (usuarioId: string, telas: Partial<TelasAcesso>) => Promise<void>
@@ -265,6 +268,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lsGravar(CHAVE_SESSAO, JSON.stringify({ usuario_id: id, expira_em: expira, conectado: manter }))
   }
 
+  /**
+   * Entrada pelo nome (sem senha). Só funciona para acesso de VENDEDOR marcado
+   * como `sem_senha` e ativo — proprietário nunca entra por aqui.
+   */
+  const entrarSemSenha = useCallback(
+    async (usuarioId: string, manter = true) => {
+      const noBanco = await lerUsuarios()
+      const lista = noBanco.length ? noBanco : usuarios
+      const conta = lista.find((u) => u.id === usuarioId)
+      if (!conta) throw new Error('Este acesso não existe mais. Fale com o proprietário.')
+      if (!conta.ativo) throw new Error('Este acesso está desativado. Fale com o proprietário.')
+      if (conta.papel === 'proprietario' || !conta.sem_senha)
+        throw new Error('Este acesso pede senha. Use "Entrar com usuário e senha".')
+      setVisualizandoId(null)
+      definirVisualizacao(null)
+      setUsuarioId(conta.id)
+      guardarSessao(conta.id, manter)
+    },
+    [usuarios],
+  )
+
   /* ------------------------------ entrar ------------------------------ */
 
   const entrar = useCallback(
@@ -298,6 +322,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!conta.ativo) throw new Error('Este acesso está desativado. Fale com o proprietário.')
+
+      // acesso de funcionário sem senha: entra tocando no nome, não digitando
+      if (conta.sem_senha)
+        throw new Error('Este acesso entra sem senha: toque no seu nome na tela de entrada.')
 
       // 1) tenta pelo Supabase Auth quando configurado
       const sb = clienteNuvem()
@@ -375,12 +403,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * a pessoa informa um nome que ainda não existe.
    */
   const prepararConta = async (
-    dados: { nome: string; usuario: string; senha: string; vendedorId?: string },
+    dados: { nome: string; usuario: string; senha?: string; vendedorId?: string; semSenha?: boolean },
     papel: 'proprietario' | 'vendedor',
   ): Promise<Usuario> => {
     const erro = validarUsuario(dados.usuario)
     if (erro) throw new Error(erro)
-    if (dados.senha.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.')
+    // o proprietário sempre usa senha; o funcionário pode entrar só pelo nome
+    const semSenha = papel === 'vendedor' && Boolean(dados.semSenha)
+    const senha = dados.senha ?? ''
+    if (semSenha) {
+      if (senha) throw new Error('Para entrar sem senha, deixe o campo de senha vazio.')
+    } else {
+      const erroSenha = validarSenha(senha)
+      if (erroSenha) throw new Error(erroSenha)
+    }
     if (!dados.nome.trim()) throw new Error('Informe o seu nome.')
 
     const noBanco = await lerUsuarios()
@@ -418,7 +454,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: novoId(),
       nome: dados.nome.trim(),
       usuario: normalizarUsuario(dados.usuario),
-      senha_hash: await gerarHashSenha(dados.senha),
+      // sem senha: o hash fica vazio e a entrada é pelo nome (nunca para o dono)
+      senha_hash: semSenha ? '' : await gerarHashSenha(senha),
+      sem_senha: semSenha,
       papel,
       vendedor_id: idVendedor,
       ativo: true,
@@ -426,12 +464,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const criarContaVendedor: AuthContexto['criarContaVendedor'] = async ({ nome, usuario, senha, vendedorId }) => {
-    const conta = await prepararConta({ nome, usuario, senha, vendedorId }, 'vendedor')
+  const criarContaVendedor: AuthContexto['criarContaVendedor'] = async ({
+    nome,
+    usuario,
+    senha,
+    vendedorId,
+    semSenha,
+  }) => {
+    const conta = await prepararConta({ nome, usuario, senha, vendedorId, semSenha }, 'vendedor')
 
     const sb = clienteNuvem()
-    if (sb) {
-      const { error } = await sb.auth.signUp({ email: emailInterno(conta.usuario), password: senha })
+    // sem senha não há o que registrar no Supabase Auth
+    if (sb && !conta.sem_senha) {
+      const { error } = await sb.auth.signUp({ email: emailInterno(conta.usuario), password: senha ?? '' })
       if (error && !/already registered/i.test(error.message)) {
         throw new Error(`Não foi possível criar a conta na nuvem: ${error.message}`)
       }
@@ -451,11 +496,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     senha,
     vendedorId,
     administrador,
+    semSenha,
   }) => {
-    const conta = await prepararConta({ nome, usuario, senha, vendedorId }, administrador ? 'proprietario' : 'vendedor')
+    if (administrador && semSenha)
+      throw new Error('O acesso de proprietário precisa de senha (ele vê tudo, inclusive valores).')
+    const conta = await prepararConta(
+      { nome, usuario, senha, vendedorId, semSenha },
+      administrador ? 'proprietario' : 'vendedor',
+    )
     await salvarRegistro('usuarios', conta)
     await recarregar()
-    avisar(`Acesso de ${conta.nome} criado. Usuário: ${conta.usuario}.`)
+    avisar(
+      conta.sem_senha
+        ? `Acesso de ${conta.nome} criado: entra tocando no próprio nome (sem senha).`
+        : `Acesso de ${conta.nome} criado. Usuário: ${conta.usuario}.`,
+    )
   }
 
   /* ------------------------------ perfil ------------------------------ */
@@ -468,7 +523,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // no modo local (ou quando a validação for local) confere a senha atual
     if (!(await senhaConfere(senhaAtual, alvo.senha_hash))) throw new Error('A senha atual não confere.')
 
-    const atualizado: Usuario = { ...alvo, senha_hash: await gerarHashSenha(nova) }
+    // quem definiu uma senha passa a entrar por ela (sai da entrada só pelo nome)
+    const atualizado: Usuario = { ...alvo, senha_hash: await gerarHashSenha(nova), sem_senha: false }
     await salvarRegistro('usuarios', atualizado)
     const sb = clienteNuvem()
     if (sb) await sb.auth.updateUser({ password: nova })
@@ -507,10 +563,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const noBanco = await lerUsuarios()
     const alvo = (noBanco.length ? noBanco : usuarios).find((u) => u.id === usuarioId)
     if (!alvo) throw new Error('Conta não encontrada.')
-    if (novaSenha.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.')
-    await salvarRegistro('usuarios', { ...alvo, senha_hash: await gerarHashSenha(novaSenha) })
+    const erroSenha = validarSenha(novaSenha)
+    if (erroSenha) throw new Error(erroSenha)
+    // definir uma senha tira a conta da entrada "só pelo nome"
+    await salvarRegistro('usuarios', { ...alvo, senha_hash: await gerarHashSenha(novaSenha), sem_senha: false })
     await recarregar()
-    avisar(`Senha de ${alvo.nome} redefinida.`)
+    avisar(`Senha de ${alvo.nome} redefinida. Agora essa conta entra com usuário e senha.`)
+  }
+
+  /**
+   * Tira a senha de um acesso de vendedor: a pessoa volta a entrar tocando no
+   * próprio nome. Não vale para o proprietário (ele vê tudo, inclusive valores).
+   */
+  const removerSenha: AuthContexto['removerSenha'] = async (usuarioId) => {
+    const noBanco = await lerUsuarios()
+    const alvo = (noBanco.length ? noBanco : usuarios).find((u) => u.id === usuarioId)
+    if (!alvo) throw new Error('Conta não encontrada.')
+    if (alvo.papel === 'proprietario')
+      throw new Error('O acesso de proprietário não pode ficar sem senha.')
+    await salvarRegistro('usuarios', { ...alvo, senha_hash: '', sem_senha: true })
+    await recarregar()
+    avisar(`${alvo.nome} agora entra sem senha (tocando no próprio nome).`, 'info')
   }
 
   const atualizarVinculo: AuthContexto['atualizarVinculo'] = async (usuarioId, vendedorId) => {
@@ -610,6 +683,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ehProprietario: usuario?.papel === 'proprietario',
     temProprietario,
     entrar,
+    entrarSemSenha,
     sair,
     criarContaProprietario,
     criarContaVendedor,
@@ -618,6 +692,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     atualizarMeuPerfil,
     trocarMeuUsuario,
     redefinirSenha,
+    removerSenha,
     atualizarVinculo,
     salvarTelas,
     alternarAtivo,
