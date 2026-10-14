@@ -87,9 +87,16 @@ const certos = []
 /* 1) onde está o pacote?                                              */
 /* ------------------------------------------------------------------ */
 
+// Aceita a pasta como argumento (usado pelo Netlify: "npm run checar dist").
+// Sem argumento, confere a pasta publicar/ (ou a dist/, se ela não existir).
+const argumento = process.argv[2] ? resolve(process.cwd(), process.argv[2]) : null
+if (argumento && !existsSync(argumento)) {
+  console.log(`\n❌ A pasta informada não existe: ${argumento}\n`)
+  process.exit(1)
+}
 const publicar = resolve(raiz, 'publicar')
 const dist = resolve(app, 'dist')
-const pasta = existsSync(publicar) ? publicar : existsSync(dist) ? dist : null
+const pasta = argumento ?? (existsSync(publicar) ? publicar : existsSync(dist) ? dist : null)
 
 if (!pasta) {
   console.log('\n❌ Nada para conferir: rode "npm run publicar" (ou "npm run build") antes.\n')
@@ -197,5 +204,9 @@ if (problemas.length) {
 }
 
 console.log(`\n✅ Pacote liberado para publicar (versão ${pacote.version}).`)
-console.log('   Próximo passo: https://app.netlify.com/drop → arraste a pasta publicar/ → Claim site.')
-console.log('   Guia curto: LANCAMENTO.md (raiz do repositório).\n')
+if (pasta === publicar) {
+  console.log('   Próximo passo: https://app.netlify.com/drop → arraste a pasta publicar/ → Claim site.')
+} else {
+  console.log(`   Conferido: ${pasta.slice(raiz.length + 1) || pasta} (é esta pasta que o Netlify/Vercel publica).`)
+}
+console.log('   Guia completo: LANCAMENTO.md (raiz do repositório).\n')

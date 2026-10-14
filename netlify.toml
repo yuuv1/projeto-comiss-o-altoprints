@@ -5,11 +5,13 @@
 [build]
   # o projeto React fica dentro da pasta app/
   base = "app"
-  command = "npm run build"
+  # build + a conferência do pacote (o site só sobe se estiver limpo)
+  command = "npm run build && npm run checar dist"
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # os testes e o jsdom 30 precisam do Node 22.22+ (o package.json pede o mesmo)
+  NODE_VERSION = "22"
 
 # Garante que qualquer endereço abra o sistema (mesmo com caminhos digitados na mão)
 [[redirects]]
