@@ -96,13 +96,22 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
         ) : null}
 
         <div className="rounded-xl border border-slate-100 p-4 dark:border-slate-800">
-          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-            <KeyRound className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Trocar minha senha
+          <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            <KeyRound className="h-4 w-4 text-purple-600 dark:text-purple-400" />{' '}
+            {usuario?.sem_senha ? 'Colocar uma senha (opcional)' : 'Trocar minha senha'}
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Campo label="Senha atual">
-              <Entrada type="password" value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••" />
-            </Campo>
+          {usuario?.sem_senha ? (
+            <p className="mb-3 text-xs text-emerald-700 dark:text-emerald-300">
+              Hoje o seu acesso entra <b>sem senha</b> (basta tocar no seu nome na tela de entrada). Só preencha abaixo
+              se quiser passar a digitar senha.
+            </p>
+          ) : null}
+          <div className={usuario?.sem_senha ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3 sm:grid-cols-3'}>
+            {usuario?.sem_senha ? null : (
+              <Campo label="Senha atual">
+                <Entrada type="password" value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••" />
+              </Campo>
+            )}
             <Campo label="Nova senha">
               <Entrada type="password" value={nova} onChange={(e) => setNova(e.target.value)} placeholder="••••••" />
             </Campo>
@@ -110,8 +119,14 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
               <Entrada type="password" value={repetir} onChange={(e) => setRepetir(e.target.value)} placeholder="••••••" />
             </Campo>
           </div>
-          <Botao className="mt-3" icone={KeyRound} onClick={trocarSenha} carregando={salvando} disabled={!atual || nova.length < 4}>
-            Trocar senha
+          <Botao
+            className="mt-3"
+            icone={KeyRound}
+            onClick={trocarSenha}
+            carregando={salvando}
+            disabled={(!usuario?.sem_senha && !atual) || nova.length < 4}
+          >
+            {usuario?.sem_senha ? 'Salvar senha' : 'Trocar senha'}
           </Botao>
           <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
             {nuvem

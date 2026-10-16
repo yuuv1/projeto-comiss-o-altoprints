@@ -8,6 +8,10 @@ no sistema antigo (artastic-printflow.lovable.app): mesma navegação em "pílul
 mesmos cartões de resumo, as mesmas etiquetas de status, os mesmos cálculos de preço
 por metragem e os mesmos relatórios prontos para a contabilidade.
 
+> 🚀 **Quer colocar no ar agora?** Siga o **[LANCAMENTO.md](LANCAMENTO.md)** — é o guia
+> curto (10 minutos) com a ordem certa: publicar, criar o acesso do dono, criar as contas
+> da equipe e conectar a nuvem.
+
 ---
 
 ## Como rodar
@@ -24,11 +28,14 @@ Rode `npm run publicar` e clique **duas vezes** em **`publicar/Altoprints.html`*
 É um arquivo único (programa + visual embutidos) que abre no navegador já funcionando,
 sem internet e sem instalar nada — os dados ficam salvos nesse computador.
 
-> **Acesso de exemplo:** enquanto os dados de demonstração estiverem carregados existe
-> um acesso de proprietário pronto — usuário **`gui`** e senha **`12345`** (troque a
-> senha em Configurações → Meu acesso, ou crie o seu próprio acesso em
-> `#/administracao`). Ele sai junto quando os dados de exemplo são apagados
-> (Configurações → Dados → Apagar todos os dados).
+> **O sistema começa vazio, do zero:** nenhum pedido, cliente ou conta vem pronto e
+> **não existe usuário nem senha padrão**. O primeiro acesso de proprietário é criado por
+> você em `#/administracao` (ou 5 toques no logo, ou `Ctrl + Alt + D`).
+>
+> **Dados de exemplo** são opcionais e **fictícios** (`CLIENTE EXEMPLO 01`, telefone
+> `(00) 90000-0001`): entram só quando o proprietário pede em *Configurações → Dados →
+> Carregar demonstração*, e a tela fica com um aviso amarelo *“dados de exemplo — não são
+> reais”* até serem apagados. Eles não criam nenhuma conta de acesso.
 
 > ⚠️ **Não abra o `publicar/index.html` com dois cliques** — a tela fica em branco. Esse
 > arquivo serve para **hospedar** (ele busca o programa na pasta `assets/`, e o navegador
@@ -44,6 +51,7 @@ Outros comandos:
 | `npm run preview` | testa a versão final |
 | `npm run testar` | roda os testes das regras (preço, comissão, senha) e das telas |
 | `npm run publicar` | monta a pasta `publicar/` (site pronto) + o arquivo `Altoprints.html` |
+| `npm run checar` | confere se o pacote pode ir para o ar (sem senha de exemplo, dado real ou chave secreta) |
 
 ---
 
@@ -132,6 +140,12 @@ administrador não há nada para fazer ali** (nem lista de nomes, nem dados).
 colocar quem já trabalhava aqui com o histórico ligado. O dono também redefine senhas e
 troca vínculos nessa tela.
 
+**Vários proprietários:** na mesma janela, *Tipo de acesso → “Proprietário — vê tudo”* cria
+outro login de dono (sócio, gerente, escritório) — o atalho também aparece em
+*Configurações → Meu acesso*. O sistema aceita quantos quiser, mas **nunca fica sem
+nenhum** proprietário ativo: o último não pode ser desativado nem excluído, e ninguém
+apaga o próprio acesso.
+
 - No menu do dono também aparecem **Equipe** (criar, ligar a um vendedor, redefinir
   senha, desativar ou excluir contas), **Relatório**, **Para imprimir**, **Entregas** e
   **Configurações** — nada disso aparece para os vendedores.
@@ -171,6 +185,8 @@ O sistema funciona de duas formas, sem mudar nenhuma tela:
 
 1. **Modo local (padrão)** — os dados ficam salvos no próprio navegador. Bom para
    conhecer o sistema e testar. Os arquivos de arte ficam no navegador também.
+   ⚠️ Cada aparelho guarda os **próprios** dados: sem a nuvem, o celular do vendedor não
+   vê os pedidos do computador.
 2. **Modo nuvem (Supabase, grátis)** — os dados ficam num banco na nuvem e aparecem
    iguais em todos os computadores e celulares. Para ativar, veja **[app/DEPLOY.md](app/DEPLOY.md)**.
 
@@ -202,8 +218,12 @@ app/
 - [x] Porta administrativa escondida (endereço `#/administracao`, 5 toques no logo, Ctrl+Alt+D)
 - [x] Equipe → Nova conta (o dono registra a equipe já com o histórico antigo ligado)
 - [x] Opções de relatórios e telas liberadas acesso por acesso (Equipe)
-- [ ] Colocar no ar (pasta `publicar/` no Netlify) e conectar o Supabase
-      (guia curto: `app/CONECTAR-NUVEM.md`)
+- [x] Sistema limpo para produção: começa vazio, sem dados nem senha de exemplo
+      (dados de treino opcionais e fictícios, com aviso na tela)
+- [x] Vários acessos de proprietário (Equipe → Nova conta → “Proprietário — vê tudo”)
+- [x] Guarda de publicação (`npm run checar`) + pacote `publicar/` conferido no GitHub Actions
+- [ ] Colocar no ar — guia curto: **[`LANCAMENTO.md`](LANCAMENTO.md)**
+- [ ] Conectar o Supabase (guia: `app/CONECTAR-NUVEM.md`) para a equipe compartilhar os dados
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
 

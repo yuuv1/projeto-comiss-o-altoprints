@@ -11,7 +11,6 @@ import {
 import {
   carregarTudo,
   limparTudo,
-  modoNuvem,
   removerArquivosDoPedido,
   removerRegistro,
   salvarConfiguracoes,
@@ -30,8 +29,7 @@ import {
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
 import { bloquearSeVisualizando, registrarAvisoDeBloqueio } from './visualizacao'
-import { gerarDadosDemo, prepararAcessoDemo } from './seed'
-import { gerarHashSenha } from './senha'
+import { gerarDadosDemo } from './seed'
 import {
   espacoNoLocalStorage,
   liberarCopiaAntiga,
@@ -40,7 +38,8 @@ import {
   type DiagnosticoArmazenamento,
   type OndeEstaGuardado,
 } from './armazenamento'
-import { limparChavesDoSistema, lsGravar, lsLer } from './local'
+import { limparChavesDoSistema, lsGravar, lsLer, lsRemover } from './local'
+import { CHAVE_EQUIPE_INICIAL, registrosEquipeInicial } from './equipe-inicial'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -127,10 +126,12 @@ const dbVazio = (): DB => ({
   configuracoes: { ...CONFIG_PADRAO },
 })
 
-const CHAVE_DEMO = 'altoprints:demo-inicial-carregada'
-
-/** o acesso de exemplo nasce sem senha: ela é definida aqui, no primeiro uso */
-const prepararDemo = (dados: DB) => prepararAcessoDemo(dados, gerarHashSenha)
+/**
+ * Marca de versões antigas, que semeavam dados de exemplo sozinhas no primeiro
+ * acesso. Hoje o sistema **sempre** começa vazio; a chave só é apagada de
+ * aparelhos que já tinham o sistema instalado, para não sobrar lixo.
+ */
+const CHAVE_DEMO_ANTIGA = 'altoprints:demo-inicial-carregada'
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<DB>(dbVazio())
@@ -171,14 +172,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * Cria os acessos da EQUIPE INICIAL (JESSICA, RAISSA, ANDREIA — lista em
+   * `lib/equipe-inicial.ts`) na primeira abertura. São acessos de funcionário
+   * **sem senha**: cada um entra tocando no próprio nome na tela de entrada.
+   *
+   * O acesso do PROPRIETÁRIO nunca vem pronto — ele é criado na porta
+   * administrativa (#/administracao) e exige senha.
+   */
+  const criarEquipeInicial = useCallback(
+    async (dados: DB): Promise<DB> => {
+      if (dados.configuracoes.modo_exemplo || lsLer(CHAVE_EQUIPE_INICIAL) === '1') return dados
+      const { vendedores, usuarios } = registrosEquipeInicial(dados)
+      if (!vendedores.length && !usuarios.length) {
+        lsGravar(CHAVE_EQUIPE_INICIAL, '1')
+        return dados
+      }
+      try {
+        await salvarVarios('vendedores', vendedores)
+        await salvarVarios('usuarios', usuarios)
+        // só marca depois de gravado: se o banco ainda não tiver a coluna nova,
+        // tenta de novo na próxima abertura em vez de desistir para sempre
+        lsGravar(CHAVE_EQUIPE_INICIAL, '1')
+        if (usuarios.length)
+          avisar(
+            `Acessos da equipe prontos: ${usuarios
+              .map((u) => u.nome)
+              .join(', ')} — cada um entra tocando no próprio nome (sem senha).`,
+            'info',
+          )
+        const idsUsuarios = new Set(usuarios.map((u) => u.id))
+        return {
+          ...dados,
+          vendedores: [...dados.vendedores, ...vendedores].sort((a, b) => a.nome.localeCompare(b.nome)),
+          usuarios: [...dados.usuarios.filter((u) => !idsUsuarios.has(u.id)), ...usuarios],
+        }
+      } catch (e) {
+        console.warn('[altoprints] não foi possível criar os acessos da equipe:', (e as Error).message)
+        return dados
+      }
+    },
+    [avisar],
+  )
+
   const conectarNuvem = useCallback(
     async (url: string, chave: string) => {
       conectarSupabase({ url, chave })
       setNuvem(true)
-      await recarregar()
+      lsRemover(CHAVE_EQUIPE_INICIAL)
+      const dados = await recarregar()
+      setDb(await criarEquipeInicial(dados))
       avisar('Banco na nuvem conectado! Os dados agora são iguais em todos os aparelhos.')
     },
-    [avisar, recarregar],
+    [avisar, criarEquipeInicial, recarregar],
   )
 
   const desconectarNuvem = useCallback(() => {
@@ -207,16 +253,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       try {
         const dados = await carregarTudo()
-        const vazio = !dados.pedidos.length && !dados.clientes.length && !dados.vendedores.length
-        const jaCarregouDemo = lsLer(CHAVE_DEMO) === '1'
-        if (vazio && !jaCarregouDemo && !modoNuvem()) {
-          const demo = gerarDadosDemo()
-          await substituirTudo(demo)
-          lsGravar(CHAVE_DEMO, '1')
-          setDb(demo)
-        } else {
-          setDb(await prepararDemo(dados))
-        }
+        // O sistema começa SEMPRE sem pedidos, clientes ou impressões: nenhum
+        // dado de exemplo é semeado aqui. Quem quiser exemplos para treinar pede
+        // em Configurações → Dados. Só os acessos da equipe são criados (acima).
+        lsRemover(CHAVE_DEMO_ANTIGA)
+        setDb(await criarEquipeInicial(dados))
         // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
         // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
         try {
@@ -451,16 +492,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await limparTudo()
       if (contaMantida) await salvarRegistro('usuarios', contaMantida)
       const vazio = { ...dbVazio(), usuarios: contaMantida ? [contaMantida] : [] }
-      localStorage.setItem(CHAVE_DEMO, '1')
-      setDb(vazio)
+      lsRemover(CHAVE_DEMO_ANTIGA)
+      lsRemover(CHAVE_EQUIPE_INICIAL)
+      setDb(await criarEquipeInicial(vazio))
       avisar(
         contaMantida
-          ? 'Todos os dados foram apagados (o seu acesso de proprietário foi mantido).'
+          ? 'Todos os dados foram apagados (o seu acesso de proprietário e os nomes da equipe foram mantidos).'
           : 'Todos os dados foram apagados.',
         'info',
       )
     },
-    [avisar, db.usuarios],
+    [avisar, criarEquipeInicial, db.usuarios],
   )
 
   /** baixa um arquivo com todo o banco (o plano grátis do Supabase não tem backup) */
@@ -500,14 +542,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [avisar],
   )
 
+  /**
+   * Carrega os dados de EXEMPLO (fictícios) para treinar a equipe.
+   * Nunca toca nas contas de acesso nem nas configurações do dono: assim ninguém
+   * é trancado para fora do sistema e o logo/comissões continuam os mesmos.
+   */
   const carregarDemo = useCallback(async () => {
     bloquearSeVisualizando()
-    const demo = await prepararDemo(gerarDadosDemo())
+    const exemplo = gerarDadosDemo()
+    const demo: DB = {
+      ...exemplo,
+      usuarios: db.usuarios,
+      configuracoes: {
+        ...db.configuracoes,
+        // avisa na tela que os pedidos abaixo não são reais
+        modo_exemplo: true,
+        revisao_ultima_em: new Date().toISOString(),
+      },
+    }
     await substituirTudo(demo)
-    lsGravar(CHAVE_DEMO, '1')
     setDb(demo)
-    avisar('Dados de demonstração carregados! O acesso de exemplo é o usuário "gui".')
-  }, [avisar])
+    avisar('Dados de exemplo (fictícios) carregados. Os seus acessos e configurações foram mantidos.')
+  }, [avisar, db.configuracoes, db.usuarios])
 
   /* ------------------------- espaço no aparelho ------------------------- */
 

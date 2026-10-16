@@ -30,7 +30,7 @@ import {
   resumirImpressoes,
   resumoDoPedido,
 } from '../src/lib/impressoes'
-import { ACESSO_DEMO, gerarDadosDemo, MARCA_SENHA_DEMO, prepararAcessoDemo } from '../src/lib/seed'
+import { gerarDadosDemo, TAMANHO_DEMO } from '../src/lib/seed'
 import {
   bloquearSeVisualizando,
   definirVisualizacao,
@@ -156,10 +156,10 @@ igual('comissão conta todas as concluídas do período', filasDaComissao([concl
 
 /* ------------------------------- semente ------------------------------ */
 const demo = gerarDadosDemo()
-igual('demo: 2 vendedores', demo.vendedores.length, 2)
-igual('demo: 30 clientes', demo.clientes.length, 30)
-igual('demo: 68 pedidos', demo.pedidos.length, 68)
-igual('demo: números únicos', new Set(demo.pedidos.map((p) => p.numero)).size, 68)
+igual('demo: 2 vendedores', demo.vendedores.length, TAMANHO_DEMO.vendedores)
+igual('demo: 30 clientes', demo.clientes.length, TAMANHO_DEMO.clientes)
+igual('demo: 68 pedidos', demo.pedidos.length, TAMANHO_DEMO.pedidos)
+igual('demo: números únicos', new Set(demo.pedidos.map((p) => p.numero)).size, TAMANHO_DEMO.pedidos)
 igual(
   'demo: todo pedido tem vendedor',
   demo.pedidos.every((p) => demo.vendedores.some((v) => v.id === p.vendedor_id)),
@@ -217,30 +217,69 @@ igual('impressão: papel branco mesmo no tema noite', /html,\s*body,\s*#root/.te
 igual('impressão: fundo degradê não vai para o papel', blocoImpressao.includes('background-image: none !important'), true)
 igual('impressão: texto do papel sai preto', /body \*[\s\S]{0,60}color: #000 !important/.test(blocoImpressao), true)
 
-/* ------------------------- acesso de exemplo --------------------------- */
-igual('demo: vem com um acesso de exemplo', demo.usuarios.length, 1)
-igual('demo: o acesso de exemplo é do proprietário', demo.usuarios[0].papel, 'proprietario')
-igual('demo: usuário do acesso de exemplo', demo.usuarios[0].usuario, ACESSO_DEMO.usuario)
-igual('demo: o acesso de exemplo está ativo', demo.usuarios[0].ativo, true)
-igual('demo: a senha do exemplo ainda não foi definida', demo.usuarios[0].senha_hash, MARCA_SENHA_DEMO)
-igualAsync('demo: a marca não vale como senha', senhaConfere('12345', MARCA_SENHA_DEMO), false)
-igualAsync(
-  'demo: depois de preparado, entra com a senha combinada',
-  prepararAcessoDemo(gerarDadosDemo(), gerarHashSenha).then((d) =>
-    senhaConfere(ACESSO_DEMO.senha, d.usuarios[0].senha_hash),
-  ),
-  true,
-)
-igualAsync(
-  'demo: depois de preparado, senha errada não entra',
-  prepararAcessoDemo(gerarDadosDemo(), gerarHashSenha).then((d) => senhaConfere('9999', d.usuarios[0].senha_hash)),
+/* -------------------- sistema limpo (publicação) ------------------------ */
+// O que garante que o sistema vai para o ar sem dados nem acessos de exemplo:
+igual('demo: NÃO cria nenhuma conta de acesso', demo.usuarios.length, 0)
+igual(
+  'demo: nenhum proprietário/contador vem pronto',
+  demo.usuarios.some((u) => u.papel === 'proprietario'),
   false,
 )
-igualAsync(
-  'demo: banco sem o acesso de exemplo não é mexido',
-  prepararAcessoDemo({ ...demo, usuarios: [] }, gerarHashSenha).then((d) => d.usuarios.length),
-  0,
+igual('demo: marca o modo de exemplo (aviso na tela)', demo.configuracoes.modo_exemplo, true)
+igual('padrão: o sistema começa fora do modo de exemplo', CONFIG_PADRAO.modo_exemplo, false)
+
+// dados 100% fictícios: nada que possa ser confundido com cliente de verdade
+igual(
+  'demo: todo cliente é rotulado como exemplo',
+  demo.clientes.every((c) => c.nome.includes('EXEMPLO')),
+  true,
 )
+igual(
+  'demo: todo vendedor é rotulado como exemplo',
+  demo.vendedores.every((v) => v.nome.includes('EXEMPLO')),
+  true,
+)
+igual(
+  'demo: telefones visivelmente falsos (DDD 00)',
+  demo.clientes.every((c) => /^\(00\) 90000-\d{4}$/.test(c.telefone)),
+  true,
+)
+igual(
+  'demo: e-mails em domínio reservado (não existe)',
+  demo.clientes.every((c) => !c.email || c.email.endsWith('@exemplo.invalid')),
+  true,
+)
+igual(
+  'demo: endereços/CEPs fictícios',
+  demo.pedidos.every((p) => !p.cep || p.cep === '00000-000'),
+  true,
+)
+igual(
+  'demo: nenhuma cidade/estado de verdade',
+  demo.pedidos.every((p) => !p.cidade || (p.cidade === 'CIDADE EXEMPLO' && p.estado === 'EX')),
+  true,
+)
+igual(
+  'demo: nomes de clientes antigos não aparecem mais',
+  JSON.stringify(demo).includes('BRUNO') || JSON.stringify(demo).includes('IVANETE'),
+  false,
+)
+
+// nenhuma senha padrão/combustível de exemplo sobrou no código publicado
+const codigoFonte = [
+  readFileSync('src/lib/seed.ts', 'utf8'),
+  readFileSync('src/lib/auth.tsx', 'utf8'),
+  readFileSync('src/lib/store.tsx', 'utf8'),
+  readFileSync('src/pages/Login.tsx', 'utf8'),
+].join('\n')
+igual('código: sem usuário/senha de exemplo embutidos', /ACESSO_DEMO|contaDemo|MARCA_SENHA_DEMO/.test(codigoFonte), false)
+igual('código: a senha de exemplo "12345" saiu do sistema', codigoFonte.includes("'12345'"), false)
+igual(
+  'código: o sistema não semeia exemplos sozinho na primeira carga',
+  /if \(vazio && !jaCarregouDemo/.test(readFileSync('src/lib/store.tsx', 'utf8')),
+  false,
+)
+
 
 /* ------------------------- espaço no navegador ------------------------- */
 igual(

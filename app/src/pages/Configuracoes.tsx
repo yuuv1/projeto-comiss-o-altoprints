@@ -752,7 +752,10 @@ export default function Configuracoes() {
               <Sparkles className="h-4 w-4" /> Dados de teste
             </p>
             <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
-              Carregue pedidos de exemplo para treinar a equipe ou apague tudo para começar de verdade.
+              O sistema <b>começa vazio</b> — nada de exemplo é carregado sozinho. Se quiser treinar a equipe, carregue
+              os exemplos abaixo: são <b>fictícios</b> (nomes “CLIENTE EXEMPLO”, telefones “(00) 90000-…”), não criam
+              nenhuma conta de acesso e deixam um aviso amarelo no topo da tela enquanto estiverem lá. Antes de usar de
+              verdade, use <b>Apagar todos os dados</b>.
               {nuvem ? ' Atenção: no modo nuvem isto afeta os dados de todos!' : ''}
             </p>
             <div className="flex flex-wrap gap-2">
@@ -762,8 +765,9 @@ export default function Configuracoes() {
                 icone={RefreshCw}
                 onClick={async () => {
                   const ok = await confirmar({
-                    titulo: 'Substituir tudo pelos dados de demonstração?',
-                    mensagem: 'Pedidos, clientes e vendedores atuais serão apagados e substituídos por exemplos.',
+                    titulo: 'Substituir tudo pelos dados de exemplo?',
+                    mensagem:
+                      'Pedidos, clientes, vendedores e impressões atuais serão apagados e substituídos por exemplos FICTÍCIOS. Os seus acessos (contas) e as configurações são mantidos.',
                     textoBotao: 'Substituir',
                   })
                   if (ok) await carregarDemo()
@@ -960,6 +964,20 @@ export default function Configuracoes() {
                 Salvar usuário
               </Botao>
             </div>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <UsersRound className="h-4 w-4 text-violet-600 dark:text-violet-400" /> Outro acesso de proprietário
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Quer um <b>segundo login de dono</b> (sócio, gerente, escritório, ou um acesso só para o celular)?
+              Crie em <b>Equipe → Nova conta</b> escolhendo “Proprietário — vê tudo”. Dá para ter quantos quiser; o
+              sistema só não fica sem nenhum proprietário ativo.
+            </p>
+            <Botao variante="secundario" icone={UsersRound} onClick={() => setAba('equipe')}>
+              Abrir Equipe para criar outro proprietário
+            </Botao>
           </Cartao>
 
           <Cartao hover={false}>

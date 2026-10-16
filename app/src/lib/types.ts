@@ -270,6 +270,13 @@ export interface Usuario {
   usuario: string
   /** senha criptografada (SHA-256 + sal) — nunca guardamos a senha em texto puro */
   senha_hash: string
+  /**
+   * `true` nos acessos de funcionário que entram **sem senha**: a pessoa toca no
+   * próprio nome na tela de entrada. Vale só para vendedor — o proprietário
+   * sempre usa senha. Quando o dono define uma senha para a conta
+   * (Equipe → Vínculo e senha), isto volta a `false`.
+   */
+  sem_senha?: boolean
   papel: Papel
   /** vendedor vinculado (usado para saber quais pedidos são "dele") */
   vendedor_id: ID | ''
@@ -309,6 +316,13 @@ export interface Configuracoes {
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
   faixas_preco: FaixaPreco[]
+  /**
+   * `true` enquanto o banco estiver com os DADOS DE EXEMPLO (fictícios), que só
+   * entram quando o proprietário pede em Configurações → Dados. Serve para o
+   * sistema avisar na tela que aqueles pedidos não são reais — ninguém confunde
+   * treino com produção. Volta a `false` ao apagar todos os dados.
+   */
+  modo_exemplo?: boolean
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -320,6 +334,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   comissao_sem_metragem: 0,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
+  modo_exemplo: false,
 }
 
 /**

@@ -118,6 +118,9 @@ create table if not exists public.usuarios (
   nome        text not null,
   usuario     text not null,
   senha_hash  text default '',
+  -- true nos acessos de funcionário que entram sem senha (tocando no próprio
+  -- nome na tela de entrada). O proprietário nunca usa isto.
+  sem_senha   boolean default false,
   papel       text default 'vendedor',
   vendedor_id text default '',
   ativo       boolean default true,
@@ -142,6 +145,8 @@ insert into public.configuracoes (id, valor) values (1, '{}'::jsonb)
 alter table public.usuarios add column if not exists telas   jsonb default '{}'::jsonb;
 alter table public.usuarios add column if not exists auth_id text;
 alter table public.pedidos  add column if not exists aviso_visto boolean default true;
+-- entrada sem senha (o funcionário toca no próprio nome): entrou na versão 1.2
+alter table public.usuarios add column if not exists sem_senha boolean default false;
 -- (a tabela "impressoes" entrou numa versão nova do sistema: quem já tinha o
 --  banco criado a recebe agora, sem perder nenhum pedido)
 

@@ -1,4 +1,16 @@
-import { Crown, Eye, KeyRound, Pencil, Save, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
+import {
+  Crown,
+  Eye,
+  KeyRound,
+  Pencil,
+  Save,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
@@ -37,6 +49,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
   const {
     usuario: eu,
     redefinirSenha,
+    removerSenha,
     atualizarVinculo,
     salvarTelas,
     alternarAtivo,
@@ -59,6 +72,8 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
   const [senhaNovaConta, setSenhaNovaConta] = useState('')
   const [novoVendedor, setNovoVendedor] = useState('')
   const [novoAdmin, setNovoAdmin] = useState(false)
+  /** a equipe entra sem senha (tocando no nome); o dono pode exigir senha por conta */
+  const [novaSemSenha, setNovaSemSenha] = useState(true)
 
   const abrirNovaConta = () => {
     setNovoNome('')
@@ -66,6 +81,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
     setSenhaNovaConta('')
     setNovoVendedor('')
     setNovoAdmin(false)
+    setNovaSemSenha(true)
     setCriando(true)
   }
 
@@ -78,6 +94,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         senha: senhaNovaConta,
         vendedorId: novoVendedor,
         administrador: novoAdmin,
+        semSenha: novaSemSenha && !novoAdmin,
       })
       setCriando(false)
     } catch (e) {
@@ -238,6 +255,20 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                         Vendedor
                       </Etiqueta>
                     )}
+                    {c.papel === 'vendedor' ? (
+                      c.sem_senha ? (
+                        <Etiqueta
+                          className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+                          icone={UserCheck}
+                        >
+                          entra pelo nome (sem senha)
+                        </Etiqueta>
+                      ) : (
+                        <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400" icone={KeyRound}>
+                          com senha
+                        </Etiqueta>
+                      )
+                    ) : null}
                     {!c.ativo ? (
                       <Etiqueta className="border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
                         Desativado
@@ -303,30 +334,36 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                       >
                         {c.ativo ? 'Desativar' : 'Liberar'}
                       </Botao>
-                      {c.papel !== 'proprietario' ? (
-                        <Botao
-                          tamanho="sm"
-                          variante="ghost"
-                          className="text-rose-500 hover:bg-rose-50"
-                          icone={Trash2}
-                          onClick={async () => {
-                            const ok = await confirmar({
-                              titulo: `Excluir o acesso de ${c.nome}?`,
-                              mensagem:
-                                'Os pedidos dele continuam salvos no sistema — só o acesso é apagado. Se ele saiu da empresa, prefira “Desativar”.',
-                            })
-                            if (ok) {
-                              try {
-                                await excluirUsuario(c.id)
-                              } catch (e) {
-                                avisar((e as Error).message, 'erro')
-                              }
+                      <Botao
+                        tamanho="sm"
+                        variante="ghost"
+                        className="text-rose-500 hover:bg-rose-50"
+                        icone={Trash2}
+                        title={
+                          c.papel === 'proprietario'
+                            ? 'Excluir este acesso de proprietário (o sistema nunca fica sem nenhum)'
+                            : 'Excluir este acesso'
+                        }
+                        onClick={async () => {
+                          const ok = await confirmar({
+                            titulo: `Excluir o acesso de ${c.nome}?`,
+                            mensagem:
+                              c.papel === 'proprietario'
+                                ? 'É um acesso de PROPRIETÁRIO (vê tudo). Os pedidos continuam salvos — só o acesso é apagado. O sistema não permite ficar sem nenhum proprietário ativo.'
+                                : 'Os pedidos dele continuam salvos no sistema — só o acesso é apagado. Se ele saiu da empresa, prefira “Desativar”.',
+                            textoBotao: 'Excluir acesso',
+                          })
+                          if (ok) {
+                            try {
+                              await excluirUsuario(c.id)
+                            } catch (e) {
+                              avisar((e as Error).message, 'erro')
                             }
-                          }}
-                        >
-                          Excluir
-                        </Botao>
-                      ) : null}
+                          }
+                        }}
+                      >
+                        Excluir
+                      </Botao>
                     </>
                   ) : (
                     <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -341,9 +378,14 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
       )}
 
       <p className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-        <b>Como cada acesso funciona:</b> o vendedor entra e vê apenas os pedidos dele (e a comissão dele). O
-        proprietário vê tudo. Aqui você pode trocar a senha de quem esqueceu, desativar quem saiu e ligar cada acesso
-        ao vendedor correspondente — é esse vínculo que define quais pedidos aparecem para cada pessoa.
+        <b>Como cada acesso funciona:</b> o vendedor entra <b>tocando no próprio nome</b> (sem senha) e vê apenas os
+        pedidos e a comissão dele. O proprietário entra com usuário e senha e vê tudo. Aqui você pode dar ou tirar a
+        senha de uma conta, desativar quem saiu e ligar cada acesso ao vendedor correspondente — é esse vínculo que
+        define quais pedidos aparecem para cada pessoa.
+        <br />
+        <b>Mais de um proprietário?</b> Pode: use <b>Nova conta</b> e escolha “Proprietário — vê tudo” (útil para sócio,
+        gerente ou para o escritório). O sistema só não deixa ficar <b>sem nenhum</b> proprietário ativo — por isso o
+        último não pode ser desativado nem excluído.
       </p>
 
       <Modal
@@ -352,7 +394,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         icone={UserPlus}
         largura="max-w-lg"
         titulo="Nova conta de acesso"
-        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui."
+        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui. Para criar mais um acesso de PROPRIETÁRIO (sócio, gerente, escritório), escolha “Proprietário — vê tudo” em Tipo de acesso."
         rodape={
           <>
             <Botao variante="secundario" onClick={() => setCriando(false)}>
@@ -362,7 +404,11 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
               icone={ShieldCheck}
               onClick={salvarNovaConta}
               carregando={salvando}
-              disabled={!novoNome.trim() || !novoUsuario.trim() || senhaNovaConta.length < 4}
+              disabled={
+                !novoNome.trim() ||
+                !novoUsuario.trim() ||
+                ((novoAdmin || !novaSemSenha) && senhaNovaConta.length < 4)
+              }
             >
               Criar acesso
             </Botao>
@@ -383,16 +429,49 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                 autoCorrect="off"
               />
             </Campo>
-            <Campo label="Senha" obrigatorio dica="A senha que a pessoa escolheu (mínimo 4 caracteres).">
-              <Entrada value={senhaNovaConta} onChange={(e) => setSenhaNovaConta(e.target.value)} placeholder="••••••" />
+            <Campo
+              label="Senha"
+              obrigatorio={novoAdmin || !novaSemSenha}
+              dica={
+                novoAdmin
+                  ? 'O acesso de proprietário sempre usa senha (mínimo 4 caracteres).'
+                  : novaSemSenha
+                    ? 'Sem senha: a pessoa entra tocando no próprio nome.'
+                    : 'A senha que a pessoa escolheu (mínimo 4 caracteres).'
+              }
+            >
+              {novoAdmin || !novaSemSenha ? (
+                <Entrada value={senhaNovaConta} onChange={(e) => setSenhaNovaConta(e.target.value)} placeholder="••••••" />
+              ) : (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  Esta conta vai entrar <b>sem senha</b> (tocando no nome).
+                </p>
+              )}
             </Campo>
             <Campo label="Tipo de acesso">
               <Selecao value={novoAdmin ? 'admin' : 'vendedor'} onChange={(e) => setNovoAdmin(e.target.value === 'admin')}>
                 <option value="vendedor">Vendedor — vê só o que é dele</option>
-                <option value="admin">Proprietário — vê tudo</option>
+                <option value="admin">Proprietário — vê tudo (com senha)</option>
               </Selecao>
             </Campo>
           </div>
+
+          {novoAdmin ? null : (
+            <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={novaSemSenha}
+                onChange={(e) => setNovaSemSenha(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
+              />
+              <span>
+                <b>Entrar sem senha</b> (a pessoa toca no próprio nome na tela de entrada, como o resto da equipe).
+                <span className="block text-xs text-slate-400 dark:text-slate-500">
+                  Desmarque para esta conta usar senha. Dá para mudar depois em “Vínculo e senha”.
+                </span>
+              </span>
+            </label>
+          )}
 
           {novoAdmin ? (
             <p className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
@@ -519,19 +598,49 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
 
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
             <p className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
-              <KeyRound className="h-4 w-4" /> Redefinir a senha
+              <KeyRound className="h-4 w-4" /> Senha desta conta
             </p>
             <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
-              Use quando a pessoa esquecer a senha. Combine a nova senha com ela e oriente a trocar depois em "Meu
-              perfil".
+              {editando?.papel === 'proprietario'
+                ? 'Acesso de proprietário: sempre usa senha. Use aqui para redefinir se ele esquecer.'
+                : editando?.sem_senha
+                  ? 'Esta conta entra SEM SENHA (a pessoa toca no próprio nome na tela de entrada). Se quiser passar a pedir senha, defina uma abaixo.'
+                  : 'Esta conta usa senha. Use aqui para redefinir quando a pessoa esquecer — ou tire a senha para ela voltar a entrar pelo nome.'}
             </p>
             <div className="flex flex-wrap items-end gap-2">
               <Campo label="Nova senha" className="w-48">
                 <Entrada value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="mínimo 4 caracteres" />
               </Campo>
               <Botao variante="aviso" icone={KeyRound} onClick={salvarNovaSenha} carregando={salvando} disabled={novaSenha.length < 4}>
-                Redefinir senha
+                {editando?.sem_senha ? 'Definir senha' : 'Redefinir senha'}
               </Botao>
+              {editando?.papel === 'vendedor' && !editando?.sem_senha ? (
+                <Botao
+                  variante="secundario"
+                  icone={UserCheck}
+                  carregando={salvando}
+                  onClick={async () => {
+                    const ok = await confirmar({
+                      titulo: `Tirar a senha de ${editando?.nome}?`,
+                      mensagem:
+                        'A pessoa volta a entrar tocando no próprio nome, sem senha. Qualquer pessoa com o link do sistema consegue abrir os pedidos dela.',
+                      textoBotao: 'Tirar a senha',
+                    })
+                    if (!ok || !editando) return
+                    setSalvando(true)
+                    try {
+                      await removerSenha(editando.id)
+                      setEditando(null)
+                    } catch (e) {
+                      avisar((e as Error).message, 'erro')
+                    } finally {
+                      setSalvando(false)
+                    }
+                  }}
+                >
+                  Tirar a senha (entra pelo nome)
+                </Botao>
+              ) : null}
             </div>
           </div>
 
