@@ -7,7 +7,7 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 | --- | --- | --- |
 | **0** | Deixar a versão limpa na `main` (sem dados e sem senha de exemplo) | 2 min |
 | **1** | Criar o banco na nuvem (**Supabase**) | 8 min |
-| **2** | Publicar o site (**Netlify**) | 5–10 min |
+| **2** | Publicar o site (**Netlify** ou **GitHub Pages**) | 5–10 min |
 | **3** | Criar o **seu** acesso de proprietário | 3 min |
 | **4** | Criar as contas da **equipe** e conectar os celulares | 5 min |
 | **5** | Conferência final (checklist) | 3 min |
@@ -91,10 +91,11 @@ Sem ele, o sistema até funciona no ar, mas cada celular/computador guarda a pr�
 
 ---
 
-## Parte 2 — Publicar o site (Netlify, grátis) — 5 a 10 min
+## Parte 2 — Publicar o site (grátis) — 5 a 10 min
 
-Escolha **um** dos dois caminhos. O **A** é o recomendado (o site já nasce conectado ao
-banco e se atualiza sozinho). O **B** é o mais rápido se você quiser ver no ar hoje.
+Escolha **um** dos três caminhos. O **A** (Netlify ligado ao GitHub) é o recomendado para
+quem quer o site já conectado ao banco. O **C** (GitHub Pages) é o mais automático: tudo
+roda dentro do próprio GitHub. O **B** é o mais rápido para ver no ar hoje.
 
 ### Caminho A (recomendado) — Netlify ligado ao GitHub
 
@@ -135,6 +136,40 @@ banco e se atualiza sozinho). O **B** é o mais rápido se você quiser ver no a
    **link de conexão** da Parte 4.
 6. Para atualizar depois: `npm run publicar` e arraste a pasta de novo em
    *Deploys → drag and drop*.
+
+---
+
+### Caminho C (automático) — GitHub Pages, direto pelo GitHub
+
+O site fica em **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>** e se atualiza
+**sozinho** a cada envio para a `main`: o robô do repositório (aba **Actions** →
+*Publicar sistema*) roda os testes, gera a versão final, confere o pacote e publica.
+
+**Antes de tudo — o repositório precisa ficar PÚBLICO.** O GitHub Pages em repositório
+privado exige conta paga (Pro/Team). Deixar público aqui é **seguro**: o robô roda a
+conferência (`npm run checar`) que **barra** qualquer senha, dado de pessoa real ou chave
+secreta antes de publicar — e o sistema já nasce vazio, do zero. (Se preferir manter o
+código fechado, use o Caminho A ou B.)
+
+1. **Deixar o repositório público:** no GitHub → repositório
+   **`yuuv1/projeto-comiss-o-altoprints`** → **Settings** → **General** → role até o fim
+   (*Danger Zone*) → **Change visibility** → **Public**.
+2. **Publicar:** aba **Actions** → **Publicar sistema (GitHub Pages)** →
+   **Run workflow** → **main** → **Run workflow**. (Daqui para frente, qualquer envio para
+   a `main` já publica sozinho — não precisa repetir.)
+   - Na primeira vez o próprio robô liga o Pages (Settings → Pages → Source:
+     *GitHub Actions*). Se quiser adiantar: ligue lá antes.
+3. Espere o **✓ verde** (uns 2 minutos na primeira vez) e abra
+   **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>**.
+4. **Como conferir:** abre a tela de login do sistema com a versão no rodapé.
+   Se aparecer a página **404** do GitHub, espere 1–2 minutos e atualize — o primeiro
+   deploy demora um pouquinho para propagar.
+
+**Onde ficam os dados neste caminho:** o GitHub Pages guarda **o site**. Os pedidos ficam
+no **Supabase** (Parte 1) — que é o que mantém o conteúdo salvo e igual em todos os
+aparelhos. Neste caminho o site sobe sem as chaves do banco: conecte a nuvem por dentro
+do sistema na **Parte 3, passo 3B** (1 minuto) e mande o **link de conexão** da Parte 4
+para os celulares da equipe.
 
 ---
 
