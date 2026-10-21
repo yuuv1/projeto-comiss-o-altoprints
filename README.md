@@ -3,6 +3,10 @@
 Sistema web (em português do Brasil) para gerenciar a produção de filmes DTF:
 pedidos, clientes, vendedores, impressão, entregas e relatórios de comissão.
 
+🌐 **Site no ar (GitHub Pages):** <https://yuuv1.github.io/projeto-comiss-o-altoprints/> —
+atualiza sozinho a cada envio na `main` (o robô roda testes, build e conferência de
+segurança antes de publicar).
+
 Recriado a partir do prompt `ultra-prompt-altoprints.md` e do comportamento observado
 no sistema antigo (artastic-printflow.lovable.app): mesma navegação em "pílulas",
 mesmos cartões de resumo, as mesmas etiquetas de status, os mesmos cálculos de preço
@@ -222,7 +226,8 @@ app/
       (dados de treino opcionais e fictícios, com aviso na tela)
 - [x] Vários acessos de proprietário (Equipe → Nova conta → “Proprietário — vê tudo”)
 - [x] Guarda de publicação (`npm run checar`) + pacote `publicar/` conferido no GitHub Actions
-- [ ] Colocar no ar — guia curto: **[`LANCAMENTO.md`](LANCAMENTO.md)**
+- [x] Colocar no ar — guia curto: **[`LANCAMENTO.md`](LANCAMENTO.md)** (site:
+      <https://yuuv1.github.io/projeto-comiss-o-altoprints/>)
 - [ ] Conectar o Supabase (guia: `app/CONECTAR-NUVEM.md`) para a equipe compartilhar os dados
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
