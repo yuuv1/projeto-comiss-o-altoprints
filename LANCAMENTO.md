@@ -173,6 +173,38 @@ para os celulares da equipe.
 
 ---
 
+## Parte 2.5 — Deixar o endereço bonitinho (domínio próprio) — opcional
+
+O GitHub Pages entrega o endereço **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>**:
+funciona em qualquer lugar, é grátis, tem HTTPS e **nunca muda**. O único defeito é ser
+comprido de falar. Se quiser um endereço curto (ex.: **`https://sistema.altoprints.com.br`**),
+siga abaixo.
+
+**Se você JÁ tem um domínio** (ex.: `altoprints.com.br`, registrado no Registro.br, Hostinger,
+etc.):
+
+1. **No painel do domínio** (onde ele foi registrado), crie um registro **CNAME**:
+   - **Nome/tipo:** `sistema` (pode ser outro apelido: `pedidos`, `painel`…)
+   - **Valor:** `yuuv1.github.io`
+2. **No GitHub:** *Settings* → **Pages** → **Custom domain** → digite
+   `sistema.seudominio.com.br` → **Save**.
+3. Espere a verificação do DNS (de minutos a algumas horas) e marque **Enforce HTTPS**.
+4. Pronto: o mesmo site responde no endereço novo **e** no do github.io.
+
+> Prefere o endereço **raiz** (`altoprints.com.br` direto, sem `sistema.`)? Dá também, mas
+> exige 4 registros **A** no lugar do CNAME (185.199.108.153, .109, .110 e .111) — o CNAME
+> num subdomínio é mais simples de acertar. Me avise que eu passo os valores.
+
+**Se você NÃO tem domínio:**
+
+- Registrar um **`.com.br`** no **Registro.br** custa ~**R$ 40/ano** e leva 5 minutos.
+- Ou seguir com o endereço do **github.io** mesmo: é grátis, seguro e estável.
+
+O sistema funciona nos dois endereços **sem mudar nada no código** — os links internos são
+relativos, então qualquer endereço serve.
+
+---
+
 ## Parte 3 — Criar o SEU acesso de proprietário (3 min)
 
 Faça isso **antes** de mandar o link para a equipe.
