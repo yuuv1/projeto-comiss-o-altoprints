@@ -3,18 +3,24 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 import { Botao, Campo, Entrada, cn } from '../components/ui'
+import { JanelaConexao } from '../components/Nuvem'
 import { useAuth } from '../lib/auth'
+import { useStore } from '../lib/store'
 
 /**
- * Porta administrativa — o único lugar do site onde existe a criação do
- * acesso do proprietário. O login do dia a dia é feito aqui também.
+ * “Login proprietário” — o único login do sistema.
  *
- * Para chegar: #/administracao, 5 toques no logo ou Ctrl + Alt + D.
- * Sem a senha do administrador, ninguém entra em nada: quem descobrir a porta
- * vê apenas um login comum.
+ * A equipe não entra com conta: usa o sistema direto (Pedidos e Clientes). Este
+ * cadastro é do dono, e é ele que libera Painel, Relatório, Funcionários e
+ * Configurações.
+ *
+ * Para chegar: o cantinho “Login proprietário” no topo, o endereço
+ * #/administracao, 5 toques no logo ou Ctrl + Alt + D.
+ * Na primeira vez a tela cria o acesso; depois só pede usuário e senha.
  */
 export default function Administracao() {
-  const { usuario, ehProprietario, temProprietario, entrar, criarContaProprietario, sair, nuvem, carregando } = useAuth()
+  const { usuario, ehProprietario, temProprietario, entrar, criarContaProprietario, carregando } = useAuth()
+  const { nuvem } = useStore()
   const navegar = useNavigate()
 
   const criando = !temProprietario
@@ -25,18 +31,14 @@ export default function Administracao() {
   const [mostrar, setMostrar] = useState(false)
   const [manter, setManter] = useState(true)
   const [erro, setErro] = useState('')
+  const [conexaoAberta, setConexaoAberta] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
-  // já conectado: o dono vai para o painel; o vendedor é desconectado
+  // já conectado: o dono vai direto para o painel
   useEffect(() => {
     if (carregando || !usuario) return
-    if (ehProprietario) {
-      navegar('/', { replace: true })
-    } else {
-      void sair()
-      setErro('Esta entrada é exclusiva do proprietário. Use a tela comum para entrar como vendedor.')
-    }
-  }, [carregando, ehProprietario, navegar, sair, usuario])
+    if (ehProprietario) navegar('/', { replace: true })
+  }, [carregando, ehProprietario, navegar, usuario])
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,7 +69,7 @@ export default function Administracao() {
         <div className="mb-3 flex flex-col items-center text-center">
           <Logo />
           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300">
-            <Lock className="h-3 w-3" /> Acesso restrito ao proprietário
+            <Lock className="h-3 w-3" /> Login do proprietário
           </p>
         </div>
 
@@ -78,12 +80,12 @@ export default function Administracao() {
           <div className="mb-3">
             <h1 className="flex items-center gap-2 text-xl font-extrabold text-slate-800 dark:text-slate-100">
               <Crown className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-              {criando ? 'Criar acesso do proprietário' : 'Administração'}
+              {criando ? 'Criar o acesso do proprietário' : 'Login proprietário'}
             </h1>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {criando
-                ? 'Primeiro acesso do dono do sistema. Depois disso, esta tela só pede usuário e senha.'
-                : 'Entre com o seu acesso de proprietário.'}
+                ? 'A equipe usa o sistema sem login. Aqui você cria a sua senha de dono — ela libera Painel, Relatório, Funcionários e Configurações.'
+                : 'Entre com o seu usuário e senha para ver os recursos do proprietário.'}
             </p>
           </div>
 
@@ -155,15 +157,15 @@ export default function Administracao() {
           ) : null}
 
           <Botao type="submit" tamanho="lg" className="w-full" icone={criando ? ShieldCheck : LogIn} carregando={enviando}>
-            {criando ? 'Criar acesso do proprietário' : 'Entrar como administrador'}
+            {criando ? 'Criar acesso e entrar' : 'Entrar como proprietário'}
           </Botao>
 
           <p className="mt-4 text-center">
             <Link
-              to="/login"
+              to="/pedidos"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-purple-700 hover:underline dark:text-slate-400 dark:hover:text-purple-300"
             >
-              <ArrowLeft className="h-3.5 w-3.5" /> Voltar para o login comum
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao sistema (a equipe não precisa de login)
             </Link>
           </p>
         </form>
@@ -180,12 +182,27 @@ export default function Administracao() {
             {nuvem ? <ShieldCheck className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
             {nuvem ? 'Banco na nuvem (Supabase) conectado' : 'Modo local: os dados ficam neste navegador'}
           </p>
+          {!nuvem ? (
+            <p className="mx-auto mt-1 max-w-sm text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              Quer o login valendo em todos os aparelhos?{' '}
+              <button
+                type="button"
+                onClick={() => setConexaoAberta(true)}
+                className="font-bold text-purple-700 underline decoration-dotted hover:text-purple-900 dark:text-purple-300"
+              >
+                Conecte este aparelho ao banco da empresa
+              </button>{' '}
+              antes de criar o acesso — assim a conta já nasce na nuvem.
+            </p>
+          ) : null}
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
             <Sparkles className="h-3 w-3" /> Dica: salve este endereço na tela de início do celular para entrar com 1
             toque.
           </p>
         </div>
       </div>
+
+      <JanelaConexao aberto={conexaoAberta} onFechar={() => setConexaoAberta(false)} />
     </div>
   )
 }

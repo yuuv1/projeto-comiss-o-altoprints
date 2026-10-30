@@ -15,7 +15,6 @@ import {
 import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
 import { BarraAcoes, Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
-import { useAuth } from '../lib/auth'
 import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
@@ -47,16 +46,12 @@ const primeiroDiaDoMes = () => {
  */
 export default function RelatorioResumo({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, nomeVendedor, avisar } = useStore()
-  const { usuario, ehProprietario } = useAuth()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
   const [campo, setCampo] = useState<Campo>('pedido')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)
   const [vendedorId, setVendedorId] = useState('todos')
-  // vendedor com a tela liberada vê o relatório só com os dados dele
-  const meuVendedorId = usuario?.vendedor_id ?? ''
-  const semVinculo = !ehProprietario && !meuVendedorId
   const [excluidos, setExcluidos] = useState<string[]>([])
 
   const atalhos = useMemo(() => {
@@ -99,7 +94,6 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const filtrados = useMemo(() => {
     return base
       .filter((p) => {
-        if (!ehProprietario) return p.vendedor_id === meuVendedorId
         if (vendedorId === 'sem-vendedor') return !p.vendedor_id
         if (vendedorId !== 'todos') return p.vendedor_id === vendedorId
         return true
@@ -110,7 +104,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         return d >= inicio && d <= fim
       })
       .sort((a, b) => dataRef(a, campo).localeCompare(dataRef(b, campo)) || a.numero - b.numero)
-  }, [base, campo, ehProprietario, fim, inicio, meuVendedorId, vendedorId])
+  }, [base, campo, fim, inicio, vendedorId])
 
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
 
@@ -207,20 +201,16 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             <Campo label="Fim">
               <Entrada type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
             </Campo>
-            <Campo label="Vendedor">
-              {ehProprietario ? (
-                <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-                  <option value="todos">Todos os vendedores</option>
-                  {db.vendedores.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.nome}
-                    </option>
-                  ))}
-                  <option value="sem-vendedor">Sem vendedor</option>
-                </Selecao>
-              ) : (
-                <Entrada value={nomeVendedor(meuVendedorId)} readOnly className="bg-slate-50 dark:bg-slate-800" />
-              )}
+            <Campo label="Funcionário">
+              <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+                <option value="todos">Todos os funcionários</option>
+                {db.vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                  </option>
+                ))}
+                <option value="sem-vendedor">Sem funcionário</option>
+              </Selecao>
             </Campo>
           </div>
 
@@ -479,7 +469,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <div className="ml-auto text-right text-[13px] leading-tight">
             <p className="text-lg font-black uppercase">{db.configuracoes.empresa_nome || 'Altoprints'}</p>
             <p className="font-bold">
-              {ehProprietario ? 'Relatório de vendas pagas e comissões da equipe' : 'Minhas vendas e minha comissão'}
+              Relatório de vendas pagas e comissões da equipe
             </p>
             <p>Período ({LABEL_CAMPO[campo].toLowerCase()}): {periodoTexto}</p>
             <p>Emitido em {dataBR(new Date().toISOString())}</p>
@@ -489,7 +479,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         {/* comissão de cada pessoa da equipe — é o que o dono confere no papel */}
         <div className="sem-quebra mb-4">
           <p className="mb-1 font-bold">
-            {ehProprietario ? 'Comissões da equipe' : `Comissão de ${nomeVendedor(meuVendedorId)}`}
+            Comissões da equipe
           </p>
           <table className="tabela-print">
             <thead>
@@ -514,7 +504,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4}>{ehProprietario ? 'TOTAL DE COMISSÕES' : 'SUA COMISSÃO NO PERÍODO'}</td>
+                <td colSpan={4}>TOTAL DE COMISSÕES</td>
                 <td className="num">{moeda(totais.comissao)}</td>
               </tr>
             </tfoot>

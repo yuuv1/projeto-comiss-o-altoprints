@@ -1,6 +1,12 @@
 # Plano — porta do proprietário + lançamento com as contas que já existem
 ### versão 2 · com as decisões que você tomou
 
+> ⚠️ **Documento histórico.** A porta administrativa (`#/administracao`, 5 toques no logo,
+> `Ctrl + Alt + D`) virou o **“Login proprietário”** e o modelo de contas de funcionário
+> **saiu do sistema** na versão **1.4.0**: hoje só o proprietário tem login e a equipe
+> escolhe o próprio nome ao registrar a fila. O que vale está em
+> **[PLANO-LOGIN.md](PLANO-LOGIN.md)**.
+
 **Decidido:**
 1. A criação do acesso do proprietário **sai** da tela comum → vai para uma **porta administrativa escondida**, que o seu chefe abre com facilidade e que exige o **acesso de administrador** para fazer qualquer coisa.
 2. **Sem código de equipe** — cadastro livre para funcionário novo.

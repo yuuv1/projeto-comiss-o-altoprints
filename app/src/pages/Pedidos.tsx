@@ -4,18 +4,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { BarraBusca, Botao, CartaoResumo, Pilulas, TituloPagina, Vazio, cn } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { telasDoUsuario } from '../lib/types'
 import { moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
-import {
-  combinaFiltro,
-  FILTROS_FILA,
-  type FiltroFila,
-  type PassoFila,
-  type Pedido,
-  podeEditarPedidos,
-  podeExcluirPedidos,
-} from '../lib/types'
+import { combinaFiltro, FILTROS_FILA, type FiltroFila, type PassoFila, type Pedido } from '../lib/types'
 
 /**
  * Pedidos — as filas de impressão.
@@ -26,7 +17,7 @@ import {
  */
 export default function Pedidos() {
   const { db, nomeVendedor } = useStore()
-  const { usuario, ehProprietario } = useAuth()
+  const { ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
   const [busca, setBusca] = useState('')
@@ -45,18 +36,17 @@ export default function Pedidos() {
     setParametros(novos, { replace: true })
   }
 
-  /** quem cuida da produção (fila de impressão) enxerga todas as filas */
-  const veTodas = ehProprietario || telasDoUsuario(usuario).paraImprimir
-
-  // o vendedor enxerga apenas as filas dele
+  /*
+   * A equipe vê o quadro inteiro de filas (é uma loja só, sem login de
+   * funcionário). Excluir pedido continua sendo recurso do proprietário.
+   */
   const meus = useMemo(() => {
-    const base = veTodas ? db.pedidos : db.pedidos.filter((p) => p.vendedor_id === usuario?.vendedor_id)
+    const base = db.pedidos
     return vendedorFiltro ? base.filter((p) => p.vendedor_id === vendedorFiltro) : base
-  }, [db.pedidos, usuario?.vendedor_id, veTodas, vendedorFiltro])
+  }, [db.pedidos, vendedorFiltro])
 
-  const permissao = db.configuracoes.permissao_vendedor
-  const podeEditar = ehProprietario || podeEditarPedidos(permissao)
-  const podeExcluir = ehProprietario || podeExcluirPedidos(permissao)
+  const podeEditar = true
+  const podeExcluir = ehProprietario
 
   const pedidos = useMemo(() => [...meus].sort((a, b) => b.numero - a.numero), [meus])
 
@@ -121,7 +111,7 @@ export default function Pedidos() {
     <>
       <TituloPagina
         icone={ClipboardList}
-        titulo={ehProprietario ? 'Pedidos' : 'Meus pedidos'}
+        titulo="Pedidos"
         subtitulo="Cada pedido é uma fila de impressão: cliente, metragem, valor automático e os dois estágios — em andamento e concluído."
         acoes={
           <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
@@ -129,6 +119,13 @@ export default function Pedidos() {
           </Botao>
         }
       />
+
+      {!ehProprietario ? (
+        <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+          Você está usando o sistema <b>sem login</b>. Ao registrar uma fila, escolha o <b>seu nome</b> — ele fica
+          gravado no pedido e entra no relatório de comissão.
+        </p>
+      ) : null}
 
       {vendedorFiltro ? (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-800 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-200">
@@ -179,15 +176,7 @@ export default function Pedidos() {
       {filtrados.length === 0 ? (
         <Vazio
           icone={filtro === 'entregue' ? PackageCheck : ClipboardList}
-          titulo={
-            busca
-              ? 'Nenhuma fila encontrada'
-              : filtro === 'todas'
-                ? ehProprietario
-                  ? 'Nenhuma fila registrada ainda'
-                  : 'Você ainda não registrou filas'
-                : 'Nada por aqui'
-          }
+          titulo={busca ? 'Nenhuma fila encontrada' : filtro === 'todas' ? 'Nenhuma fila registrada ainda' : 'Nada por aqui'}
           descricao={busca ? 'Tente buscar por outro termo.' : ajuda}
           acao={
             !busca && filtro === 'todas' ? (
@@ -203,8 +192,8 @@ export default function Pedidos() {
             <PedidoCartao
               key={p.id}
               pedido={p}
-              mostrarVendedor={veTodas}
-              mostrarValor={ehProprietario || p.vendedor_id === usuario?.vendedor_id}
+              mostrarVendedor
+              mostrarValor
               onPasso={(passo) => aoPasso(p, passo)}
               acoes={acoesDoCartao(p)}
             />

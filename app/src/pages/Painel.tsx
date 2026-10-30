@@ -117,9 +117,9 @@ export default function Painel() {
       },
       {
         id: 'equipe',
-        titulo: 'Cadastrar as contas da equipe',
-        detalhe: 'cada pessoa entra tocando no próprio nome',
-        feito: db.usuarios.length > 1 || db.vendedores.length > 0,
+        titulo: 'Cadastrar os funcionários',
+        detalhe: 'cada um escolhe o próprio nome ao registrar a fila (sem login)',
+        feito: db.vendedores.length > 0,
         to: '/configuracoes?aba=equipe',
       },
       {
@@ -151,7 +151,7 @@ export default function Painel() {
         to: '/pedido/novo',
       },
     ],
-    [db.configuracoes.logo_url, db.pedidos.length, db.usuarios.length, db.vendedores.length, faixas, nuvem],
+    [db.configuracoes.logo_url, db.pedidos.length, db.vendedores.length, faixas, nuvem],
   )
 
   const pendentes = passos.filter((p) => !p.feito)
@@ -161,10 +161,9 @@ export default function Painel() {
 
   const mesAtual = hoje.slice(0, 7)
   const equipe = useMemo(() => {
-    return db.usuarios
-      .map((u) => {
-        const dono = u.papel === 'proprietario'
-        const meus = dono ? [] : db.pedidos.filter((p) => u.vendedor_id && p.vendedor_id === u.vendedor_id)
+    return db.vendedores
+      .map((conta) => {
+        const meus = db.pedidos.filter((p) => p.vendedor_id === conta.id)
         const noMes = meus.filter((p) => dataPagamento(p).startsWith(mesAtual))
         const concluidos = filasDaComissao(noMes)
         const ultima = meus
@@ -173,16 +172,15 @@ export default function Painel() {
           .sort()
           .pop()
         return {
-          conta: u,
-          dono,
+          conta,
           pedidos: noMes.length,
           faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
           comissao: calcularComissao(concluidos, faixas, semMetragem).total,
           ultima: ultima ?? null,
         }
       })
-      .sort((a, b) => Number(b.dono) - Number(a.dono) || b.faturamento - a.faturamento)
-  }, [db.pedidos, db.usuarios, faixas, mesAtual, semMetragem])
+      .sort((a, b) => b.faturamento - a.faturamento || a.conta.nome.localeCompare(b.conta.nome))
+  }, [db.pedidos, db.vendedores, faixas, mesAtual, semMetragem])
 
   const ranking = useMemo(
     () =>
@@ -210,7 +208,7 @@ export default function Painel() {
     { label: 'Novo pedido', sub: 'registrar uma fila', icone: Plus, cor: 'from-pink-500 to-purple-600', to: '/pedido/novo' },
     { label: 'A receber', sub: moeda(aReceberTodos), icone: Wallet, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=a_pagar' },
     { label: 'Na máquina', sub: `${resumoHoje.naFila} fila(s)`, icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
-    { label: 'Equipe', sub: `${db.usuarios.length} acesso(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
+    { label: 'Equipe', sub: `${db.vendedores.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
     { label: 'Relatório', sub: 'comissões e faturamento', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
 
@@ -522,14 +520,14 @@ export default function Painel() {
       <Cartao hover={false} className="mt-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Equipe · mês atual</h2>
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Funcionários · mês atual</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {db.usuarios.length} acesso(s) • {db.vendedores.length} vendedor(es) •{' '}
-              {db.clientes.length} cliente(s)
+              {db.vendedores.length} funcionário(s) • {db.clientes.length} cliente(s) •{' '}
+              {db.usuarios.length} login(s) de proprietário
             </p>
           </div>
           <Botao tamanho="sm" variante="secundario" icone={Users} onClick={() => navegar('/configuracoes?aba=equipe')}>
-            Gerenciar equipe
+            Funcionários e acessos
           </Botao>
         </div>
 
@@ -537,8 +535,8 @@ export default function Painel() {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                <th className="px-2 py-1.5">Acesso</th>
-                <th className="px-2 py-1.5">Vínculo</th>
+                <th className="px-2 py-1.5">Funcionário</th>
+                <th className="px-2 py-1.5">Situação</th>
                 <th className="px-2 py-1.5 text-right">Pedidos</th>
                 <th className="px-2 py-1.5 text-right">Faturamento</th>
                 <th className="px-2 py-1.5 text-right">Comissão</th>
@@ -547,7 +545,7 @@ export default function Painel() {
               </tr>
             </thead>
             <tbody>
-              {equipe.map(({ conta, dono, pedidos, faturamento, comissao, ultima }) => (
+              {equipe.map(({ conta, pedidos, faturamento, comissao, ultima }) => (
                 <tr
                   key={conta.id}
                   className="border-t border-slate-100 text-slate-700 dark:border-slate-800 dark:text-slate-200"
@@ -558,23 +556,17 @@ export default function Painel() {
                         {conta.nome.slice(0, 2).toUpperCase()}
                       </span>
                       <span className="font-bold">{conta.nome}</span>
-                      {!conta.ativo ? (
-                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                          inativo
-                        </span>
-                      ) : null}
+
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">
-                    {dono ? 'vê tudo' : `${LABEL_PAPEL[conta.papel]} · ${nomeVendedor(conta.vendedor_id)}`}
-                  </td>
-                  <td className="px-2 py-2 text-right font-semibold">{dono ? '—' : pedidos}</td>
-                  <td className="px-2 py-2 text-right font-semibold">{dono ? '—' : moeda(faturamento)}</td>
+                  <td className="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">sem login (equipe)</td>
+                  <td className="px-2 py-2 text-right font-semibold">{pedidos}</td>
+                  <td className="px-2 py-2 text-right font-semibold">{moeda(faturamento)}</td>
                   <td className="px-2 py-2 text-right font-bold text-amber-600 dark:text-amber-400">
-                    {dono ? '—' : moeda(comissao)}
+                    {moeda(comissao)}
                   </td>
                   <td className="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">
-                    {dono ? '—' : ultima ? dataBR(ultima) : 'sem pedidos'}
+                    {ultima ? dataBR(ultima) : 'sem pedidos'}
                   </td>
                   <td className="px-2 py-2 text-right">
                     <Botao
@@ -590,7 +582,7 @@ export default function Painel() {
               {equipe.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-2 py-4 text-center text-sm text-slate-400 dark:text-slate-500">
-                    Nenhuma conta de acesso ainda — crie a primeira em Configurações → Equipe.
+                    Nenhum funcionário cadastrado ainda — cadastre em Configurações → Funcionários e acessos.
                   </td>
                 </tr>
               ) : null}

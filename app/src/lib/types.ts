@@ -224,7 +224,7 @@ export const LABEL_PAPEL: Record<Papel, string> = {
   vendedor: 'Vendedor',
 }
 
-/** Telas extras que o proprietário pode liberar para um acesso de vendedor */
+/** Telas extras (ficaram guardadas para usos futuros; hoje a equipe usa o sistema sem login) */
 export interface TelasAcesso {
   /** Relatório de vendas — sempre filtrado pelos pedidos do próprio vendedor */
   relatorio: boolean

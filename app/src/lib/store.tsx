@@ -28,7 +28,6 @@ import {
   limparAvisoDeConexao,
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
-import { bloquearSeVisualizando, registrarAvisoDeBloqueio } from './visualizacao'
 import { gerarDadosDemo } from './seed'
 import {
   espacoNoLocalStorage,
@@ -39,9 +38,10 @@ import {
   type OndeEstaGuardado,
 } from './armazenamento'
 import { limparChavesDoSistema, lsGravar, lsLer, lsRemover } from './local'
-import { CHAVE_EQUIPE_INICIAL, registrosEquipeInicial } from './equipe-inicial'
+import { CHAVE_EQUIPE_INICIAL, vendedoresDaEquipeInicial } from './equipe-inicial'
 import {
   CONFIG_PADRAO,
+  normalizarPedido,
   type Arquivo,
   type Cliente,
   type Configuracoes,
@@ -49,6 +49,7 @@ import {
   type ID,
   type Impressao,
   type Pedido,
+  type Usuario,
   type Vendedor,
 } from './types'
 
@@ -64,7 +65,8 @@ interface Ctx {
   erro: string | null
   nuvem: boolean
   limparErro: () => void
-  recarregar: () => Promise<DB>
+  /** relê o banco; `silencioso` evita a tela de "Carregando" nas sincronizações automáticas */
+  recarregar: (silencioso?: boolean) => Promise<DB>
   /* toasts */
   toasts: Toast[]
   avisar: (texto: string, tipo?: Toast['tipo']) => void
@@ -150,15 +152,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   /* No modo "ver como funcionário" toda gravação é bloqueada: aqui a pessoa
      recebe o aviso na tela em vez de o botão simplesmente não fazer nada. */
-  useEffect(() => {
-    registrarAvisoDeBloqueio((texto) => avisar(texto, 'erro'))
-    return () => registrarAvisoDeBloqueio(null)
-  }, [avisar])
-
-  const fecharToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
-
-  const recarregar = useCallback(async () => {
-    setCarregando(true)
+  const recarregar = useCallback(async (silencioso = false) => {
+    if (!silencioso) setCarregando(true)
     try {
       const dados = await carregarTudo()
       setDb(dados)
@@ -168,52 +163,75 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setErro((e as Error).message)
       throw e
     } finally {
-      setCarregando(false)
+      if (!silencioso) setCarregando(false)
     }
   }, [])
 
   /**
-   * Cria os acessos da EQUIPE INICIAL (JESSICA, RAISSA, ANDREIA — lista em
-   * `lib/equipe-inicial.ts`) na primeira abertura. São acessos de funcionário
-   * **sem senha**: cada um entra tocando no próprio nome na tela de entrada.
+   * Cadastra os FUNCIONÁRIOS da equipe inicial (JESSICA, RAISSA, ANDREIA — lista
+   * em `lib/equipe-inicial.ts`) na primeira abertura. Não existe conta nem senha
+   * de funcionário: são só nomes na lista que aparece ao registrar uma fila.
    *
-   * O acesso do PROPRIETÁRIO nunca vem pronto — ele é criado na porta
-   * administrativa (#/administracao) e exige senha.
+   * O acesso do PROPRIETÁRIO nunca vem pronto — ele é criado no primeiro
+   * “Login proprietário” e exige senha.
    */
   const criarEquipeInicial = useCallback(
     async (dados: DB): Promise<DB> => {
       if (dados.configuracoes.modo_exemplo || lsLer(CHAVE_EQUIPE_INICIAL) === '1') return dados
-      const { vendedores, usuarios } = registrosEquipeInicial(dados)
-      if (!vendedores.length && !usuarios.length) {
+      const vendedores = vendedoresDaEquipeInicial(dados)
+      if (!vendedores.length) {
         lsGravar(CHAVE_EQUIPE_INICIAL, '1')
         return dados
       }
       try {
         await salvarVarios('vendedores', vendedores)
-        await salvarVarios('usuarios', usuarios)
         // só marca depois de gravado: se o banco ainda não tiver a coluna nova,
         // tenta de novo na próxima abertura em vez de desistir para sempre
         lsGravar(CHAVE_EQUIPE_INICIAL, '1')
-        if (usuarios.length)
-          avisar(
-            `Acessos da equipe prontos: ${usuarios
-              .map((u) => u.nome)
-              .join(', ')} — cada um entra tocando no próprio nome (sem senha).`,
-            'info',
-          )
-        const idsUsuarios = new Set(usuarios.map((u) => u.id))
+        avisar(`Funcionários prontos: ${vendedores.map((v) => v.nome).join(', ')}.`, 'info')
         return {
           ...dados,
           vendedores: [...dados.vendedores, ...vendedores].sort((a, b) => a.nome.localeCompare(b.nome)),
-          usuarios: [...dados.usuarios.filter((u) => !idsUsuarios.has(u.id)), ...usuarios],
         }
       } catch (e) {
-        console.warn('[altoprints] não foi possível criar os acessos da equipe:', (e as Error).message)
+        console.warn('[altoprints] não foi possível cadastrar os funcionários da equipe:', (e as Error).message)
         return dados
       }
     },
     [avisar],
   )
+
+  /*
+   * SINCRONIA DA NUVEM — com o Supabase conectado, os aparelhos releem o banco
+   * sozinhos: a cada 15 s, quando a pessoa volta para a aba e quando a janela
+   * ganha foco. Assim o pedido lançado no computador aparece no celular, e um
+   * backup restaurado num aparelho chega nos outros sem ninguém recarregar.
+   */
+  useEffect(() => {
+    if (!emNuvem()) return
+    let ativo = true
+    const atualizar = async () => {
+      if (!ativo) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      try {
+        await recarregar(true)
+      } catch {
+        // sem internet: segue com o que está na tela e tenta de novo no próximo ciclo
+      }
+    }
+    const relogio = window.setInterval(atualizar, 15000)
+    const aoVoltar = () => void atualizar()
+    document.addEventListener('visibilitychange', aoVoltar)
+    window.addEventListener('focus', aoVoltar)
+    return () => {
+      ativo = false
+      window.clearInterval(relogio)
+      document.removeEventListener('visibilitychange', aoVoltar)
+      window.removeEventListener('focus', aoVoltar)
+    }
+  }, [recarregar, nuvem])
+
+  const fecharToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
 
   const conectarNuvem = useCallback(
     async (url: string, chave: string) => {
@@ -279,7 +297,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarVendedor = useCallback(
     async (dados: { nome: string }, id?: ID) => {
-      bloquearSeVisualizando()
       const nome = dados.nome.trim()
       if (!nome) throw new Error('Informe o nome do vendedor.')
       const existente = id ? db.vendedores.find((v) => v.id === id) : undefined
@@ -302,7 +319,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirVendedor = useCallback(
     async (id: ID) => {
-      bloquearSeVisualizando()
       await removerRegistro('vendedores', id)
       setDb((atual) => ({ ...atual, vendedores: atual.vendedores.filter((v) => v.id !== id) }))
       avisar('Vendedor excluído.', 'info')
@@ -314,7 +330,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarCliente = useCallback(
     async (dados: Omit<Cliente, 'id' | 'created_at'>, id?: ID) => {
-      bloquearSeVisualizando()
       if (!dados.nome.trim()) throw new Error('O nome do cliente é obrigatório.')
       if (!dados.vendedor_id) throw new Error('Escolha o vendedor responsável.')
       const existente = id ? db.clientes.find((c) => c.id === id) : undefined
@@ -338,7 +353,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirCliente = useCallback(
     async (id: ID) => {
-      bloquearSeVisualizando()
       await removerRegistro('clientes', id)
       setDb((atual) => ({ ...atual, clientes: atual.clientes.filter((c) => c.id !== id) }))
       avisar('Cliente excluído.', 'info')
@@ -350,7 +364,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const enviarArquivos = useCallback(
     async (pedidoId: ID, arquivos: File[]) => {
-      bloquearSeVisualizando()
       if (!arquivos.length) return
       const registros: Arquivo[] = []
       for (const f of arquivos) registros.push(await enviarArquivo(pedidoId, f))
@@ -362,7 +375,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarPedido = useCallback(
     async (dados: Omit<Pedido, 'id'>, id: ID | undefined, arquivosNovos: File[]) => {
-      bloquearSeVisualizando()
       if (!dados.cliente_nome.trim()) throw new Error('Informe o nome do cliente.')
       if (!dados.vendedor_id) throw new Error('Escolha o vendedor responsável.')
 
@@ -433,7 +445,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const atualizarPedido = useCallback(
     async (id: ID, patch: Partial<Pedido>) => {
-      bloquearSeVisualizando()
       const atual = db.pedidos.find((p) => p.id === id)
       if (!atual) return
       const registro: Pedido = { ...atual, ...patch, updated_at: new Date().toISOString() }
@@ -445,7 +456,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirPedido = useCallback(
     async (id: ID) => {
-      bloquearSeVisualizando()
       const arquivos = db.arquivos.filter((a) => a.pedido_id === id)
       await apagarVariosArquivos(arquivos)
       await removerArquivosDoPedido(id)
@@ -463,7 +473,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const excluirArquivoDoPedido = useCallback(
     async (arquivo: Arquivo) => {
-      bloquearSeVisualizando()
       await apagarVariosArquivos([arquivo])
       await removerRegistro('arquivos', arquivo.id)
       setDb((atual) => ({ ...atual, arquivos: atual.arquivos.filter((a) => a.id !== arquivo.id) }))
@@ -476,7 +485,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const salvarConfig = useCallback(
     async (parcial: Partial<Configuracoes>) => {
-      bloquearSeVisualizando()
       await salvarConfiguracoes(parcial)
       setDb((atual) => ({ ...atual, configuracoes: { ...atual.configuracoes, ...parcial } }))
     },
@@ -485,7 +493,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resetarDados = useCallback(
     async (manterContaId?: string) => {
-      bloquearSeVisualizando()
       // guarda o acesso de quem está apagando: sem isso, o proprietário perderia
       // a própria conta e não conseguiria nem entrar no sistema de novo
       const contaMantida = manterContaId ? db.usuarios.find((u) => u.id === manterContaId) : undefined
@@ -518,37 +525,72 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     avisar('Backup baixado. Guarde o arquivo em um lugar seguro.')
   }, [avisar, db])
 
-  /** restaura um backup baixado antes (substitui tudo o que está no sistema) */
+  /**
+   * Restaura um backup (substitui tudo o que está no sistema).
+   *
+   * Aceita o arquivo que o próprio sistema baixa e também backups de versões
+   * antigas, inclusive os que vêm embrulhados (`{ versao, dados }`, `{ db }`).
+   * Contas de FUNCIONÁRIO de versões antigas são descartadas — hoje só o
+   * proprietário tem login. Se o arquivo não trouxer nenhuma conta de dono, os
+   * acessos que já existem neste aparelho continuam valendo (ninguém fica de
+   * fora do sistema).
+   */
   const restaurarBackup = useCallback(
     async (arquivo: File) => {
-      bloquearSeVisualizando()
       const texto = await arquivo.text()
-      const dados = JSON.parse(texto) as Partial<DB>
-      if (!Array.isArray(dados.pedidos) || !Array.isArray(dados.clientes))
-        throw new Error('Este arquivo não parece ser um backup do sistema.')
-      const restaurado: DB = {
-        vendedores: dados.vendedores ?? [],
-        clientes: dados.clientes ?? [],
-        pedidos: dados.pedidos ?? [],
-        arquivos: dados.arquivos ?? [],
-        impressoes: dados.impressoes ?? [],
-        usuarios: dados.usuarios ?? [],
-        configuracoes: { ...CONFIG_PADRAO, ...(dados.configuracoes ?? {}) },
+      let bruto: unknown
+      try {
+        bruto = JSON.parse(texto)
+      } catch {
+        throw new Error('Este arquivo não é um backup do sistema (não é um JSON válido).')
       }
+      const embrulho = bruto as Record<string, unknown>
+      // alguns backups vêm dentro de uma capa: { versao, dados: {...} } / { db: {...} }
+      const dados = (embrulho?.dados ?? embrulho?.db ?? embrulho?.data ?? embrulho) as Partial<DB>
+      if (!dados || (!Array.isArray(dados.pedidos) && !Array.isArray(dados.clientes)))
+        throw new Error('Este arquivo não parece ser um backup do sistema (faltam os pedidos e clientes).')
+
+      const donosDoArquivo: Usuario[] = (dados.usuarios ?? [])
+        .filter((u) => u && u.papel !== 'vendedor' && Boolean(u.senha_hash))
+        .map((u) => ({
+          ...u,
+          papel: 'proprietario' as const,
+          ativo: u.ativo ?? true,
+          vendedor_id: '',
+          telas: { ...u.telas },
+        }))
+
+      const restaurado: DB = {
+        vendedores: (dados.vendedores ?? []).map((v) => ({ ...v, id: v.id || novoId() })),
+        clientes: (dados.clientes ?? []).map((c) => ({ ...c, id: c.id || novoId() })),
+        // pedidos de versões antigas (status_producao/impresso) viram o estágio de hoje
+        pedidos: (dados.pedidos ?? []).map((p) =>
+          normalizarPedido(p as unknown as Partial<Pedido> & Record<string, unknown>),
+        ),
+        arquivos: (dados.arquivos ?? []).map((a) => ({ ...a, id: a.id || novoId() })),
+        impressoes: (dados.impressoes ?? []).map((i) => ({ ...i, id: i.id || novoId() })),
+        usuarios: donosDoArquivo.length ? donosDoArquivo : db.usuarios.filter((u) => u.papel === 'proprietario'),
+        configuracoes: { ...CONFIG_PADRAO, ...(dados.configuracoes ?? {}), modo_exemplo: false },
+      }
+
       await substituirTudo(restaurado)
       setDb(restaurado)
-      avisar('Backup restaurado com sucesso!')
+      const resumo = `${restaurado.pedidos.length} pedidos · ${restaurado.clientes.length} clientes · ${restaurado.vendedores.length} funcionários`
+      avisar(
+        emNuvem()
+          ? `Backup restaurado (${resumo}) e enviado para a nuvem: todos os aparelhos passam a ver estes dados.`
+          : `Backup restaurado (${resumo}). Com a nuvem conectada, ele também chega aos outros aparelhos.`,
+      )
     },
-    [avisar],
+    [avisar, db.usuarios],
   )
 
   /**
    * Carrega os dados de EXEMPLO (fictícios) para treinar a equipe.
-   * Nunca toca nas contas de acesso nem nas configurações do dono: assim ninguém
+   * Nunca toca nos acessos de proprietário nem nas configurações do dono: assim ninguém
    * é trancado para fora do sistema e o logo/comissões continuam os mesmos.
    */
   const carregarDemo = useCallback(async () => {
-    bloquearSeVisualizando()
     const exemplo = gerarDadosDemo()
     const demo: DB = {
       ...exemplo,

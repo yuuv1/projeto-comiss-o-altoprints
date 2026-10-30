@@ -16,6 +16,7 @@ import {
   useConfirmacao,
 } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { moeda } from '../lib/format'
 import RelatorioClienteEspecial from './RelatorioClienteEspecial'
 import { useStore } from '../lib/store'
@@ -33,7 +34,7 @@ const clienteEmBranco = (): Omit<Cliente, 'id' | 'created_at'> => ({
 
 export default function Clientes() {
   const { db, salvarCliente, excluirCliente, nomeVendedor } = useStore()
-  const { usuario, ehProprietario } = useAuth()
+  const { ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   // a busca rápida (Ctrl + K) chega aqui já com o nome do cliente: /clientes?busca=ANA
   const [parametros] = useSearchParams()
@@ -54,7 +55,7 @@ export default function Clientes() {
 
   const abrirNovo = () => {
     setEditando(null)
-    setForm({ ...clienteEmBranco(), vendedor_id: ehProprietario ? '' : usuario?.vendedor_id ?? '' })
+    setForm({ ...clienteEmBranco(), vendedor_id: ultimoFuncionario() })
     setValorEspecialTxt('')
     setPreenchido(false)
     setAberto(true)
@@ -69,17 +70,15 @@ export default function Clientes() {
     setAberto(true)
   }
 
+  /* a loja é uma só: todo mundo vê a mesma lista de clientes */
   const clientes = useMemo(() => {
     const t = busca.trim().toLowerCase()
-    const todos = ehProprietario
-      ? db.clientes
-      : db.clientes.filter((c) => c.vendedor_id === usuario?.vendedor_id)
-    const lista = [...todos].sort((a, b) => a.nome.localeCompare(b.nome))
+    const lista = [...db.clientes].sort((a, b) => a.nome.localeCompare(b.nome))
     if (!t) return lista
     return lista.filter((c) =>
       [c.nome, c.telefone, c.email, nomeVendedor(c.vendedor_id)].join(' ').toLowerCase().includes(t),
     )
-  }, [busca, db.clientes, ehProprietario, nomeVendedor, usuario?.vendedor_id])
+  }, [busca, db.clientes, nomeVendedor])
 
   const especiais = db.clientes.filter((c) => c.especial).length
 
@@ -270,23 +269,21 @@ export default function Clientes() {
               placeholder="cliente@email.com"
             />
           </Campo>
-          <Campo label="Vendedor responsável" obrigatorio>
-            {ehProprietario ? (
-              <Selecao
-                value={form.vendedor_id}
-                onChange={(e) => setForm({ ...form, vendedor_id: e.target.value })}
-                required
-              >
-                <option value="">Selecione</option>
-                {db.vendedores.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.nome}
-                  </option>
-                ))}
-              </Selecao>
-            ) : (
-              <Entrada value={nomeVendedor(usuario?.vendedor_id)} readOnly className="bg-slate-50 dark:bg-slate-800" />
-            )}
+          <Campo label="Funcionário responsável" dica="Opcional — quem atende este cliente.">
+            <Selecao
+              value={form.vendedor_id}
+              onChange={(e) => {
+                setForm({ ...form, vendedor_id: e.target.value })
+                guardarUltimoFuncionario(e.target.value)
+              }}
+            >
+              <option value="">Sem responsável</option>
+              {db.vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nome}
+                </option>
+              ))}
+            </Selecao>
           </Campo>
           <Campo
             label="Valor especial do metro (opcional)"

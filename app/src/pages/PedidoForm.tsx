@@ -39,6 +39,7 @@ import { calcularComissao } from '../lib/comissao'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
+import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { useStore } from '../lib/store'
 import {
   ESTADOS,
@@ -116,17 +117,17 @@ export default function PedidoForm() {
   const [params] = useSearchParams()
   const navegar = useNavigate()
   const { db, salvarPedido, excluirPedido, excluirArquivoDoPedido, avisar, nomeVendedor } = useStore()
-  const { usuario, ehProprietario, vendedorNome } = useAuth()
+  const { ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
   const novo = !id
   const existente = useMemo(() => db.pedidos.find((p) => p.id === id), [db.pedidos, id])
 
-  const permissao = db.configuracoes.permissao_vendedor
-  /** o vendedor só mexe no que é dele, e conforme a permissão definida pelo dono */
-  const pedidoDeOutro = Boolean(existente) && !ehProprietario && existente?.vendedor_id !== usuario?.vendedor_id
-  const somenteLeitura =
-    pedidoDeOutro || (!ehProprietario && Boolean(existente) && permissao === 'somente_criar')
-  const podeExcluir = ehProprietario || (!pedidoDeOutro && permissao === 'total')
+  /*
+   * Sem login de funcionário: quem está no balcão cria e ajusta a fila.
+   * Excluir pedido (e com ele o histórico) continua sendo recurso do dono.
+   */
+  const somenteLeitura = false
+  const podeExcluir = ehProprietario
 
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(() => ({ ...pedidoVazio() }))
   const [metragemTxt, setMetragemTxt] = useState('')
@@ -157,7 +158,8 @@ export default function PedidoForm() {
     } else if (novo) {
       setForm({
         ...pedidoVazio(),
-        vendedor_id: params.get('vendedor') ?? usuario?.vendedor_id ?? '',
+        // já vem com o nome de quem usou o sistema pela última vez neste aparelho
+        vendedor_id: params.get('vendedor') ?? ultimoFuncionario(),
       })
       setMetragemTxt('')
       setValorTxt('')
@@ -213,6 +215,7 @@ export default function PedidoForm() {
         existente?.id,
         arquivosNovos,
       )
+      if (form.vendedor_id) guardarUltimoFuncionario(form.vendedor_id)
       setArquivosNovos([])
       navegar('/pedidos')
     } catch (err) {
@@ -328,17 +331,6 @@ export default function PedidoForm() {
         }
       />
 
-      {somenteLeitura ? (
-        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-          <p>
-            {pedidoDeOutro
-              ? 'Este pedido é de outro vendedor — você pode visualizar, mas não alterar.'
-              : 'O proprietário definiu que os vendedores podem apenas criar pedidos. Peça o ajuste ao proprietário.'}
-          </p>
-        </div>
-      ) : null}
-
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ------------------------- coluna principal ------------------------ */}
         <div className="space-y-4 lg:col-span-2">
@@ -386,26 +378,26 @@ export default function PedidoForm() {
               </Campo>
 
               <Campo
-                label="Vendedor responsável"
+                label={ehProprietario ? 'Funcionário responsável' : 'Seu nome (funcionário)'}
                 obrigatorio
-                dica={ehProprietario ? undefined : 'Você só pode lançar pedidos no seu próprio nome.'}
+                dica={
+                  ehProprietario
+                    ? 'É este nome que entra no relatório de comissão.'
+                    : 'Escolha o seu nome — ele fica gravado no pedido e entra na sua comissão.'
+                }
               >
-                {ehProprietario ? (
-                  <Selecao
-                    value={form.vendedor_id}
-                    onChange={(e) => set({ vendedor_id: e.target.value })}
-                    required
-                  >
-                    <option value="">Selecione o vendedor</option>
-                    {db.vendedores.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.nome}
-                      </option>
-                    ))}
-                  </Selecao>
-                ) : (
-                  <Entrada value={vendedorNome} readOnly className="bg-slate-50 dark:bg-slate-800" />
-                )}
+                <Selecao
+                  value={form.vendedor_id}
+                  onChange={(e) => set({ vendedor_id: e.target.value })}
+                  required
+                >
+                  <option value="">{ehProprietario ? 'Selecione o funcionário' : 'Escolha o seu nome'}</option>
+                  {db.vendedores.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.nome}
+                    </option>
+                  ))}
+                </Selecao>
               </Campo>
 
               <Campo label="Data da fila" dica="Já vem com o dia de hoje.">
