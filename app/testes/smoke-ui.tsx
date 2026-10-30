@@ -482,6 +482,73 @@ async function main() {
   if (!avisoExemplo) falhas++
   console.log(`  ${avisoExemplo ? '✅' : '❌'} dados de exemplo avisam que "não são reais" e trazem o atalho para apagar`)
 
+  // ---------- painel do chefe: resumo de hoje, atalhos grandes, checklist e tabela ----------
+  const resumoHojeOk =
+    painel.includes('Resumo de hoje') &&
+    painel.includes('Na fila agora') &&
+    painel.includes('Parados 3+ dias') &&
+    painel.includes('Entregues hoje')
+  if (!resumoHojeOk) falhas++
+  console.log(`  ${resumoHojeOk ? '✅' : '❌'} painel abre com o “Resumo de hoje” (fila, entregas, parados)`)
+
+  const atalhosGrandesOk = ['Novo pedido', 'A receber', 'Na máquina', 'Equipe', 'Relatório'].every((t) =>
+    painel.includes(t),
+  )
+  if (!atalhosGrandesOk) falhas++
+  console.log(`  ${atalhosGrandesOk ? '✅' : '❌'} painel tem os 5 atalhos grandes do dia a dia`)
+
+  const checklistOk = painel.includes('Primeiros passos') && /\d de 6 prontos/.test(painel)
+  if (!checklistOk) falhas++
+  console.log(`  ${checklistOk ? '✅' : '❌'} checklist de primeiros passos aparece (e some quando terminar)`)
+
+  const equipeTabelaOk = painel.includes('Equipe · mês atual') && painel.includes('Última venda')
+  if (!equipeTabelaOk) falhas++
+  console.log(`  ${equipeTabelaOk ? '✅' : '❌'} equipe aparece em tabela (pedidos, faturamento, comissão, última venda)`)
+
+  // ---------- busca rápida (Ctrl + K) ----------
+  dom.window.location.hash = '#/'
+  await espera(600)
+  dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+  await espera(400)
+  const dialogoBusca = raiz?.querySelector('[role="dialog"][aria-label="Busca rápida"]') ?? null
+  if (!dialogoBusca) falhas++
+  console.log(`  ${dialogoBusca ? '✅' : '❌'} Ctrl + K abre a busca rápida de qualquer tela`)
+
+  const campoBusca = dialogoBusca?.querySelector('input') as HTMLInputElement | null
+  if (campoBusca) {
+    // o React guarda o último valor do campo: escrever pelo setter nativo é o que
+    // faz o evento "input" chegar mesmo no onChange (como um dedo digitando)
+    const setterNativo = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')?.set
+    setterNativo?.call(campoBusca, 'cliente exemplo 03')
+    campoBusca.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+  }
+  await espera(500)
+  const textoBusca = (dialogoBusca?.textContent ?? '').replace(/\s+/g, ' ')
+  const achouPelaBusca = textoBusca.includes('CLIENTE EXEMPLO 03')
+  if (!achouPelaBusca) falhas++
+  console.log(`  ${achouPelaBusca ? '✅' : '❌'} a busca acha o cliente pelo nome (${textoBusca.slice(0, 60)}…)`)
+
+  // o resultado do cliente mostra o vendedor dele no subtítulo ("vendedor: ...")
+  const resultadoDoCliente = [...(dialogoBusca?.querySelectorAll('ul li button') ?? [])].find((b) =>
+    (b.textContent ?? '').includes('vendedor:'),
+  ) as HTMLElement | undefined
+  resultadoDoCliente?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await espera(600)
+  const foiParaOCliente = dom.window.location.hash.startsWith('#/clientes')
+  if (!foiParaOCliente) falhas++
+  console.log(`  ${foiParaOCliente ? '✅' : '❌'} clicar no resultado leva direto para o cliente (${dom.window.location.hash})`)
+
+  // ---------- chegar em Pedidos filtrado por vendedor ----------
+  dom.window.location.hash = `#/pedidos?vendedor=${vendedor.vendedor_id}`
+  await espera(700)
+  const textoFiltroVendedor = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const filtroVendedorOk =
+    textoFiltroVendedor.includes('Mostrando só os pedidos de') && textoFiltroVendedor.includes(nomeDoVinculo)
+  if (!filtroVendedorOk) falhas++
+  console.log(
+    `  ${filtroVendedorOk ? '✅' : '❌'} Pedidos aceita ?vendedor= e avisa de quem está mostrando os pedidos`,
+  )
+
   // a tela Equipe precisa abrir a janela de criar conta (por ela o dono registra a equipe)
   dom.window.location.hash = '#/equipe'
   await espera(700)

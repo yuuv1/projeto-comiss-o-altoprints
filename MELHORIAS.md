@@ -1,9 +1,13 @@
 # Possíveis melhorias do sistema
-### ideias para escolher (nada aqui está implementado ainda)
+### ideias para escolher — as marcadas com ✅ já entraram no sistema
 
 Cada ideia tem uma etiqueta de esforço: **🟢 pequeno** (faço em uma rodada) · **🟡 médio** (uma ou duas rodadas) · **🔴 grande** (precisa de mais planejamento).
 
 No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
+
+> **Já entregue na versão 1.3.0:** a busca global (Ctrl + K), o resumo de hoje e o checklist de
+> primeiros passos no Painel do proprietário, a equipe em tabela e a explicação em cada aba das
+> Configurações. O que falta mesmo é a **nuvem** — plano em `PLANO-NUVEM-E-PUBLICACAO.md`.
 
 ---
 
@@ -69,7 +73,7 @@ No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 | **Instalar como app no celular (PWA)** com ícone e tela cheia | Abre igual aplicativo, sem passar pelo navegador | 🟡 |
 | **Funcionar offline** e sincronizar quando voltar a internet | Queda de internet não para o atendimento | 🔴 |
 | **Notificação de "pedido pago" / "pedido pronto"** no celular | Ninguém precisa ficar abrindo o sistema para conferir | 🔴 |
-| **Busca global (Ctrl+K)** por pedido, cliente, telefone e código de rastreio | Achar qualquer coisa em 2 segundos | 🟢 |
+| ✅ **Busca global (Ctrl+K)** por pedido, cliente, telefone, cidade, rastreio e vendedor | Achar qualquer coisa em 2 segundos | 🟢 |
 | **Importar CSV do sistema antigo** (pedidos e clientes) | Traz o histórico de uma vez, sem digitar | 🟡 |
 | **Backup automático semanal** + restaurar por arquivo | Proteção real contra qualquer perda | 🟢 |
 | **Modo lista/compacto** (mais pedidos na tela) | Melhor para quem usa computador o dia todo | 🟢 |

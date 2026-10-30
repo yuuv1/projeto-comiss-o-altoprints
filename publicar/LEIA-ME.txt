@@ -1,4 +1,4 @@
-Altoprints — Sistema de Pedidos DTF  (versão 1.2.0)
+Altoprints — Sistema de Pedidos DTF  (versão 1.3.0)
 
 O SISTEMA COMEÇA VAZIO, DO ZERO:
   - Nenhum pedido, cliente ou impressão vem pronto.
@@ -66,7 +66,7 @@ SE APARECER UM ERRO DE "SEM ESPAÇO" OU NADA FOR SALVO:
   - Confira se a janela do navegador não está ANÔNIMA/PRIVADA: nesse modo o
     navegador não deixa o sistema salvar nada. Abra numa janela normal.
   - A tela de login avisa quando isso está acontecendo e mostra a versão do
-    sistema no rodapé (ex.: "versão 1.2.0").
+    sistema no rodapé (ex.: "versão 1.3.0").
   - Em Configurações → Dados existe o bloco "Onde os dados ficam neste aparelho",
     com o botão "Liberar espaço" quando o armazenamento antigo estiver cheio.
 

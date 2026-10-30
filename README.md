@@ -61,23 +61,24 @@ Outros comandos:
 
 ## Telas do sistema
 
-| Menu | Rota | Para que serve |
-| --- | --- | --- |
-| **Pedidos** | `/` | Início. Cartões (Total, Retirada, Correios, A receber), busca grande e lista de pedidos |
-| **Clientes** | `/clientes` | Cadastro de clientes, vendedor responsável, ★ cliente especial e valor especial do metro |
-| **Vendedores** | `/vendedores` | Cadastro simples de vendedores |
-| **Por vendedor** | `/por-vendedor` | Pedidos de um vendedor, filtro de 7/30/90 dias, totais e avisos de impressão |
-| **Para imprimir** | `/para-imprimir` | Só pedidos **pagos e ainda não impressos** (ao marcar, registra metros e quem imprimiu) |
-| **Impressões** | `/impressoes` | Histórico da produção: metros impressos, reimpressões com motivo, filtros, CSV e folha de produção em A4 |
-| **Entregas** | `/entregas` | Aba Correios (rastreio/entrega) e aba Retirada na loja |
-| **Relatório** | `/relatorio` | Somente pagos, comissão pelas faixas de metragem, CSV e impressão em A4 |
-| **Cliente especial** | `/relatorio-cliente-especial` | Extrato do cliente especial (pagos e pendentes) em A4 |
-| **Equipe** | `/equipe` | (só o proprietário) contas de acesso, vínculo com o vendedor e quais telas cada um pode abrir |
-| **Configurações** | `/configuracoes` | Comissões, permissões, empresa, nuvem, backup e o próprio acesso do dono |
+> **Versão atual: 1.3.0** — o número aparece na tela de entrada e no rodapé do sistema.
+> Se o aparelho mostrar um número menor, ele está com uma versão antiga em cache: recarregue.
 
-Extras: janela de **revisão a cada 3 dias** com os pedidos que não estão "DTF pronto"
-e "Pago" ao mesmo tempo, **Importar comprovante** (a IA lê a foto e preenche o pedido)
-e **tema claro/escuro** (botão no cabeçalho, cada pessoa escolhe o seu).
+| Tela | Rota | Para que serve |
+| --- | --- | --- |
+| **Painel** (dono) | `/` | Resumo de hoje, atalhos grandes, checklist de primeiros passos, desempenho por vendedor, comissão por faixa e a equipe em tabela |
+| **Minha área** (vendedor) | `/` | Só o que é dele: avisos de fila pronta, comissão do mês, últimos pedidos e as filas do dia |
+| **Pedidos** | `/pedidos` | As filas de impressão com quatro filtros (Em andamento, A pagar, Concluídas, Entregues) e os selos clicáveis no cartão. Aceita `?filtro=` e `?vendedor=` |
+| **Clientes** | `/clientes` | Cadastro, vendedor responsável, ★ cliente especial, valor especial do metro e a aba **Especiais** |
+| **Relatório** | `/relatorio` | Resumo por vendedor, comissão pelas faixas de metragem, CSV e impressão em A4 |
+| **Cliente especial** | `/relatorio-cliente-especial` | Extrato do cliente especial (pagos e pendentes) em A4 |
+| **Configurações** | `/configuracoes` | 11 abas: Comissões, Preços, Permissões, **Equipe**, **Vendedores**, Empresa, Comprovantes (IA), Dados, Nuvem, Meu acesso e Aparência. Aceita `?aba=` |
+| **Porta do proprietário** | `/administracao` | Criar o primeiro acesso de dono e, depois, só o login de administrador |
+
+Extras: **busca rápida em tudo com `Ctrl + K`** (pedido, cliente, telefone, cidade,
+rastreio e vendedor), **Janela de revisão a cada 3 dias** (o que está fora de "concluído
+e pago"), **Importar comprovante** (a IA lê a foto e preenche o pedido) e **tema
+claro/escuro** (botão no cabeçalho, cada pessoa escolhe o seu).
 
 ---
 
@@ -150,9 +151,10 @@ outro login de dono (sócio, gerente, escritório) — o atalho também aparece 
 nenhum** proprietário ativo: o último não pode ser desativado nem excluído, e ninguém
 apaga o próprio acesso.
 
-- No menu do dono também aparecem **Equipe** (criar, ligar a um vendedor, redefinir
-  senha, desativar ou excluir contas), **Relatório**, **Para imprimir**, **Entregas** e
-  **Configurações** — nada disso aparece para os vendedores.
+- A barra de cima tem só **Painel/Minha área, Pedidos, Clientes e Relatório**. A
+  engrenagem do canto abre as **Configurações**, e dentro delas ficam **Equipe**
+  (criar, ligar a um vendedor, redefinir senha, desativar ou excluir contas) e
+  **Vendedores** — nada disso aparece para quem é vendedor.
 - **Permissões dos vendedores** (`Configurações → Permissões`): podem ter acesso total,
   mexer nos pedidos mas não excluir (padrão) ou só criar pedidos.
 - **Senhas** nunca ficam em texto puro: guardamos só um hash (impressão digital).
@@ -178,8 +180,9 @@ apaga o próprio acesso.
 - O botão **Auto / Manual** alterna entre o cálculo automático e o valor digitado.
 - Ao marcar o pagamento como **Pago**, a data do pagamento é preenchida com hoje.
 
-Status de produção: Editar arte → Fila de impressão → Pagamento → Imprimir → **DTF pronto**.
-Status de pagamento: Pendente, Pago, Parcial, Cancelado.
+Cada pedido é uma **fila** com um estágio (`em andamento` ou `concluído` — "saiu da
+máquina") e duas marcações opcionais no cartão: **pago** e **entregue**. O relatório
+conta as filas **concluídas** do período; o "pago" é orientação da equipe.
 
 ---
 
@@ -203,7 +206,7 @@ app/
 ├── src/
 │   ├── lib/            regras e dados (tipos, preços, comissão, senha, tema, banco, arquivos)
 │   ├── components/     telas de apoio (menu, cartões, modais, etiquetas de status, logo)
-│   ├── pages/          as 8 telas do menu + formulário de pedido
+│   ├── pages/          as telas do sistema + formulário de pedido
 │   └── index.css       estilos + regras de impressão A4
 ├── testes/             testes das regras e das telas (npm run testar)
 ├── supabase/schema.sql banco na nuvem (rodar no SQL Editor do Supabase)
@@ -228,6 +231,13 @@ app/
 - [x] Guarda de publicação (`npm run checar`) + pacote `publicar/` conferido no GitHub Actions
 - [x] Colocar no ar — guia curto: **[`LANCAMENTO.md`](LANCAMENTO.md)** (site:
       <https://yuuv1.github.io/projeto-comiss-o-altoprints/>)
+- [x] **Painel do chefe**: resumo de hoje, atalhos grandes, checklist de primeiros passos,
+      comissão por faixa e equipe em tabela
+- [x] **Busca rápida (Ctrl + K)** em todo o sistema, respeitando o que cada acesso pode ver
+- [x] Abrir Configurações direto numa aba (`?aba=equipe`, `?aba=nuvem`…) e explicação curta
+      em cada aba
+- [ ] **Conectar o Supabase** (mesmos dados para a equipe toda) — plano em
+      **[`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md)**
 - [ ] Conectar o Supabase (guia: `app/CONECTAR-NUVEM.md`) para a equipe compartilhar os dados
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia

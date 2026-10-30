@@ -12,6 +12,7 @@ import {
   Rows4,
   Moon,
   Printer,
+  Search,
   Settings,
   Sparkles,
   Star,
@@ -37,6 +38,7 @@ import { useTema } from '../lib/tema'
 import { naFilaDeImpressao } from '../lib/types'
 import { VERSAO } from '../lib/versao'
 import { Logo } from './Logo'
+import { BuscaGlobal } from './BuscaGlobal'
 import { PerfilDialog } from './PerfilDialog'
 import { ReviewModal } from './ReviewModal'
 import { Botao, cn } from './ui'
@@ -60,7 +62,21 @@ export function Layout() {
   const navegar = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
+  const [buscaAberta, setBuscaAberta] = useState(false)
   const local = useLocation()
+
+  // Ctrl + K (ou ⌘ + K) abre a busca rápida de qualquer tela
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        setBuscaAberta((v) => !v)
+      }
+      if (e.key === 'Escape') setBuscaAberta(false)
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [])
 
   // trocar de tela fecha o menu do celular
   useEffect(() => {
@@ -145,6 +161,18 @@ export function Layout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2 xl:ml-1">
+            <button
+              onClick={() => setBuscaAberta(true)}
+              title="Buscar pedido, cliente ou telefone (Ctrl + K)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2 text-slate-500 shadow-sm transition hover:text-purple-700 sm:pr-3 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+            >
+              <Search className="h-4 w-4" />
+              <span className="hidden text-[12px] font-bold sm:inline">Buscar</span>
+              <span className="hidden rounded-md border border-slate-200 px-1 text-[10px] font-bold text-slate-400 md:inline dark:border-slate-600 dark:text-slate-400">
+                Ctrl K
+              </span>
+            </button>
+
             <button
               onClick={alternar}
               className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
@@ -310,6 +338,7 @@ export function Layout() {
       </footer>
 
       <PerfilDialog aberto={perfilAberto} onFechar={() => setPerfilAberto(false)} />
+      <BuscaGlobal aberto={buscaAberta} onFechar={() => setBuscaAberta(false)} />
       {ehProprietario ? <ReviewModal /> : null}
     </div>
   )

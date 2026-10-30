@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardList, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Wallet } from 'lucide-react'
+import { CheckCircle2, ClipboardList, Filter, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
@@ -25,26 +25,34 @@ import {
  * Os filtros separam cada etapa; "Todas" mostra tudo.
  */
 export default function Pedidos() {
-  const { db } = useStore()
+  const { db, nomeVendedor } = useStore()
   const { usuario, ehProprietario } = useAuth()
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
   const [busca, setBusca] = useState('')
-  // dá para chegar já filtrado: /pedidos?filtro=a_imprimir
-  const [parametros] = useSearchParams()
+  // dá para chegar já filtrado: /pedidos?filtro=a_imprimir ou /pedidos?vendedor=<id>
+  const [parametros, setParametros] = useSearchParams()
+  const vendedorFiltro = parametros.get('vendedor') ?? ''
   const [filtro, setFiltro] = useState<FiltroFila>(() => {
     const pedido = parametros.get('filtro')
     return FILTROS_FILA.some((f) => f.id === pedido) ? (pedido as FiltroFila) : 'todas'
   })
 
+  /** tira o filtro de vendedor da barra de endereço (volta a ver todo mundo) */
+  const limparVendedor = () => {
+    const novos = new URLSearchParams(parametros)
+    novos.delete('vendedor')
+    setParametros(novos, { replace: true })
+  }
+
   /** quem cuida da produção (fila de impressão) enxerga todas as filas */
   const veTodas = ehProprietario || telasDoUsuario(usuario).paraImprimir
 
   // o vendedor enxerga apenas as filas dele
-  const meus = useMemo(
-    () => (veTodas ? db.pedidos : db.pedidos.filter((p) => p.vendedor_id === usuario?.vendedor_id)),
-    [db.pedidos, usuario?.vendedor_id, veTodas],
-  )
+  const meus = useMemo(() => {
+    const base = veTodas ? db.pedidos : db.pedidos.filter((p) => p.vendedor_id === usuario?.vendedor_id)
+    return vendedorFiltro ? base.filter((p) => p.vendedor_id === vendedorFiltro) : base
+  }, [db.pedidos, usuario?.vendedor_id, veTodas, vendedorFiltro])
 
   const permissao = db.configuracoes.permissao_vendedor
   const podeEditar = ehProprietario || podeEditarPedidos(permissao)
@@ -121,6 +129,19 @@ export default function Pedidos() {
           </Botao>
         }
       />
+
+      {vendedorFiltro ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-800 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-200">
+          <Filter className="h-4 w-4" />
+          Mostrando só os pedidos de <b>{nomeVendedor(vendedorFiltro)}</b>
+          <button
+            onClick={limparVendedor}
+            className="ml-auto rounded-lg border border-purple-300 bg-white px-2 py-1 text-[11px] font-bold text-purple-700 transition hover:bg-purple-100 dark:border-purple-800 dark:bg-slate-900 dark:text-purple-300"
+          >
+            Ver todos os vendedores
+          </button>
+        </div>
+      ) : null}
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo

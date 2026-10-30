@@ -1,21 +1,37 @@
 # Próximas etapas — logins com relatórios, área do chefe e catálogo de impressões
 ### você pediu: (1) logins com opções de relatórios, (2) melhor experiência do chefe no administrativo, (3) catalogar as impressões
 
-## Situação
+> **Documento de planejamento.** A situação real está logo abaixo; as seções seguintes guardam
+> o histórico de como cada frente foi pensada (não são tarefas pendentes).
+
+## Situação (conferida no código em 30/10/2026)
 
 - **Frente A (logins com opções de relatórios): IMPLEMENTADA** — as caixinhas por acesso estão
-  na tela **Equipe**, e as telas liberadas saem filtradas só com os dados do vendedor.
-- **Frente C (catalogar as impressões): IMPLEMENTADA na parte principal** — janela de registrar
-  impressão (metros, quem imprimiu, arte, observação, reimpressão com motivo), tela **Impressões**
-  com totais e filtros, histórico dentro do pedido e o cartão “Meu dia na produção”. Falta só o
-  **catálogo de artes** (segunda aba da tela Impressões), que é uma melhoria em cima do que já existe.
-- **Frente B (experiência do chefe):** próxima.
-- **Publicação:** decidido publicar primeiro a pasta `publicar/` no Netlify Drop (sem nuvem) e
-  conectar o Supabase depois, para a equipe toda compartilhar os mesmos dados.
->
-> **Já feito nesta rodada:** tabela de comissão corrigida (50 a 100 m = 2%, acima de 100 m = 1,5%)
-> e o "sem metragem" agora começa em **0%** (editável). A pasta **`publicar/`** também já está
-> gerada, pronta para arrastar no Netlify Drop (menu de instruções dentro dela).
+  em **Configurações → Equipe**, e as telas liberadas saem filtradas só com os dados do vendedor.
+- **Frente B (experiência do chefe): IMPLEMENTADA nesta versão (1.3.0)**:
+  - **Resumo de hoje** no topo do Painel: criados, pagos, na fila, concluídos, entregues e
+    **parados há 3+ dias**;
+  - **atalhos grandes** do dia a dia (Novo pedido · A receber · Na máquina · Equipe · Relatório);
+  - **checklist de primeiros passos** com barra de progresso (some quando tudo está pronto);
+  - **busca global `Ctrl + K`** (pedido, cliente, telefone, cidade, rastreio e vendedor),
+    respeitando o que cada acesso pode ver;
+  - **equipe em formato de tabela** (pedidos, faturamento, comissão do mês e última venda);
+  - **Configurações** com uma frase de "para que serve" em cada aba e abertura direta
+    por endereço (`?aba=equipe`, `?aba=nuvem`…).
+- **Frente C (catalogar as impressões): FORA do sistema, por decisão de simplificação.**
+  Hoje o pedido é uma **fila** com um estágio (`em andamento` / `concluído`) e duas marcações
+  (pago e entregue) — quem muda o status é a tela **Pedidos**, e a **tela de impressões foi
+  retirada** do menu (o teste de tela garante que ela não volte sem querer). O que continua
+  no código: a tabela `impressoes` no banco/backup e o histórico fictício dos dados de exemplo,
+  prontos para uma tela futura se você quiser.
+- **Publicação:** o site já está no ar pelo **GitHub Pages** (versão 1.3.0). Falta **conectar
+  o Supabase** para a equipe toda ver os mesmos dados — plano em
+  [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md).
+
+> **Corrigido nesta rodada:** tabela de comissão oficial (50–100 m = 2% · acima de 100 m = 1,5%),
+> texto da confirmação "Usar tabela oficial" que ainda dizia "acima de 50 m", links mortos
+> (`/por-vendedor` → `/relatorio`) e a possibilidade de abrir Pedidos já filtrado por vendedor
+> (`/pedidos?vendedor=`), usada pelos atalhos do Painel.
 
 ---
 
@@ -126,9 +142,9 @@ regenerada com `npm run publicar` depois de cada frente.
 
 ## Decisões tomadas
 
-1. **Opções de relatórios:** caixinha por acesso (implementado na tela Equipe).
-2. **Catálogo de impressões:** registro completo (metros, quem imprimiu, quando, observação e motivo
-   quando for reimpressão) — próxima frente a implementar.
-3. **Publicação:** primeiro a pasta `publicar/` no Netlify Drop, sem nuvem; o Supabase entra depois
-   para a equipe toda ver os mesmos pedidos — **guia pronto em `app/PASSO-A-PASSO-SUPABASE.md`**
-   (com a chave nova `sb_publishable`, aviso da pausa de 1 semana do plano grátis e backup manual).
+1. **Opções de relatórios:** caixinha por acesso (implementado em Configurações → Equipe).
+2. **Impressões:** o fluxo é o status da fila na tela Pedidos; a tela de catálogo de impressões
+   saiu do sistema (os dados continuam no banco para o futuro).
+3. **Publicação:** GitHub Pages publica sozinho a `main`; o **Supabase** entra em seguida para a
+   equipe toda ver os mesmos pedidos — plano em [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md)
+   e guia detalhado em [`LANCAMENTO.md`](LANCAMENTO.md) / `app/PASSO-A-PASSO-SUPABASE.md`.
