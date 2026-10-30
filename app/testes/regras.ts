@@ -10,6 +10,7 @@ import {
   migrarFaixas,
   validarFaixas,
 } from '../src/lib/comissao'
+import { buscarTudo, LIMITE_BUSCA, normalizarBusca } from '../src/lib/busca'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import {
@@ -207,6 +208,49 @@ igual(
 igual(
   'demo: as filas não pagas continuam contando no relatório',
   filasDaComissao(demo.pedidos).some((p) => !p.pago) && filasDaComissao(demo.pedidos).length > 0,
+  true,
+)
+
+/* ---------------------- busca rápida (Ctrl + K) ------------------------ */
+igual('busca vazia não devolve nada', buscarTudo(demo, '   ').length, 0)
+igual(
+  'busca acha o cliente pelo nome',
+  buscarTudo(demo, 'cliente exemplo 07').some(
+    (a) => a.tipo === 'cliente' && a.cliente.nome === 'CLIENTE EXEMPLO 07',
+  ),
+  true,
+)
+igual('busca ignora acento e maiúscula', normalizarBusca('JOSÉ') === normalizarBusca('jose'), true)
+igual(
+  'busca acha pelo telefone digitado sem máscara',
+  buscarTudo(demo, '900000007').some((a) => a.tipo === 'cliente' && a.cliente.nome === 'CLIENTE EXEMPLO 07'),
+  true,
+)
+const numeroProcurado = demo.pedidos[5].numero
+igual(
+  'busca acha o pedido pelo número (com #)',
+  buscarTudo(demo, `#${numeroProcurado}`).some((a) => a.tipo === 'pedido' && a.pedido.numero === numeroProcurado),
+  true,
+)
+const vendedorDaBusca = demo.vendedores[0]
+const soDele = buscarTudo(demo, 'exemplo', { vendedorId: vendedorDaBusca.id })
+igual(
+  'busca de um vendedor só devolve pedidos e clientes dele',
+  soDele
+    .filter((a) => a.tipo === 'pedido')
+    .every((a) => a.tipo === 'pedido' && a.pedido.vendedor_id === vendedorDaBusca.id) &&
+    soDele.filter((a) => a.tipo === 'cliente').every((a) => a.tipo === 'cliente' && a.cliente.vendedor_id === vendedorDaBusca.id),
+  true,
+)
+igual('busca do vendedor não lista vendedores', soDele.some((a) => a.tipo === 'vendedor'), false)
+igual(
+  'busca do dono lista os vendedores',
+  buscarTudo(demo, 'exemplo', { verVendedores: true }).some((a) => a.tipo === 'vendedor'),
+  true,
+)
+igual(
+  'busca não passa do limite de resultados',
+  buscarTudo(demo, 'exemplo', { verVendedores: true }).length <= LIMITE_BUSCA,
   true,
 )
 

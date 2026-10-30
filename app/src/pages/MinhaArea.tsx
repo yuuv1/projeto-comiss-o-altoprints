@@ -270,7 +270,7 @@ export default function MinhaArea() {
                 variante="secundario"
                 icone={UserCheck}
                 className="justify-start"
-                onClick={() => navegar('/por-vendedor')}
+                onClick={() => navegar('/relatorio')}
               >
                 Meu desempenho por período
               </Botao>

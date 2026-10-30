@@ -20,20 +20,22 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 
 ---
 
-## Parte 0 — Deixar a versão limpa na `main` (2 min)
+## Parte 0 — Conferir a versão que está na `main` (2 min)
 
-A versão **1.2.0** (sem pedidos de exemplo, sem o acesso antigo `gui`/`12345`, e já com
-**JESSICA, RAISSA e ANDREIA** entrando pelo nome sem senha) está no **Pull Request #5**.
-Enquanto ele não for aprovado, a `main` ainda tem o pacote **antigo**.
+A `main` já está **limpa e pronta para publicar** (versão **1.3.0**): sem pedidos de
+exemplo, sem o acesso antigo `gui`/`12345`, com a equipe entrando pelo nome e sem senha e
+com o Painel do chefe, a busca em `Ctrl + K` e as explicações nas Configurações.
 
-1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints/pull/5>
-2. Role até o fim e clique em **Merge pull request** → **Confirm merge**.
-   (Ou peça: *“pode fazer o merge do PR 5”* — eu faço.)
-3. **Como conferir que deu certo:** abra o arquivo
-   [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam ser
-   `Altoprints — Sistema de Pedidos DTF (versão 1.2.0)` e
-   `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se ainda aparecer `usuário: gui  senha: 12345`, o
-   merge não foi feito.
+1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira se o último
+   commit da `main` é o merge mais recente (nada de Pull Request aberto com pendência).
+2. **Como conferir que deu certo:** abra o arquivo
+   [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam
+   ser `Altoprints — Sistema de Pedidos DTF (versão 1.3.0)` e
+   `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se aparecer `versão 1.2.0` (ou `usuário: gui`),
+   a `main` ainda está com o pacote antigo.
+3. O site publicado se atualiza sozinho a cada envio na `main` (o robô roda os testes, o
+   build e a conferência de segurança antes). Para conferir: abra o site e veja se a tela
+   de entrada mostra `versão 1.3.0` no rodapé.
 
 > **Já tinha aberto uma versão antiga em algum aparelho?** Aqueles dados de exemplo (e o
 > acesso `gui`) ficam **naquele navegador**. Para zerar: abra o sistema no aparelho →
@@ -295,7 +297,7 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 
 ## Parte 5 — Conferência final
 
-- [ ] **PR #5 aprovado** e a `main` com a versão **1.2.0** (Parte 0)
+- [ ] `main` com a versão **1.3.0** e sem PR pendente (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
 - [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
@@ -310,7 +312,7 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.2.0** aparecendo no rodapé da tela de login
+- [ ] Versão **1.3.0** aparecendo no rodapé da tela de login
 
 ---
 
@@ -343,7 +345,7 @@ até o mês seguinte (sem cobrança surpresa).
 | “Falha ao enviar o arquivo” | o SQL não rodou por completo (faltou o bucket) | rode o SQL de novo |
 | Tela em branco ao abrir o `index.html` com 2 cliques | normal: esse arquivo é para **hospedar** | use o **`Altoprints.html`** (arquivo único) ou o site no ar |
 | “Sem espaço” / nada é salvo | janela **anônima** ou armazenamento cheio | abra numa janela normal; *Configurações → Dados → Liberar espaço* |
-| O Netlify mostra o site **antigo** | deploy da `main` sem o merge | Parte 0 (merge do PR #5) → *Deploys → Trigger deploy* |
+| O site mostra a versão **antiga** | o deploy não rodou ou o navegador guardou cache | *Actions → Publicar sistema → Re-run* · depois recarregue com `Ctrl + Shift + R` |
 | O deploy do Netlify **falhou** | o guarda de publicação barrou algo | leia o log: ele diz exatamente o que encontrou |
 | Quer trocar de projeto do Supabase | — | *Configurações → Nuvem → Desconectar* e conecte com os dados novos |
 

@@ -1,5 +1,6 @@
 import { Mail, Pencil, Phone, Plus, Star, Trash2, UserPlus, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Abas,
   AreaTexto,
@@ -34,7 +35,15 @@ export default function Clientes() {
   const { db, salvarCliente, excluirCliente, nomeVendedor } = useStore()
   const { usuario, ehProprietario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
-  const [busca, setBusca] = useState('')
+  // a busca rápida (Ctrl + K) chega aqui já com o nome do cliente: /clientes?busca=ANA
+  const [parametros] = useSearchParams()
+  const [busca, setBusca] = useState(() => parametros.get('busca') ?? '')
+
+  // chegou outra busca pela barra de endereço (ex.: pela janela do Ctrl + K)?
+  const buscaDaUrl = parametros.get('busca')
+  useEffect(() => {
+    if (buscaDaUrl !== null) setBusca(buscaDaUrl)
+  }, [buscaDaUrl])
   const [aba, setAba] = useState<'clientes' | 'especiais'>('clientes')
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Cliente | null>(null)

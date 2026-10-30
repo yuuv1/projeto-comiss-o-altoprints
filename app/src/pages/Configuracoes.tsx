@@ -27,6 +27,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
 import { useAuth } from '../lib/auth'
 import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
@@ -63,6 +64,36 @@ type Aba =
   | 'nuvem'
   | 'aparencia'
 
+/** Lista fechada de abas — também serve para validar o que vem na barra de endereço */
+const ABAS_CONFIG: Aba[] = [
+  'comissoes',
+  'precos',
+  'permissoes',
+  'equipe',
+  'vendedores',
+  'empresa',
+  'ia',
+  'dados',
+  'nuvem',
+  'acesso',
+  'aparencia',
+]
+
+/** Explicação curta de cada aba ("para que serve") */
+const AJUDA_ABA: Record<Aba, string> = {
+  comissoes: 'As faixas de metragem que definem o percentual de comissão de cada pedido concluído.',
+  precos: 'O preço do metro por faixa de metragem — é o que calcula o valor dos pedidos novos.',
+  permissoes: 'O que um vendedor pode fazer com os próprios pedidos: criar, editar e excluir.',
+  equipe: 'As contas de acesso, o vínculo com o vendedor e as telas que cada pessoa pode abrir.',
+  vendedores: 'A lista simples de vendedores usada nos pedidos, clientes e relatórios.',
+  empresa: 'Nome e logo da empresa, que aparecem no sistema e nas folhas impressas.',
+  ia: 'A chave da IA que lê a foto do comprovante e preenche o pedido automaticamente.',
+  dados: 'Backup, restauração, dados de exemplo e o espaço usado neste aparelho.',
+  nuvem: 'A conexão com o Supabase, para a equipe toda ver os mesmos pedidos em qualquer aparelho.',
+  acesso: 'O seu usuário e a sua senha, e como criar um segundo acesso de proprietário.',
+  aparencia: 'Tema claro/escuro e o tamanho dos blocos (só para este aparelho).',
+}
+
 export default function Configuracoes() {
   const {
     db,
@@ -79,8 +110,17 @@ export default function Configuracoes() {
   const { usuario, trocarMinhaSenha, trocarMeuUsuario, atualizarMeuPerfil } = useAuth()
   const { tema, densidade, setTema, definirDensidade } = useTema()
   const { confirmar, dialog } = useConfirmacao()
-  const [aba, setAba] = useState<Aba>('comissoes')
+  // dá para chegar direto numa aba: /configuracoes?aba=equipe (usado pelo Painel)
+  const [parametros] = useSearchParams()
+  const abaDaUrl = parametros.get('aba')
+  const [aba, setAba] = useState<Aba>(() =>
+    ABAS_CONFIG.includes(abaDaUrl as Aba) ? (abaDaUrl as Aba) : 'comissoes',
+  )
   const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    if (ABAS_CONFIG.includes(abaDaUrl as Aba)) setAba(abaDaUrl as Aba)
+  }, [abaDaUrl])
 
   /* --------------------------- espaço no aparelho --------------------------- */
   const vazio: DiagnosticoArmazenamento = { localOk: true, idbOk: true, onde: 'nenhum', bytesLocal: 0, ocupantes: [] }
@@ -233,6 +273,8 @@ export default function Configuracoes() {
         }
       />
 
+      <p className="-mt-1.5 mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">{AJUDA_ABA[aba]}</p>
+
       {/* ------------------------------ COMISSÕES ------------------------------ */}
       {aba === 'comissoes' ? (
         <div className="space-y-4">
@@ -254,7 +296,8 @@ export default function Configuracoes() {
                   onClick={async () => {
                     const ok = await confirmar({
                       titulo: 'Usar a tabela oficial de comissão?',
-                      mensagem: 'As faixas atuais serão substituídas por 1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · acima de 50 m 1,5%.',
+                      mensagem:
+                        'As faixas atuais serão substituídas por 1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · 50–100 m 2% · acima de 100 m 1,5%.',
                       textoBotao: 'Usar tabela oficial',
                     })
                     if (ok) setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
