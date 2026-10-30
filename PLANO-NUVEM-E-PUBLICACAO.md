@@ -2,7 +2,7 @@
 ### o que falta para a equipe toda usar o sistema de verdade
 
 **Situação em 30/10/2026:** o site está no ar pelo **GitHub Pages**
-(<https://yuuv1.github.io/projeto-comiss-o-altoprints/>) na **versão 1.3.0**,
+(<https://yuuv1.github.io/projeto-comiss-o-altoprints/>) na **versão 1.4.0**,
 mas ainda em **modo local** — cada celular/computador guarda os próprios dados.
 Até a nuvem ser conectada, o pedido criado no computador da loja **não aparece**
 no celular da vendedora.
@@ -57,7 +57,7 @@ no celular da vendedora.
 
 ## 3. Ordem que eu recomendo (para não fazer conta em dobro)
 
-1. **Publicar esta versão (1.3.0)** na `main` — o site já sai com o Painel novo, a busca
+1. **Publicar esta versão (1.4.0)** na `main` — o site já sai com o Painel novo, a busca
    `Ctrl + K` e o checklist de primeiros passos.
 2. **Criar o Supabase** e rodar o SQL.
 3. **Conectar a nuvem** (pelo sistema ou pelas *Secrets*) e conferir com **dois aparelhos**:
@@ -105,4 +105,4 @@ no celular da vendedora.
 - [ ] JESSICA, RAISSA e ANDREIA entram pelo nome em **qualquer** aparelho
 - [ ] Relatório do mês mostra os mesmos números nos dois aparelhos
 - [ ] Primeiro backup baixado e guardado
-- [ ] Site mostra **versão 1.3.0** no rodapé da tela de entrada
+- [ ] Site mostra **v1.4.0** no rodapé do sistema

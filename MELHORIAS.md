@@ -5,7 +5,7 @@ Cada ideia tem uma etiqueta de esforço: **🟢 pequeno** (faço em uma rodada) 
 
 No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 
-> **Já entregue na versão 1.3.0:** a busca global (Ctrl + K), o resumo de hoje e o checklist de
+> **Já entregue na versão 1.4.0:** só o proprietário tem login (a equipe escolhe o próprio nome no pedido) e o backup ficou importável/sincronizável. Antes, na 1.3.0: a busca global (Ctrl + K), o resumo de hoje e o checklist de
 > primeiros passos no Painel do proprietário, a equipe em tabela e a explicação em cada aba das
 > Configurações. O que falta mesmo é a **nuvem** — plano em `PLANO-NUVEM-E-PUBLICACAO.md`.
 

@@ -8,34 +8,35 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 | **0** | Deixar a versão limpa na `main` (sem dados e sem senha de exemplo) | 2 min |
 | **1** | Criar o banco na nuvem (**Supabase**) | 8 min |
 | **2** | Publicar o site (**Netlify** ou **GitHub Pages**) | 5–10 min |
-| **3** | Criar o **seu** acesso de proprietário | 3 min |
-| **4** | Criar as contas da **equipe** e conectar os celulares | 5 min |
+| **3** | Criar o **seu** acesso de proprietário (único login do sistema) | 3 min |
+| **4** | Cadastrar os **funcionários** e conectar os celulares | 5 min |
 | **5** | Conferência final (checklist) | 3 min |
 | **6** | Rotina: backup, atualização, senhas | — |
 | **7** | Deu erro? Tabela de socorro | — |
 
 > **Regra de ouro da ordem:** primeiro o **banco** (Parte 1), depois o **site** (Parte 2),
-> depois as **contas** (Partes 3 e 4). Criando as contas *depois* de conectar a nuvem, elas
-> já nascem no banco da empresa e todo mundo vê a mesma coisa.
+> depois o **seu login** (Parte 3) e os **funcionários** (Parte 4). Fazendo isso *depois* de
+> conectar a nuvem, tudo já nasce no banco da empresa e todo mundo vê a mesma coisa.
 
 ---
 
 ## Parte 0 — Conferir a versão que está na `main` (2 min)
 
-A `main` já está **limpa e pronta para publicar** (versão **1.3.0**): sem pedidos de
-exemplo, sem o acesso antigo `gui`/`12345`, com a equipe entrando pelo nome e sem senha e
-com o Painel do chefe, a busca em `Ctrl + K` e as explicações nas Configurações.
+A `main` já está **limpa e pronta para publicar** (versão **1.4.0**): sem pedidos de
+exemplo, sem usuário/senha padrão, **sem login de funcionário** (a equipe escolhe o próprio
+nome ao registrar a fila), com **“Login proprietário”** no topo, Painel do chefe, busca em
+`Ctrl + K` e backup importável em qualquer aparelho.
 
 1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira se o último
    commit da `main` é o merge mais recente (nada de Pull Request aberto com pendência).
 2. **Como conferir que deu certo:** abra o arquivo
    [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam
-   ser `Altoprints — Sistema de Pedidos DTF (versão 1.3.0)` e
+   ser `Altoprints — Sistema de Pedidos DTF (versão 1.4.0)` e
    `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se aparecer `versão 1.2.0` (ou `usuário: gui`),
    a `main` ainda está com o pacote antigo.
 3. O site publicado se atualiza sozinho a cada envio na `main` (o robô roda os testes, o
    build e a conferência de segurança antes). Para conferir: abra o site e veja se a tela
-   de entrada mostra `versão 1.3.0` no rodapé.
+   rodapé mostra `v1.4.0`.
 
 > **Já tinha aberto uma versão antiga em algum aparelho?** Aqueles dados de exemplo (e o
 > acesso `gui`) ficam **naquele navegador**. Para zerar: abra o sistema no aparelho →
@@ -217,11 +218,11 @@ Faça isso **antes** de mandar o link para a equipe.
    `https://SEU-ENDERECO.netlify.app/#/administracao`
    - Outras formas de abrir a mesma porta: **5 toques seguidos no logo** ou
      **Ctrl + Alt + D** no computador.
-2. Como ainda não existe nenhum dono, a tela mostra **“Criar acesso do proprietário”**:
+2. Como ainda não existe nenhum dono, a tela mostra **“Criar o acesso do proprietário”**:
    - **Seu nome** · **Usuário** (só letras/números) · **Senha** e **Repita a senha**
    - Use uma **senha forte** (ela é a tranca do sistema: quem tem o link chega até a porta,
      mas sem a senha não vê nada).
-3. Clique em **Criar acesso do proprietário**. A conta já nasce **no banco da nuvem**.
+3. Clique em **Criar acesso e entrar**. A conta já nasce **no banco da nuvem**.
 4. **Salve o endereço como ícone no celular:** abra `…/#/administracao` no navegador do
    celular → menu → **“Adicionar à tela de início”**. Daí em diante é 1 toque.
 
@@ -230,48 +231,46 @@ Faça isso **antes** de mandar o link para a equipe.
 **Conecte este aparelho ao banco ANTES de criar a conta** (assim ela não fica só neste
 navegador):
 
-1. Na **tela de login**, clique em **“Conectar este aparelho ao banco da empresa”**.
+1. Abra **`/#/administracao`** e, logo abaixo do formulário, use **“Conectar este aparelho
+   ao banco da empresa”** (esse ajuste é do proprietário — a equipe nunca precisa).
 2. No campo de colar, **cole a URL e a chave pública juntas** (pode colar a mensagem
    inteira do painel do Supabase): o sistema mostra *“Encontrei a URL e a chave!”*.
    Confira os dois campos e clique em **Conectar à nuvem**.
    - Alternativa: cole o **código** (começa com `ALT1.`) ou o **link** de conexão.
 3. Deve aparecer **“Banco na nuvem (Supabase) conectado”**.
-4. Agora siga o **3A** (porta administrativa → criar o acesso do proprietário).
+4. Agora siga o **3A** (criar o acesso do proprietário).
 
 ### 3C. Um segundo login de proprietário (sócio, gerente, escritório)
 
-Dentro do sistema: **Equipe → Nova conta → Tipo de acesso: “Proprietário — vê tudo”**.
-O atalho também está em **Configurações → Meu acesso → Outro acesso de proprietário**.
+Dentro do sistema: **Configurações → Funcionários e acessos → Novo acesso** (ou o atalho em
+**Configurações → Meu acesso → Outro acesso de proprietário**).
 Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono ativo (o
 último não pode ser desativado nem excluído, e ninguém exclui o próprio acesso).
 
 ---
 
-## Parte 4 — Equipe e celulares (5 min)
+## Parte 4 — Funcionários e celulares (5 min)
 
-### 4.1 Como a equipe entra (sem senha)
+### 4.1 Como a equipe entra (sem login, sem senha)
 
-- **JESSICA**, **RAISSA** e **ANDREIA** já vêm cadastradas no sistema (com os 3 vendedores
-  criados e sem nenhum pedido ainda).
-- Na tela inicial aparece **“Quem está usando?”**: cada uma só **toca no próprio nome** e já
-  entra na área dela — **sem precisar de senha**.
-- Só o **proprietário** usa senha (pela porta `#/administracao`, 5 toques no logo ou
-  `Ctrl + Alt + D`).
-- **Para adicionar mais alguém depois:** *Equipe → Nova conta* (já vem marcado **“Entrar sem
-  senha”** por padrão) — ou a própria pessoa toca em **“Sou funcionário novo — criar meu
-  acesso”** na tela inicial.
-- **Se no futuro quiser colocar senha em alguém (ou tirar):** *Equipe → Vínculo e senha*.
-- **Permissões:** *Configurações → Permissões* (total / sem excluir / somente criar).
-- **Telas extras por pessoa** (relatório, fila de impressão, cliente especial):
-  *Equipe → Vínculo e senha*.
+- **JESSICA**, **RAISSA** e **ANDREIA** já vêm cadastradas como **funcionárias** (nomes na
+  lista, sem conta e sem senha). Nenhum pedido vem pronto.
+- A equipe abre o sistema e **já está dentro**: a tela inicial é **Pedidos**.
+- Ao registrar uma fila, a pessoa **escolhe o próprio nome** no campo *“Seu nome
+  (funcionário)”*. É esse nome que aparece no cartão, no relatório e na comissão.
+- **Para adicionar mais alguém depois:** entre como proprietário →
+  *Configurações → Funcionários e acessos → Novo funcionário*. **Só o dono cadastra.**
+- **Não existe mais** senha, “tela de entrada pelo nome” ou permissão por funcionário: a
+  equipe vê os pedidos e os clientes da loja; as telas de gestão são do proprietário.
 
 ### 4.2 Conectar os aparelhos da equipe (1 clique para cada um)
 
 1. **Configurações → Nuvem → “Conectar os aparelhos da equipe” → Copiar link**.
 2. Mande no grupo do WhatsApp: *“Abram este link uma vez para o sistema ficar conectado.”*
 3. Quem abrir o link já fica conectado naquele celular — não precisa digitar nada.
-4. Se o link não abrir em algum aparelho: mande o **código** (botão *Copiar código*); a
-   pessoa cola na tela de login em **“Conectar este aparelho ao banco da empresa”**.
+4. Se o link não abrir em algum aparelho: mande o **código** (botão *Copiar código*); no
+   aparelho, abra `/#/administracao` → **“Conectar este aparelho ao banco da empresa”** e
+   cole ali (é uma configuração do dono, feita uma vez por aparelho).
 
 > No **Caminho A** (chaves no Netlify) isso nem é necessário: todo aparelho que abrir o
 > site já nasce conectado. O link serve para o **Caminho B**.
@@ -290,29 +289,28 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 > *Oi, meninas! O sistema novo de pedidos está no ar 👇*
 > *Link: (colocar aqui)*
 > *Abra o link uma vez para conectar o seu celular.*
-> *Para entrar é só tocar no seu nome na tela inicial (não precisa de senha).*
-> *Para trocar de pessoa: canto direito → Meu perfil → Sair do sistema.*
+> *Abra o link uma vez e já está dentro: a equipe não tem login.*
+> *Ao registrar a fila, escolha o seu nome na lista “Seu nome (funcionário)”.*
 
 ---
 
 ## Parte 5 — Conferência final
 
-- [ ] `main` com a versão **1.3.0** e sem PR pendente (Parte 0)
+- [ ] `main` com a versão **1.4.0** e sem PR pendente (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
 - [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
-- [ ] Tela de login mostra **“Dados e contas no banco da empresa (Supabase)”** ou
-      *Configurações → Nuvem* mostra **“Banco na nuvem conectado”**
+- [ ] *Configurações → Nuvem* mostra **“Banco na nuvem conectado”**
 - [ ] Seu acesso de **proprietário** criado com **senha forte** + ícone salvo no celular
 - [ ] Segundo proprietário criado, se for o caso (Parte 3C)
-- [ ] **JESSICA, RAISSA e ANDREIA** aparecendo na tela inicial (“Quem está usando?”)
+- [ ] **JESSICA, RAISSA e ANDREIA** aparecendo na lista de funcionários do pedido
 - [ ] **Comissões** e **preços do metro** conferidos em *Configurações*
 - [ ] **Logo da empresa** enviado em *Configurações → Empresa*
 - [ ] **Nenhum dado de exemplo** no sistema (sem a faixa amarela “não são reais”).
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.3.0** aparecendo no rodapé da tela de login
+- [ ] Versão **1.4.0** aparecendo no rodapé do sistema
 
 ---
 
@@ -323,11 +321,11 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 | **Toda semana** | *Configurações → Dados → Baixar backup* (o plano grátis do Supabase **não** faz backup automático) |
 | **Atualização do sistema** | Caminho A: automático (enviou para a `main`, o Netlify publica). Caminho B: `npm run publicar` + arrastar a pasta de novo |
 | **Mudou o banco?** | *Configurações → Nuvem → Copiar o SQL* → SQL Editor → **Run**. Só completa o molde, nunca apaga nada |
-| **Alguém esqueceu a senha** | *Equipe → Vínculo e senha → Redefinir senha* |
+| **Outro proprietário esqueceu a senha** | *Configurações → Funcionários e acessos → Redefinir senha* |
 | **VOCÊ esqueceu a senha** | [`app/DEPLOY.md`](app/DEPLOY.md) → seção **“Esqueci a senha”** (uma linha de SQL resolve) |
 | **1 semana sem usar o sistema** | O banco grátis “dorme”: <https://supabase.com/dashboard> → projeto → **Restore project**. Nada se perde |
 | **Endereço administrativo vazou** | Trocamos por outro (uma linha de código) |
-| **Saiu alguém da equipe** | *Equipe → **Desativar*** (mantém o histórico) — melhor que excluir |
+| **Saiu alguém da equipe** | *Funcionários e acessos* → o nome **não pode ser excluído** se tiver pedidos; use **Renomear** (mantém o histórico) |
 
 **Limites do plano grátis (folgado para uma loja):** 500 MB de banco (centenas de milhares
 de pedidos) · 1 GB de artes · 100 GB de tráfego/mês no Netlify. Se estourar, o site pausa

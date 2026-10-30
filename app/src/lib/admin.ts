@@ -15,17 +15,23 @@ export const ROTA_ADMIN = '/administracao'
 
 const SEGUNDOS = 3000
 
-/** conta toques/cliques seguidos no logo: 5 dentro de 3 segundos */
+/**
+ * Conta toques/cliques seguidos no logo: 5 dentro de 3 segundos.
+ * Devolve `true` no toque que abriu a porta — aí quem clicou não deve também
+ * navegar para a tela inicial.
+ */
 export function useCincoToquesNoLogo(acao: () => void) {
   const contador = useRef({ n: 0, inicio: 0 })
-  return useCallback(() => {
+  return useCallback((): boolean => {
     const agora = Date.now()
     if (agora - contador.current.inicio > SEGUNDOS) contador.current = { n: 0, inicio: agora }
     contador.current.n += 1
     if (contador.current.n >= 5) {
       contador.current = { n: 0, inicio: 0 }
       acao()
+      return true
     }
+    return false
   }, [acao])
 }
 

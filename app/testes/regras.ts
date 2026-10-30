@@ -32,15 +32,6 @@ import {
   resumoDoPedido,
 } from '../src/lib/impressoes'
 import { gerarDadosDemo, TAMANHO_DEMO } from '../src/lib/seed'
-import {
-  bloquearSeVisualizando,
-  definirVisualizacao,
-  emVisualizacao,
-  idVisualizado,
-  MENSAGEM_SO_VISUALIZACAO,
-  registrarAvisoDeBloqueio,
-  rotuloVisualizacao,
-} from '../src/lib/visualizacao'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
 import {
   combinaFiltro,
@@ -314,7 +305,7 @@ const codigoFonte = [
   readFileSync('src/lib/seed.ts', 'utf8'),
   readFileSync('src/lib/auth.tsx', 'utf8'),
   readFileSync('src/lib/store.tsx', 'utf8'),
-  readFileSync('src/pages/Login.tsx', 'utf8'),
+  readFileSync('src/pages/Administracao.tsx', 'utf8'),
 ].join('\n')
 igual('código: sem usuário/senha de exemplo embutidos', /ACESSO_DEMO|contaDemo|MARCA_SENHA_DEMO/.test(codigoFonte), false)
 igual('código: a senha de exemplo "12345" saiu do sistema', codigoFonte.includes("'12345'"), false)
@@ -336,49 +327,6 @@ igual(
 igual('espaço: erro comum não é confundido', ehErroDeEspaco(new Error('Usuário ou senha inválidos.')), false)
 igual('espaço: a mensagem explica o que fazer', MENSAGEM_SEM_ESPACO.includes('Configurações → Dados'), true)
 igual('espaço: sem navegador, a medição não quebra', espacoNoLocalStorage(), 0)
-
-/* -------------------- modo "ver como funcionário" ---------------------- */
-// o bloqueio de gravação é ligado/desligado por uma marca simples
-igual('sem visualização, nada é bloqueado', (() => {
-  try {
-    bloquearSeVisualizando()
-    return 'livre'
-  } catch {
-    return 'bloqueado'
-  }
-})(), 'livre')
-definirVisualizacao('u1')
-igual('em visualização, o sistema sabe disso', emVisualizacao(), true)
-igual('em visualização, id visualizado fica registrado', idVisualizado(), 'u1')
-igual('em visualização, gravar é bloqueado', (() => {
-  try {
-    bloquearSeVisualizando()
-    return 'livre'
-  } catch (e) {
-    return (e as Error).message.includes('ver como funcionário') ? 'bloqueado' : 'outro erro'
-  }
-})(), 'bloqueado')
-igual('ao bloquear, a tela recebe o aviso', (() => {
-  let aviso = ''
-  registrarAvisoDeBloqueio((t) => {
-    aviso = t
-  })
-  try {
-    bloquearSeVisualizando()
-  } catch {
-    /* o aviso já foi dado */
-  }
-  registrarAvisoDeBloqueio(null)
-  return aviso === MENSAGEM_SO_VISUALIZACAO
-})(), true)
-definirVisualizacao(null)
-igual('saindo da visualização, tudo volta ao normal', emVisualizacao(), false)
-igual('a mensagem explica como sair', MENSAGEM_SO_VISUALIZACAO.includes('volte ao seu acesso'), true)
-igual(
-  'o rótulo da faixa diz o nome e o papel',
-  rotuloVisualizacao('JESSICA', 'Vendedor').includes('JESSICA (Vendedor)'),
-  true,
-)
 
 /* ------------------------------ impressões ----------------------------- */
 const agoraImpressao = new Date()

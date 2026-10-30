@@ -37,26 +37,20 @@ import { useStore } from '../lib/store'
 import { DESCRICAO_DENSIDADE, LABEL_DENSIDADE, useTema } from '../lib/tema'
 import { VERSAO } from '../lib/versao'
 import {
-  DESCRICAO_PERMISSAO,
   FAIXAS_PADRAO,
   FAIXAS_PRECO_PADRAO,
-  LABEL_PERMISSAO,
   type FaixaComissao,
   type FaixaPreco,
-  type PermissaoVendedor,
 } from '../lib/types'
 import { faixaDePreco } from '../lib/pricing'
 import { AbaNuvem } from '../components/Nuvem'
 import Equipe from './Equipe'
-import Vendedores from './Vendedores'
 import { Abas, Botao, Campo, Cartao, Entrada, Etiqueta, cn, useConfirmacao } from '../components/ui'
 
 type Aba =
   | 'comissoes'
   | 'precos'
-  | 'permissoes'
   | 'equipe'
-  | 'vendedores'
   | 'empresa'
   | 'ia'
   | 'dados'
@@ -68,9 +62,7 @@ type Aba =
 const ABAS_CONFIG: Aba[] = [
   'comissoes',
   'precos',
-  'permissoes',
   'equipe',
-  'vendedores',
   'empresa',
   'ia',
   'dados',
@@ -83,9 +75,7 @@ const ABAS_CONFIG: Aba[] = [
 const AJUDA_ABA: Record<Aba, string> = {
   comissoes: 'As faixas de metragem que definem o percentual de comissão de cada pedido concluído.',
   precos: 'O preço do metro por faixa de metragem — é o que calcula o valor dos pedidos novos.',
-  permissoes: 'O que um vendedor pode fazer com os próprios pedidos: criar, editar e excluir.',
-  equipe: 'As contas de acesso, o vínculo com o vendedor e as telas que cada pessoa pode abrir.',
-  vendedores: 'A lista simples de vendedores usada nos pedidos, clientes e relatórios.',
+  equipe: 'Os funcionários que aparecem nos pedidos e os acessos de proprietário (login com senha).',
   empresa: 'Nome e logo da empresa, que aparecem no sistema e nas folhas impressas.',
   ia: 'A chave da IA que lê a foto do comprovante e preenche o pedido automaticamente.',
   dados: 'Backup, restauração, dados de exemplo e o espaço usado neste aparelho.',
@@ -240,9 +230,7 @@ export default function Configuracoes() {
   const abas: { id: Aba; label: string; icone: typeof Percent }[] = [
     { id: 'comissoes', label: 'Comissões', icone: Percent },
     { id: 'precos', label: 'Preços', icone: Tags },
-    { id: 'permissoes', label: 'Permissões', icone: UserCog },
-    { id: 'equipe', label: 'Equipe', icone: UsersRound },
-    { id: 'vendedores', label: 'Vendedores', icone: UsersRound },
+    { id: 'equipe', label: 'Funcionários e acessos', icone: UsersRound },
     { id: 'empresa', label: 'Empresa', icone: ImageIcon },
     { id: 'ia', label: 'Comprovantes (IA)', icone: Sparkles },
     { id: 'dados', label: 'Dados', icone: Database },
@@ -281,8 +269,8 @@ export default function Configuracoes() {
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
             <b>Como funciona:</b> entram no relatório <b>todas as filas concluídas</b> do período (marcadas como pagas ou
             não — o "pago" é só orientação da equipe). A comissão de cada fila é calculada pela <b>metragem</b>: o
-            percentual da faixa em que ela cai é aplicado sobre o valor da fila. O vendedor vê só a comissão dele; o
-            proprietário vê a de todos, com o total.
+            percentual da faixa em que ela cai é aplicado sobre o valor da fila. O relatório mostra a comissão de cada
+            funcionário, com o total.
           </div>
 
           <Cartao hover={false}>
@@ -579,62 +567,6 @@ export default function Configuracoes() {
         </div>
       ) : null}
 
-      {/* ----------------------------- PERMISSÕES ----------------------------- */}
-      {aba === 'permissoes' ? (
-        <Cartao hover={false}>
-          <p className="mb-1 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-            <UserCog className="h-4 w-4 text-purple-600 dark:text-purple-400" /> O que o vendedor pode fazer com os
-            pedidos dele
-          </p>
-          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            Vale para todas as contas de vendedor. O proprietário sempre pode tudo.
-          </p>
-
-          <div className="space-y-2">
-            {(Object.keys(LABEL_PERMISSAO) as PermissaoVendedor[]).map((chave) => {
-              const ativa = db.configuracoes.permissao_vendedor === chave
-              return (
-                <button
-                  key={chave}
-                  onClick={async () => {
-                    await salvarConfig({ permissao_vendedor: chave })
-                    avisar(`Permissão atualizada: ${LABEL_PERMISSAO[chave].toLowerCase()}.`)
-                  }}
-                  className={cn(
-                    'flex w-full items-start gap-3 rounded-xl border p-4 text-left transition',
-                    ativa
-                      ? 'border-purple-300 bg-purple-50 shadow-soft dark:border-purple-700 dark:bg-purple-950/40'
-                      : 'border-slate-100 bg-white hover:border-purple-200 dark:border-slate-800 dark:bg-slate-900',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
-                      ativa ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-300 dark:border-slate-600',
-                    )}
-                  >
-                    {ativa ? <Check className="h-3 w-3" /> : null}
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold text-slate-800 dark:text-slate-100">
-                      {LABEL_PERMISSAO[chave]}
-                    </span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400">
-                      {DESCRICAO_PERMISSAO[chave]}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          <p className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-            Independente desta escolha, o vendedor <b>sempre</b> vê somente os próprios pedidos, não acessa relatórios
-            financeiros e não mexe em configurações.
-          </p>
-        </Cartao>
-      ) : null}
-
       {/* ------------------------------ EMPRESA ------------------------------ */}
       {aba === 'empresa' ? (
         <Cartao hover={false} className="space-y-4">
@@ -810,7 +742,7 @@ export default function Configuracoes() {
                   const ok = await confirmar({
                     titulo: 'Substituir tudo pelos dados de exemplo?',
                     mensagem:
-                      'Pedidos, clientes, vendedores e impressões atuais serão apagados e substituídos por exemplos FICTÍCIOS. Os seus acessos (contas) e as configurações são mantidos.',
+                      'Pedidos, clientes, funcionários e impressões atuais serão apagados e substituídos por exemplos FICTÍCIOS. Os seus acessos de proprietário e as configurações são mantidos.',
                     textoBotao: 'Substituir',
                   })
                   if (ok) await carregarDemo()
@@ -826,7 +758,7 @@ export default function Configuracoes() {
                   const ok = await confirmar({
                     titulo: 'Apagar todos os dados?',
                     mensagem:
-                      'Pedidos, clientes, vendedores, arquivos e as contas da equipe serão apagados definitivamente. O seu acesso de proprietário é mantido para você não perder a entrada no sistema.',
+                      'Pedidos, clientes, funcionários, arquivos e os outros acessos de proprietário serão apagados definitivamente. O seu acesso é mantido para você não perder a entrada no sistema.',
                     textoBotao: 'Apagar tudo',
                   })
                   if (ok) await resetarDados(usuario?.id)
@@ -869,7 +801,7 @@ export default function Configuracoes() {
                     const ok = await confirmar({
                       titulo: 'Restaurar este backup?',
                       mensagem:
-                        'Os dados atuais (pedidos, clientes, vendedores, contas e configurações) serão substituídos pelos do arquivo.',
+                        'Os dados atuais (pedidos, clientes, funcionários, acessos e configurações) serão substituídos pelos do arquivo. Com a nuvem conectada, essa troca vale para todos os aparelhos.',
                       textoBotao: 'Restaurar',
                     })
                     if (!ok) return
@@ -883,8 +815,9 @@ export default function Configuracoes() {
               </label>
             </div>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              O backup inclui pedidos, clientes, vendedores, arquivos (links) e contas de acesso. Fotos e artes enviadas
-              ficam no Supabase Storage e continuam lá.
+              O backup inclui pedidos, clientes, funcionários, arquivos (links) e os acessos de proprietário. Fotos e
+              artes enviadas ficam no Supabase Storage e continuam lá. Para restaurar um backup em outro computador:
+              abra o sistema nele e use <b>Restaurar backup</b>; com a nuvem conectada, o conteúdo vale para todos.
             </p>
           </Cartao>
         </div>
@@ -892,12 +825,8 @@ export default function Configuracoes() {
       {/* -------------------------------- NUVEM ------------------------------- */}
       {aba === 'nuvem' ? <AbaNuvem /> : null}
 
-      {/* ------------------------------ MEU ACESSO ---------------------------- */}
-      {/* -------------------------------- EQUIPE -------------------------------- */}
+      {/* ----------------------- FUNCIONÁRIOS E ACESSOS ------------------------ */}
       {aba === 'equipe' ? <Equipe embutido /> : null}
-
-      {/* ------------------------------ VENDEDORES ------------------------------ */}
-      {aba === 'vendedores' ? <Vendedores embutido /> : null}
 
       {/* ------------------------------ APARÊNCIA ------------------------------ */}
       {aba === 'aparencia' ? (
@@ -1015,11 +944,11 @@ export default function Configuracoes() {
             </p>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
               Quer um <b>segundo login de dono</b> (sócio, gerente, escritório, ou um acesso só para o celular)?
-              Crie em <b>Equipe → Nova conta</b> escolhendo “Proprietário — vê tudo”. Dá para ter quantos quiser; o
-              sistema só não fica sem nenhum proprietário ativo.
+              Use <b>Funcionários e acessos → Novo acesso de proprietário</b>. Dá para ter quantos quiser; o sistema
+              só não fica sem nenhum proprietário ativo.
             </p>
             <Botao variante="secundario" icone={UsersRound} onClick={() => setAba('equipe')}>
-              Abrir Equipe para criar outro proprietário
+              Abrir Funcionários e acessos
             </Botao>
           </Cartao>
 
@@ -1028,7 +957,8 @@ export default function Configuracoes() {
               <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Trocar a minha senha
             </p>
             <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-              A senha fica guardada apenas como hash. Para a senha de outras pessoas, use <b>Equipe → Vínculo e senha</b>.
+              A senha fica guardada apenas como hash. Para redefinir a senha de outro proprietário, use{' '}
+              <b>Funcionários e acessos</b>.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <Campo label="Senha atual">
@@ -1098,7 +1028,8 @@ export default function Configuracoes() {
 
           <p className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
             <b>Quem pode mudar o quê:</b> as comissões e as permissões da equipe só aparecem aqui, para o proprietário.
-            Os vendedores não têm acesso a esta tela — nem pelo menu, nem digitando o endereço.
+            Esta tela e as Configurações são só do proprietário. A equipe usa o sistema sem login — nem pelo menu, nem
+            digitando o endereço, ela chega aqui.
           </p>
         </div>
       ) : null}

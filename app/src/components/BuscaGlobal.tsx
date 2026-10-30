@@ -15,7 +15,7 @@ const DICAS = ['nome do cliente', 'nº do pedido (ex.: 12)', 'telefone', 'cidade
 
 export function BuscaGlobal({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
   const { db, nomeVendedor } = useStore()
-  const { usuario, ehProprietario } = useAuth()
+  const { ehProprietario } = useAuth()
   const navegar = useNavigate()
   const [termo, setTermo] = useState('')
   const campo = useRef<HTMLInputElement | null>(null)
@@ -24,10 +24,10 @@ export function BuscaGlobal({ aberto, onFechar }: { aberto: boolean; onFechar: (
   const achados = useMemo(
     () =>
       buscarTudo(db, termo, {
-        vendedorId: ehProprietario ? '' : usuario?.vendedor_id ?? '',
+        vendedorId: '',
         verVendedores: ehProprietario,
       }),
-    [db, ehProprietario, termo, usuario?.vendedor_id],
+    [db, ehProprietario, termo],
   )
 
   // abre limpo e com o cursor no campo
@@ -124,8 +124,8 @@ export function BuscaGlobal({ aberto, onFechar }: { aberto: boolean; onFechar: (
               </div>
               <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
                 {ehProprietario
-                  ? 'Você vê tudo: pedidos, clientes e vendedores.'
-                  : `Você vê apenas os pedidos e clientes de ${nomeVendedor(usuario?.vendedor_id)}.`}
+                  ? 'Você vê tudo: pedidos, clientes e funcionários.'
+                  : 'Você vê todos os pedidos e clientes da loja.'}
               </p>
             </div>
           ) : achados.length === 0 ? (

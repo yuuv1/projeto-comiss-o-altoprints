@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
 import { BarraAcoes, Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio } from '../components/ui'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
-import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
 import { LABEL_ESTAGIO, type Pedido } from '../lib/types'
 
@@ -15,14 +14,13 @@ const primeiroDiaDoMes = () => {
 /** Extrato do cliente especial — também aparece como aba dentro de Clientes */
 export default function RelatorioClienteEspecial({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, nomeVendedor } = useStore()
-  const { usuario, ehProprietario } = useAuth()
   // vendedor com a tela liberada vê só os clientes especiais dele
   const especiais = useMemo(
     () =>
       db.clientes.filter(
-        (c) => c.especial && (ehProprietario || c.vendedor_id === (usuario?.vendedor_id ?? '')),
+        (c) => c.especial,
       ),
-    [db.clientes, ehProprietario, usuario?.vendedor_id],
+    [db.clientes],
   )
   const [clienteId, setClienteId] = useState('')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)

@@ -1,8 +1,11 @@
 /**
- * Testes do login (roda num DOM simulado).
- * Verifica: criar conta do proprietário, entrar, senha errada, conta desativada,
- * cadastro de vendedor, usuário repetido, troca de senha, permissões e bloqueio
- * por excesso de tentativas.
+ * Testes do acesso (roda num DOM simulado).
+ *
+ * O modelo de hoje: **só o proprietário tem login**. A equipe usa o sistema sem
+ * conta — escolhe o próprio nome ao registrar uma fila. Aqui conferimos:
+ * criar o acesso do dono, entrar/sair, senha errada, bloqueio de tentativas,
+ * login de conta que não é dono, vários proprietários, troca/redefinição de
+ * senha e as regras que impedem o sistema de ficar sem dono.
  *
  * Rode com:  npm run testar
  */
@@ -65,11 +68,14 @@ async function main() {
   const React = await import('react')
   const { StoreProvider } = await import('../src/lib/store')
   const { AuthProvider, useAuth, normalizarUsuario, validarUsuario } = await import('../src/lib/auth')
-  const { podeEditarPedidos, podeExcluirPedidos, FAIXAS_PADRAO } = await import('../src/lib/types')
-  const { EQUIPE_INICIAL, CHAVE_EQUIPE_INICIAL } = await import('../src/lib/equipe-inicial')
+  const { FAIXAS_PADRAO } = await import('../src/lib/types')
+  const { EQUIPE_INICIAL, CHAVE_EQUIPE_INICIAL, vendedoresDaEquipeInicial } = await import('../src/lib/equipe-inicial')
   const { validarSenha } = await import('../src/lib/usuario')
+  const { gerarHashSenha } = await import('../src/lib/senha')
+  const { salvarRegistro } = await import('../src/lib/backend')
+  const { guardarUltimoFuncionario, ultimoFuncionario } = await import('../src/lib/funcionario')
 
-  /* ---------------------- funções puras do login ---------------------- */
+  /* ------------------------ funções puras do acesso ------------------------ */
   igual('usuario normalizado (acentos e maiúsculas)', normalizarUsuario('  Jéssica Alves '), 'jessicaalves')
   igual('usuario remove símbolos estranhos', normalizarUsuario('jé$sica@2026'), 'jesica2026')
   igual('usuario curto é recusado', validarUsuario('ab'), 'O nome de usuário precisa ter pelo menos 3 letras.')
@@ -78,35 +84,43 @@ async function main() {
   igual('senha no tamanho mínimo passa', validarSenha('1234'), '')
   igual('senha em branco não vale como senha', validarSenha('   '), 'A senha precisa ter pelo menos 4 caracteres.')
   igual('a equipe inicial tem os nomes de quem já trabalha aqui', EQUIPE_INICIAL.join(', '), 'JESSICA, RAISSA, ANDREIA')
-  igual('permissão total edita', podeEditarPedidos('total'), true)
-  igual('permissão total exclui', podeExcluirPedidos('total'), true)
-  igual('permissão sem excluir não exclui', podeExcluirPedidos('sem_excluir'), false)
-  igual('permissão sem excluir edita', podeEditarPedidos('sem_excluir'), true)
-  igual('permissão somente criar não edita', podeEditarPedidos('somente_criar'), false)
   igual('faixas padrão têm 6 intervalos', FAIXAS_PADRAO.length, 6)
+
+  /* --------------------- equipe inicial (sem conta) --------------------- */
+  const semEquipe = { vendedores: [], clientes: [], pedidos: [], arquivos: [], impressoes: [], usuarios: [], configuracoes: {} } as never
+  igual(
+    'equipe inicial cria só vendedores (nenhuma conta de funcionário)',
+    vendedoresDaEquipeInicial(semEquipe).map((v) => v.nome).sort(),
+    EQUIPE_INICIAL.slice().sort(),
+  )
+  const comJessica = { ...(semEquipe as object), vendedores: [{ id: 'v1', nome: 'JESSICA', created_at: '' }] } as never
+  igual(
+    'equipe inicial não duplica quem já existe',
+    vendedoresDaEquipeInicial(comJessica).map((v) => v.nome).sort(),
+    ['ANDREIA', 'RAISSA'],
+  )
+
+  /* ------------------ nome do funcionário lembrado no aparelho ------------------ */
+  igual('sem escolha anterior, nenhum funcionário vem marcado', ultimoFuncionario(), '')
+  guardarUltimoFuncionario('v123')
+  igual('a última escolha de funcionário é lembrada', ultimoFuncionario(), 'v123')
+  guardarUltimoFuncionario('')
+  igual('escolha vazia não apaga a lembrança', ultimoFuncionario(), 'v123')
 
   /* --------------------------- contexto real -------------------------- */
   type Auth = {
     usuario: { id: string; usuario: string; papel: string; ativo: boolean } | null
+    ehProprietario: boolean
     temProprietario: boolean
+    carregando: boolean
     entrar: (u: string, s: string, m: boolean) => Promise<void>
     sair: () => Promise<void>
     criarContaProprietario: (d: { nome: string; usuario: string; senha: string }) => Promise<void>
-    criarContaVendedor: (d: { nome: string; usuario: string; senha: string }) => Promise<void>
+    criarOutroProprietario: (d: { nome: string; usuario: string; senha: string }) => Promise<void>
     trocarMinhaSenha: (a: string, n: string) => Promise<void>
-    criarContaComoDono: (d: {
-      nome: string
-      usuario: string
-      senha?: string
-      vendedorId?: string
-      administrador?: boolean
-      semSenha?: boolean
-    }) => Promise<void>
+    redefinirSenha: (id: string, nova: string) => Promise<void>
     alternarAtivo: (id: string, ativo: boolean) => Promise<void>
     excluirUsuario: (id: string) => Promise<void>
-    entrarSemSenha: (id: string, m?: boolean) => Promise<void>
-    removerSenha: (id: string) => Promise<void>
-    redefinirSenha: (id: string, nova: string) => Promise<void>
   }
   let auth: Auth | null = null
   function Probe() {
@@ -118,9 +132,7 @@ async function main() {
   const conta = (login: string) => banco().usuarios.find((u: { usuario: string }) => u.usuario === login)
 
   // O sistema começa SEM DADOS: nenhum pedido, cliente ou comissão de exemplo é
-  // semeado (a demonstração só entra quando o proprietário pede em Configurações → Dados).
-  // A única coisa criada de cara são os acessos da equipe atual, que entram pelo nome.
-
+  // semeado. A única coisa criada de cara são os FUNCIONÁRIOS da equipe atual.
   const raiz = dom.window.document.getElementById('root')
   createRoot(raiz as unknown as Element).render(
     React.createElement(
@@ -136,64 +148,41 @@ async function main() {
   igual('sistema novo começa sem pedidos de exemplo', inicio?.pedidos?.length ?? 0, 0)
   igual('sistema novo começa sem clientes de exemplo', inicio?.clientes?.length ?? 0, 0)
   igual('sistema novo não tem proprietário', pegar().temProprietario, false)
-
-  /* ------------------- equipe inicial (entra pelo nome) ------------------ */
+  igual('ninguém está logado ao abrir o sistema', pegar().usuario, null)
+  igual('sem login, ninguém é tratado como proprietário', pegar().ehProprietario, false)
   igual(
-    'a equipe atual já vem cadastrada na primeira abertura',
-    (inicio?.usuarios ?? []).map((u: { nome: string }) => u.nome).sort(),
-    EQUIPE_INICIAL.slice().sort(),
-  )
-  igual(
-    'todos os acessos da equipe inicial entram sem senha',
-    (inicio?.usuarios ?? []).every((u: { sem_senha?: boolean; papel: string }) => u.sem_senha && u.papel === 'vendedor'),
-    true,
-  )
-  igual(
-    'nenhuma conta da equipe inicial nasce com senha',
-    (inicio?.usuarios ?? []).every((u: { senha_hash: string }) => !u.senha_hash),
-    true,
-  )
-  igual(
-    'cada pessoa da equipe inicial ganhou o próprio cadastro de vendedor',
+    'a equipe atual já vem cadastrada como funcionários',
     (inicio?.vendedores ?? []).map((v: { nome: string }) => v.nome).sort(),
     EQUIPE_INICIAL.slice().sort(),
   )
+  igual('nenhuma conta de funcionário é criada', (inicio?.usuarios ?? []).length, 0)
   igual(
     'a equipe inicial é criada uma única vez (marca no aparelho)',
     dom.window.localStorage.getItem(CHAVE_EQUIPE_INICIAL),
     '1',
   )
 
-  // entra tocando no nome — sem digitar senha nenhuma
-  const idJessica = conta('jessica').id
-  await pegar().entrarSemSenha(idJessica)
-  await respirar()
-  igual('entrar pelo nome conecta a pessoa certa', pegar().usuario?.usuario, 'jessica')
-  igual('quem entra pelo nome é vendedor', pegar().usuario?.papel, 'vendedor')
-  await pegar().sair()
-  await respirar()
-  await esperaErro(
-    'conta sem senha não entra por usuário e senha',
-    pegar().entrar('jessica', 'qualquercoisa', true),
-    'entra sem senha',
-  )
-  await esperaErro('conta sem senha não entra com senha em branco', pegar().entrar('jessica', '', true), 'entra sem senha')
-  await esperaErro(
-    'conta desativada também não entra pelo nome',
-    (async () => {
-      await pegar().entrarSemSenha('id-que-nao-existe')
-    })(),
-    'não existe',
-  )
-
   /* ------------------------ conta do proprietário ---------------------- */
+  await esperaErro(
+    'senha curta é recusada ao criar o acesso',
+    pegar().criarContaProprietario({ nome: 'Dona', usuario: 'dona', senha: '12' }),
+    'pelo menos 4',
+  )
+  await esperaErro(
+    'usuário curto é recusado ao criar o acesso',
+    pegar().criarContaProprietario({ nome: 'Dona', usuario: 'do', senha: '1234' }),
+    'pelo menos 3',
+  )
   await pegar().criarContaProprietario({ nome: 'Dona do Sistema', usuario: 'Dona', senha: '1234' })
   await respirar()
   igual('proprietário criado e logado', pegar().usuario?.usuario, 'dona')
   igual('agora o sistema tem proprietário', pegar().temProprietario, true)
+  igual('o dono é reconhecido como proprietário', pegar().ehProprietario, true)
+  igual('a senha do dono nunca é guardada em texto puro', conta('dona')?.senha_hash === '1234', false)
+  igual('a conta do dono não é ligada a funcionário', conta('dona')?.vendedor_id, '')
 
   await esperaErro(
-    'não deixa criar um segundo proprietário',
+    'não deixa criar um segundo dono pela porta da primeira vez',
     pegar().criarContaProprietario({ nome: 'Outro', usuario: 'outro', senha: '1234' }),
     'já tem um proprietário',
   )
@@ -202,6 +191,8 @@ async function main() {
   await pegar().sair()
   await respirar()
   igual('depois de sair não há usuário', pegar().usuario, null)
+  igual('sair apaga a sessão guardada', Boolean(dom.window.localStorage.getItem('altoprints:sessao')), false)
+  igual('o sistema continua sabendo que existe um dono', pegar().temProprietario, true)
   await esperaErro('senha errada é recusada', pegar().entrar('dona', '9999', true), 'Usuário ou senha inválidos')
   await esperaErro('usuário inexistente é recusado', pegar().entrar('ninguem', '1234', true), 'Usuário ou senha inválidos')
   await pegar().entrar('DONA', '1234', true)
@@ -209,204 +200,117 @@ async function main() {
   igual('entrou com o usuário em maiúsculas', pegar().usuario?.usuario, 'dona')
   igual('sessão guardada', Boolean(dom.window.localStorage.getItem('altoprints:sessao')), true)
 
-  /* ------------------------- conta do vendedor ------------------------ */
-  await pegar().criarContaVendedor({ nome: 'CARLA', usuario: 'carla', senha: '4321' })
+  /* ------------- conta de funcionário (de versão antiga) não entra ------------- */
+  await pegar().sair()
   await respirar()
-  igual('vendedor cadastrado', pegar().usuario?.usuario, 'carla')
-  igual('vendedor tem papel de vendedor', pegar().usuario?.papel, 'vendedor')
-
-  const banco1 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
-  igual('conta do vendedor guardada', banco1.usuarios.length, 5)
-  igual(
-    'senha nunca é guardada em texto puro',
-    banco1.usuarios.some((u: { senha_hash: string }) => u.senha_hash === '4321'),
-    false,
-  )
-  igual(
-    'vendedor criado ficou ligado a um vendedor da lista',
-    Boolean(banco1.usuarios.find((u: { usuario: string }) => u.usuario === 'carla')?.vendedor_id),
-    true,
-  )
+  await salvarRegistro('usuarios', {
+    id: 'conta-antiga-jessica',
+    nome: 'JESSICA',
+    usuario: 'jessica',
+    senha_hash: await gerarHashSenha('4321'),
+    papel: 'vendedor',
+    vendedor_id: inicio.vendedores[0].id,
+    ativo: true,
+    criado_em: new Date().toISOString(),
+  })
   await esperaErro(
-    'nome de usuário repetido é recusado (mesmo com a tela desatualizada)',
-    pegar().criarContaVendedor({ nome: 'Outra', usuario: 'carla', senha: '1111' }),
+    'conta de funcionário é recusada no login (só o dono tem login)',
+    pegar().entrar('jessica', '4321', true),
+    'exclusivo do proprietário',
+  )
+  await pegar().entrar('dona', '1234', true)
+  await respirar()
+
+  /* ---------------- o dono cria outros acessos de proprietário --------------- */
+  const sessaoAntes = pegar().usuario?.usuario
+  await pegar().criarOutroProprietario({ nome: 'Sócio', usuario: 'socio', senha: '1234' })
+  await respirar()
+  igual('criar outro dono não troca a sessão de quem criou', pegar().usuario?.usuario, sessaoAntes)
+  igual('o segundo dono foi criado', Boolean(conta('socio')), true)
+  igual('o segundo dono entra como proprietário', conta('socio')?.papel, 'proprietario')
+  await esperaErro(
+    'nome de usuário repetido é recusado',
+    pegar().criarOutroProprietario({ nome: 'Outra', usuario: 'DONA', senha: '1111' }),
     'já está em uso',
   )
-  const banco2 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
-  igual('nenhuma conta duplicada foi criada', banco2.usuarios.length, 5)
+  igual('nenhuma conta duplicada foi criada', banco().usuarios.filter((u: { usuario: string }) => u.usuario === 'dona').length, 1)
 
-  /* ---------------- o dono cria as contas da equipe ------------------- */
-  // a CARLA acabou de criar o acesso dela; um segundo acesso no mesmo vendedor é recusado
-  const idVendedorCarla = banco2.usuarios.find((u: { usuario: string }) => u.usuario === 'carla')?.vendedor_id
-  igual('vendedor da jessica existe', Boolean(idVendedorCarla), true)
-  await esperaErro(
-    'não deixa criar duas contas para o mesmo vendedor',
-    pegar().criarContaComoDono({
-      nome: 'CARLA',
-      usuario: 'carla2',
-      senha: '1234',
-      vendedorId: idVendedorCarla,
-    }),
-    'já tem um acesso criado',
-  )
-  await esperaErro(
-    'cadastro pelo login também recusa nome já usado',
-    pegar().criarContaVendedor({ nome: 'CARLA', usuario: 'carla3', senha: '1234' }),
-    'Já existe um acesso para este nome',
-  )
-
-  // o proprietário cria a conta da BRUNA (vendedor novo) sem trocar a própria sessão
-  const sessaoAntes = pegar().usuario?.usuario
-  await pegar().criarContaComoDono({ nome: 'BRUNA', usuario: 'bruna', senha: '1234' })
+  /* ----------------------- trocar / redefinir senha ----------------------- */
+  await esperaErro('troca de senha exige a senha atual', pegar().trocarMinhaSenha('errada', '5555'), 'senha atual não confere')
+  await pegar().trocarMinhaSenha('1234', '5555')
   await respirar()
-  igual('criar conta pela Equipe não troca a sessão de quem criou', pegar().usuario?.usuario, sessaoAntes)
-  const banco3 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
-  const contaBruna = banco3.usuarios.find((u: { usuario: string }) => u.usuario === 'bruna')
-  igual('conta da raissa criada com vendedor novo', Boolean(contaBruna?.vendedor_id), true)
-  igual(
-    'vendedor novo da raissa foi criado uma única vez',
-    banco3.vendedores.filter((v: { nome: string }) => v.nome === 'BRUNA').length,
-    1,
-  )
-
-  // o dono também pode criar outro administrador (sempre com senha)
-  await esperaErro(
-    'proprietário nunca pode ser criado sem senha',
-    pegar().criarContaComoDono({ nome: 'Sócio', usuario: 'socio', administrador: true, semSenha: true }),
-    'precisa de senha',
-  )
-  await pegar().criarContaComoDono({ nome: 'Sócio', usuario: 'socio', senha: '1234', administrador: true })
-  await respirar()
-
-  // dar e tirar senha de um acesso de vendedor
-  await pegar().redefinirSenha(idJessica, '7777')
-  await respirar()
-  igual('definir senha tira a conta do modo sem senha', Boolean(conta('jessica')?.sem_senha), false)
-  await esperaErro(
-    'conta que ganhou senha não entra mais pelo nome sem senha',
-    pegar().entrarSemSenha(idJessica),
-    'pede senha',
-  )
-  await pegar().removerSenha(idJessica)
-  await respirar()
-  igual('tirar a senha devolve a entrada pelo nome', Boolean(conta('jessica')?.sem_senha), true)
   await pegar().sair()
   await respirar()
-  await pegar().entrar('socio', '1234', true)
+  await esperaErro('senha antiga não funciona mais', pegar().entrar('dona', '1234', true), 'Usuário ou senha inválidos')
+  await pegar().entrar('dona', '5555', true)
   await respirar()
-  igual('conta criada como administrador entra como proprietário', pegar().usuario?.papel, 'proprietario')
-  igual('usuário criado pelo dono aparece no sistema', pegar().usuario?.usuario, 'socio')
+  igual('senha nova funciona', pegar().usuario?.usuario, 'dona')
+
+  const idSocio = conta('socio').id
+  await esperaErro(
+    'redefinir a própria senha é pela tela Meu acesso',
+    pegar().redefinirSenha(pegar().usuario?.id ?? '', '9999'),
+    'Meu acesso',
+  )
+  await pegar().redefinirSenha(idSocio, '4321')
+  await respirar()
   await pegar().sair()
   await respirar()
-  await pegar().entrar('dona', '1234', true)
+  await pegar().entrar('socio', '4321', true)
   await respirar()
-  igual('dono volta a entrar normalmente', pegar().usuario?.usuario, 'dona')
+  igual('a senha redefinida pelo dono funciona', pegar().usuario?.usuario, 'socio')
 
   /* ------------- vários proprietários: desativar e excluir -------------- */
-  // O sistema aceita mais de um acesso de proprietário (sócio, gerente...), mas
-  // nunca pode ficar sem nenhum ativo — e ninguém apaga o próprio acesso.
-  const banco4 = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
-  const idDona = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'dona').id
-  const idSocio = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'socio').id
-  const idBruna = banco4.usuarios.find((u: { usuario: string }) => u.usuario === 'bruna').id
+  const idDona = conta('dona').id
+  await esperaErro('ninguém exclui o próprio acesso', pegar().excluirUsuario(idSocio), 'próprio acesso')
+  await esperaErro('ninguém desativa o próprio acesso', pegar().alternarAtivo(idSocio, false), 'próprio acesso')
 
-  await esperaErro('ninguém exclui o próprio acesso', pegar().excluirUsuario(idDona), 'próprio acesso')
-  await pegar().alternarAtivo(idSocio, false)
+  await pegar().alternarAtivo(idDona, false)
   await respirar()
-  igual(
-    'segundo proprietário pode ser desativado (resta um ativo)',
-    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.find(
-      (u: { usuario: string }) => u.usuario === 'socio',
-    )?.ativo,
-    false,
-  )
-  await pegar().excluirUsuario(idSocio)
-  await respirar()
-  igual(
-    'segundo proprietário foi excluído',
-    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.some(
-      (u: { usuario: string }) => u.usuario === 'socio',
-    ),
-    false,
-  )
-  // agora só resta a "dona": o sistema não pode ficar sem proprietário
+  igual('um dono pode ser desativado (resta outro ativo)', conta('dona')?.ativo, false)
   await pegar().sair()
   await respirar()
-  await pegar().entrar('bruna', '1234', true)
+  await esperaErro('dono desativado não entra', pegar().entrar('dona', '5555', true), 'desativado')
+  await pegar().entrar('socio', '4321', true)
   await respirar()
-  await esperaErro(
-    'o último proprietário ativo não pode ser excluído',
-    pegar().excluirUsuario(idDona),
-    'único proprietário',
-  )
-  await pegar().sair()
+  await pegar().alternarAtivo(idDona, true)
   await respirar()
-  igual(
-    'a dona continua cadastrada (o sistema não ficou sem proprietário)',
-    JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).usuarios.some(
-      (u: { usuario: string }) => u.usuario === 'dona' && u.ativo,
-    ),
-    true,
-  )
-  igual('a conta usada no teste continua existindo', Boolean(idBruna), true)
+  igual('o dono pode ser reativado', conta('dona')?.ativo, true)
 
-  // volta a sessão para a CARLA (é ela que troca a própria senha abaixo)
-  await pegar().sair()
+  // exclusão: só sobra o sócio, então a dona pode sair
+  await pegar().excluirUsuario(idDona)
   await respirar()
-  await pegar().entrar('carla', '4321', true)
-  await respirar()
-  igual('carla entra de novo para trocar a própria senha', pegar().usuario?.usuario, 'carla')
+  igual('o acesso excluído saiu do sistema', Boolean(conta('dona')), false)
 
-  /* --------------------------- trocar senha --------------------------- */
-  await esperaErro(
-    'troca de senha exige a senha atual',
-    pegar().trocarMinhaSenha('errada', '5555'),
-    'senha atual não confere',
-  )
-  await pegar().trocarMinhaSenha('4321', '5555')
-  await respirar()
-  await pegar().sair()
-  await respirar()
-  await esperaErro('senha antiga não funciona mais', pegar().entrar('carla', '4321', true), 'Usuário ou senha inválidos')
-  await pegar().entrar('carla', '5555', true)
-  await respirar()
-  igual('senha nova funciona', pegar().usuario?.usuario, 'carla')
-
-  /* --------------------------- desativar conta ------------------------ */
-  const idVendedor = banco2.usuarios.find((u: { usuario: string }) => u.usuario === 'carla').id
-  await pegar().sair()
-  await respirar()
-  await pegar().entrar('dona', '1234', true)
-  await respirar()
-  await pegar().alternarAtivo(idVendedor, false)
-  await respirar()
-  await pegar().sair()
-  await respirar()
-  await esperaErro('conta desativada não entra', pegar().entrar('carla', '5555', true), 'desativado')
+  // agora o sócio é o único proprietário: nem ele nem o sistema podem ficar sem dono
+  await esperaErro('o único proprietário ativo não pode ser excluído', pegar().excluirUsuario(idSocio), 'próprio acesso')
+  igual('o sistema continua com um proprietário ativo', pegar().temProprietario, true)
 
   /* ---------------------- limite de tentativas ------------------------ */
+  await pegar().sair()
+  await respirar()
   for (let i = 0; i < 5; i++) {
     try {
-      await pegar().entrar('dona', 'senhaerrada', true)
+      await pegar().entrar('socio', 'senhaerrada', true)
     } catch {
       /* esperado */
     }
     await espera(20)
   }
-  await esperaErro('bloqueia depois de várias tentativas', pegar().entrar('dona', '1234', true), 'Muitas tentativas')
+  await esperaErro('bloqueia depois de várias tentativas', pegar().entrar('socio', '4321', true), 'Muitas tentativas')
 
   /* ---------------------- aparência (tema e densidade) ---------------------- */
   {
     const { aplicarAparicao, LABEL_DENSIDADE } = await import('../src/lib/tema')
-    const raiz = dom.window.document.documentElement
+    const raizHtml = dom.window.document.documentElement
 
     aplicarAparicao({ tema: 'escuro', densidade: 'confortavel' })
-    igual('tema escuro liga a classe no <html>', raiz.classList.contains('dark'), true)
-    igual('modo confortável liga a classe no <html>', raiz.classList.contains('confortavel'), true)
+    igual('tema escuro liga a classe no <html>', raizHtml.classList.contains('dark'), true)
+    igual('modo confortável liga a classe no <html>', raizHtml.classList.contains('confortavel'), true)
 
     aplicarAparicao({ tema: 'claro', densidade: 'compacto' })
-    igual('tema claro desliga a classe escura', raiz.classList.contains('dark'), false)
-    igual('modo compacto é o padrão (sem classe)', raiz.classList.contains('confortavel'), false)
+    igual('tema claro desliga a classe escura', raizHtml.classList.contains('dark'), false)
+    igual('modo compacto é o padrão (sem classe)', raizHtml.classList.contains('confortavel'), false)
     igual('os dois modos têm nome para a tela', [LABEL_DENSIDADE.compacto, LABEL_DENSIDADE.confortavel].join(' / '), 'Compacto / Confortável')
   }
 
@@ -419,6 +323,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.log('Falha geral nos testes de login:', e)
-  process.exit(2)
+  console.error(e)
+  process.exit(1)
 })

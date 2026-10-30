@@ -2,13 +2,12 @@ import { KeyRound, LogOut, UserCog } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { useStore } from '../lib/store'
-import { LABEL_PERMISSAO } from '../lib/types'
 import { Botao, Campo, Entrada, Etiqueta, Modal } from './ui'
 
 /** Meu perfil: nome, troca da própria senha e sair do sistema */
 export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
-  const { usuario, ehProprietario, vendedorNome, trocarMinhaSenha, atualizarMeuPerfil, sair, nuvem } = useAuth()
-  const { db, avisar } = useStore()
+  const { usuario, trocarMinhaSenha, atualizarMeuPerfil, sair, nuvem } = useAuth()
+  const { avisar } = useStore()
 
   const [nome, setNome] = useState(usuario?.nome ?? '')
   const [atual, setAtual] = useState('')
@@ -38,7 +37,7 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
       icone={UserCog}
       largura="max-w-lg"
       titulo="Meu perfil"
-      subtitulo="Seus dados de acesso."
+      subtitulo="Seu acesso de proprietário."
       rodape={
         <>
           <Botao
@@ -49,7 +48,7 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
               await sair()
             }}
           >
-            Sair do sistema
+            Sair do modo proprietário
           </Botao>
           <Botao
             icone={UserCog}
@@ -70,18 +69,11 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Etiqueta
-            className={
-              ehProprietario
-                ? 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300'
-                : 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300'
-            }
-          >
-            {ehProprietario ? 'Proprietário' : 'Vendedor'}
+          <Etiqueta className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300">
+            Proprietário
           </Etiqueta>
           <span className="text-xs text-slate-500 dark:text-slate-400">
             usuário: <b>{usuario?.usuario}</b>
-            {ehProprietario ? '' : ` • vendedor: ${vendedorNome}`}
           </span>
         </div>
 
@@ -89,29 +81,15 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
           <Entrada value={nome} onChange={(e) => setNome(e.target.value)} />
         </Campo>
 
-        {!ehProprietario ? (
-          <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300">
-            Permissão definida pelo proprietário: <b>{LABEL_PERMISSAO[db.configuracoes.permissao_vendedor] ?? LABEL_PERMISSAO.sem_excluir}</b>.
-          </p>
-        ) : null}
-
         <div className="rounded-xl border border-slate-100 p-4 dark:border-slate-800">
           <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
             <KeyRound className="h-4 w-4 text-purple-600 dark:text-purple-400" />{' '}
-            {usuario?.sem_senha ? 'Colocar uma senha (opcional)' : 'Trocar minha senha'}
+            Trocar minha senha
           </p>
-          {usuario?.sem_senha ? (
-            <p className="mb-3 text-xs text-emerald-700 dark:text-emerald-300">
-              Hoje o seu acesso entra <b>sem senha</b> (basta tocar no seu nome na tela de entrada). Só preencha abaixo
-              se quiser passar a digitar senha.
-            </p>
-          ) : null}
-          <div className={usuario?.sem_senha ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3 sm:grid-cols-3'}>
-            {usuario?.sem_senha ? null : (
-              <Campo label="Senha atual">
-                <Entrada type="password" value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••" />
-              </Campo>
-            )}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Campo label="Senha atual">
+              <Entrada type="password" value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••" />
+            </Campo>
             <Campo label="Nova senha">
               <Entrada type="password" value={nova} onChange={(e) => setNova(e.target.value)} placeholder="••••••" />
             </Campo>
@@ -124,9 +102,9 @@ export function PerfilDialog({ aberto, onFechar }: { aberto: boolean; onFechar: 
             icone={KeyRound}
             onClick={trocarSenha}
             carregando={salvando}
-            disabled={(!usuario?.sem_senha && !atual) || nova.length < 4}
+            disabled={!atual || nova.length < 4}
           >
-            {usuario?.sem_senha ? 'Salvar senha' : 'Trocar senha'}
+            Trocar senha
           </Botao>
           <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
             {nuvem

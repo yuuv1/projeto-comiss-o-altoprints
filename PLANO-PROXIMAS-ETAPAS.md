@@ -24,7 +24,7 @@
   retirada** do menu (o teste de tela garante que ela não volte sem querer). O que continua
   no código: a tabela `impressoes` no banco/backup e o histórico fictício dos dados de exemplo,
   prontos para uma tela futura se você quiser.
-- **Publicação:** o site já está no ar pelo **GitHub Pages** (versão 1.3.0). Falta **conectar
+- **Publicação:** o site já está no ar pelo **GitHub Pages** (versão 1.4.0). Falta **conectar
   o Supabase** para a equipe toda ver os mesmos dados — plano em
   [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md).
 

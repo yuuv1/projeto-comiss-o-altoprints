@@ -53,22 +53,10 @@ async function prepararAmbiente() {
     ativo: true,
     criado_em: new Date().toISOString(),
   }
-  const vendedor = {
-    id: novoId(),
-    nome: 'VENDEDOR TESTE',
-    usuario: 'vendedor',
-    senha_hash: await gerarHashSenha('1234'),
-    papel: 'vendedor' as const,
-    vendedor_id: banco.vendedores[0].id,
-    ativo: true,
-    telas: { relatorio: true, paraImprimir: true },
-    criado_em: new Date().toISOString(),
-  }
-
   // garante uma fila do vendedor esperando na máquina (para testar os passos no cartão)
   const naFila = banco.pedidos.find(
     (p: { vendedor_id: string; estagio: string; iniciado_em: string | null }) =>
-      p.vendedor_id === vendedor.vendedor_id && p.estagio === 'em_andamento' && !p.iniciado_em,
+      p.vendedor_id === banco.vendedores[0].id && p.estagio === 'em_andamento' && !p.iniciado_em,
   )
   if (naFila) {
     naFila.pago = false
@@ -76,10 +64,10 @@ async function prepararAmbiente() {
     naFila.entregue = false
   }
 
-  banco.usuarios = [dono, vendedor]
+  banco.usuarios = [dono]
   dom.window.localStorage.setItem('altoprints:db:v1', JSON.stringify(banco))
 
-  return { banco, dono, vendedor, nomeDoVinculo: banco.vendedores[0].nome, outroVendedor: banco.vendedores[1].nome }
+  return { banco, dono, nomeDoVinculo: banco.vendedores[0].nome, outroVendedor: banco.vendedores[1].nome }
 }
 
 function sessaoDe(id: string) {
@@ -94,7 +82,7 @@ function sessaoDe(id: string) {
 }
 
 async function main() {
-  const { dono, vendedor, nomeDoVinculo, outroVendedor } = await prepararAmbiente()
+  const { banco, dono, nomeDoVinculo, outroVendedor } = await prepararAmbiente()
   sessaoDe(dono.id)
 
   const { createRoot } = await import('react-dom/client')
@@ -119,9 +107,9 @@ async function main() {
   )
   await espera(2500)
 
-  const banco = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
-  const idPedido = banco.pedidos.find(
-    (p: { vendedor_id: string }) => p.vendedor_id === vendedor.vendedor_id,
+  const bancoAtual = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
+  const idPedido = bancoAtual.pedidos.find(
+    (p: { vendedor_id: string }) => p.vendedor_id === banco.vendedores[0].id,
   )?.id
 
   let falhas = 0
@@ -262,66 +250,44 @@ async function main() {
   if (!extrasOk) falhas++
   console.log(`  ${extrasOk ? '✅' : '❌'} “Mais opções” mostra entrega, datas e observações`)
 
-  // ---------- ver o sistema como funcionário ----------
+  // ---------- só o proprietário cadastra/exclui funcionário ----------
   dom.window.location.hash = '#/equipe'
-  await espera(700)
-  const abriuVerComo = clicar(raiz, 'Ver como')
   await espera(800)
-  const textoVerComo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const verComoOk =
-    abriuVerComo &&
-    textoVerComo.includes('vendo o sistema como') &&
-    textoVerComo.includes('Minha área') &&
-    textoVerComo.includes('Voltar ao meu acesso')
-  if (!verComoOk) falhas++
-  console.log(`\n  ${verComoOk ? '✅' : '❌'} “Ver como” abre o sistema com os olhos do funcionário`)
-
-  dom.window.location.hash = '#/configuracoes'
-  await espera(600)
-  const textoBloqueado = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const bloqueadoNaVisualizacao = textoBloqueado.includes('do proprietário')
-  if (!bloqueadoNaVisualizacao) falhas++
-  console.log(
-    `  ${bloqueadoNaVisualizacao ? '✅' : '❌'} no modo visualização, telas do dono ficam bloqueadas como para o vendedor`,
-  )
-
-  // tentar salvar no modo visualização: nada é gravado e a tela avisa
-  dom.window.location.hash = '#/vendedores'
-  await espera(600)
-  const antesVisualizar = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
-  const abriuFormulario = clicar(raiz, 'Novo vendedor')
-  await espera(400)
-  const campoNome = raiz?.querySelector('form input') as HTMLInputElement | null
-  if (campoNome) {
-    campoNome.value = 'NAO DEVE SALVAR'
-    campoNome.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
-  }
-  await espera(200)
-  const formulario = raiz?.querySelector('form') as HTMLFormElement | null
-  formulario?.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }))
-  await espera(600)
-  const depoisVisualizar = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
-  const textoAviso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const nadaGravado =
-    abriuFormulario && antesVisualizar === depoisVisualizar && textoAviso.includes('só visualização')
-  if (!nadaGravado) falhas++
-  console.log(
-    `\n  ${nadaGravado ? '✅' : '❌'} no modo visualização nada é gravado e a tela avisa (${antesVisualizar} → ${depoisVisualizar} vendedores)`,
-  )
-  if (!nadaGravado) {
-    console.log(
-      `     (formulário aberto: ${abriuFormulario} · aviso na tela: ${textoAviso.includes('só visualização')})`,
-    )
-  }
-
-  dom.window.location.hash = '#/'
-  await espera(500)
-  const voltou = clicar(raiz, 'Voltar ao meu acesso')
+  const antesEquipe = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
+  // excluir quem já tem pedidos é bloqueado (o histórico/comissão não pode se perder)
+  const clicouExcluir = clicar(raiz, 'Excluir')
   await espera(700)
-  const textoVoltou = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const voltouOk = voltou && textoVoltou.includes('Painel do proprietário')
-  if (!voltouOk) falhas++
-  console.log(`  ${voltouOk ? '✅' : '❌'} “Voltar ao meu acesso” devolve o painel do proprietário`)
+  const textoExcluir = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const depoisEquipe = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).vendedores.length
+  const protegidoOk =
+    clicouExcluir &&
+    antesEquipe === depoisEquipe &&
+    textoExcluir.includes('pedido(s) no histórico') &&
+    textoExcluir.includes('renomeie em vez de excluir')
+  if (!protegidoOk) falhas++
+  console.log(
+    `\n  ${protegidoOk ? '✅' : '❌'} funcionário com pedidos no histórico não é excluído (${antesEquipe} → ${depoisEquipe})`,
+  )
+
+  // cadastrar um funcionário novo acrescenta um nome na lista (sem criar conta/senha)
+  const campoNovoFuncionario = dom.window.document.querySelector('#novo-funcionario') as HTMLInputElement | null
+  if (campoNovoFuncionario) {
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')?.set
+    setter?.call(campoNovoFuncionario, 'FUNCIONARIO NOVO')
+    campoNovoFuncionario.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+  }
+  const clicouCadastrar = clicar(raiz, 'Cadastrar')
+  await espera(900)
+  const bancoDepois = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1')))
+  const criouFuncionario =
+    Boolean(campoNovoFuncionario) &&
+    clicouCadastrar &&
+    bancoDepois.vendedores.some((v: { nome: string }) => v.nome === 'FUNCIONARIO NOVO') &&
+    bancoDepois.usuarios.length === 1
+  if (!criouFuncionario) falhas++
+  console.log(
+    `  ${criouFuncionario ? '✅' : '❌'} o dono cadastra funcionário novo sem criar conta de acesso (${bancoDepois.vendedores.length} nomes · ${bancoDepois.usuarios.length} login)`,
+  )
 
   // ---------- o sistema abre compacto e a aba Aparência troca o tamanho ----------
   const raizHtml = dom.window.document.documentElement
@@ -461,12 +427,16 @@ async function main() {
 
   dom.window.location.hash = '#/configuracoes'
   await espera(700)
-  const clicouEquipe = clicar(raiz, 'Equipe')
+  const clicouEquipe = clicar(raiz, 'Funcionários e acessos')
   await espera(600)
   const textoEquipeAba = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const equipeOk = clicouEquipe && textoEquipeAba.includes('Nova conta') && textoEquipeAba.includes('Contas')
+  const equipeOk =
+    clicouEquipe &&
+    textoEquipeAba.includes('Funcionários') &&
+    textoEquipeAba.includes('Acessos de proprietário') &&
+    textoEquipeAba.includes('Novo funcionário')
   if (!equipeOk) falhas++
-  console.log(`  ${equipeOk ? '✅' : '❌'} Equipe é uma aba dentro de Configurações`)
+  console.log(`  ${equipeOk ? '✅' : '❌'} “Funcionários e acessos” é uma aba dentro de Configurações`)
 
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
@@ -501,9 +471,9 @@ async function main() {
   if (!checklistOk) falhas++
   console.log(`  ${checklistOk ? '✅' : '❌'} checklist de primeiros passos aparece (e some quando terminar)`)
 
-  const equipeTabelaOk = painel.includes('Equipe · mês atual') && painel.includes('Última venda')
+  const equipeTabelaOk = painel.includes('Funcionários · mês atual') && painel.includes('Última venda')
   if (!equipeTabelaOk) falhas++
-  console.log(`  ${equipeTabelaOk ? '✅' : '❌'} equipe aparece em tabela (pedidos, faturamento, comissão, última venda)`)
+  console.log(`  ${equipeTabelaOk ? '✅' : '❌'} funcionários aparecem em tabela (pedidos, faturamento, comissão, última venda)`)
 
   // ---------- busca rápida (Ctrl + K) ----------
   dom.window.location.hash = '#/'
@@ -539,7 +509,7 @@ async function main() {
   console.log(`  ${foiParaOCliente ? '✅' : '❌'} clicar no resultado leva direto para o cliente (${dom.window.location.hash})`)
 
   // ---------- chegar em Pedidos filtrado por vendedor ----------
-  dom.window.location.hash = `#/pedidos?vendedor=${vendedor.vendedor_id}`
+  dom.window.location.hash = `#/pedidos?vendedor=${banco.vendedores[0].id}`
   await espera(700)
   const textoFiltroVendedor = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const filtroVendedorOk =
@@ -549,41 +519,47 @@ async function main() {
     `  ${filtroVendedorOk ? '✅' : '❌'} Pedidos aceita ?vendedor= e avisa de quem está mostrando os pedidos`,
   )
 
-  // a tela Equipe precisa abrir a janela de criar conta (por ela o dono registra a equipe)
+  // a tela do proprietário cadastra FUNCIONÁRIOS (sem conta) e outros acessos de dono
   dom.window.location.hash = '#/equipe'
-  await espera(700)
-  const abriuNovaConta = clicar(raiz, 'Nova conta')
-  await espera(500)
-  const textoNovaConta = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const novaContaOk =
-    abriuNovaConta &&
-    textoNovaConta.includes('Nova conta de acesso') &&
-    textoNovaConta.includes('Já trabalha aqui?') &&
-    textoNovaConta.includes('criar vendedor novo com este nome')
-  if (!novaContaOk) falhas++
-  console.log(`\n  ${novaContaOk ? '✅' : '❌'} Equipe abre a janela “Nova conta” com o vínculo e o histórico`)
+  await espera(800)
+  const textoEquipe = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const funcionariosOk =
+    textoEquipe.includes('Funcionários e acessos') &&
+    textoEquipe.includes(nomeDoVinculo) &&
+    textoEquipe.includes(outroVendedor) &&
+    textoEquipe.includes('Novo funcionário') &&
+    textoEquipe.includes('Acessos de proprietário') &&
+    textoEquipe.includes('Renomear')
+  if (!funcionariosOk) falhas++
+  console.log(`\n  ${funcionariosOk ? '✅' : '❌'} a tela lista os funcionários (sem conta/senha) e os acessos de dono`)
+  if (!funcionariosOk) console.log('     TEXTO:', textoEquipe.slice(0, 260))
 
-  // pela mesma janela o dono cria OUTRO acesso de proprietário (sócio/gerente)
+  const abriuNovoAcesso = clicar(raiz, 'Novo acesso')
+  await espera(600)
+  const textoNovoAcesso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const novoDonoOk =
-    textoNovaConta.includes('Proprietário — vê tudo') && textoNovaConta.includes('Tipo de acesso')
+    abriuNovoAcesso &&
+    textoNovoAcesso.includes('Novo acesso de proprietário') &&
+    textoNovoAcesso.includes('Usuário (login)') &&
+    textoNovoAcesso.includes('Repita a senha')
   if (!novoDonoOk) falhas++
-  console.log(`  ${novoDonoOk ? '✅' : '❌'} “Nova conta” deixa criar outro acesso de proprietário (vê tudo)` )
+  console.log(`  ${novoDonoOk ? '✅' : '❌'} a janela “Novo acesso” cria outro proprietário com usuário e senha`)
+  if (!novoDonoOk) console.log('     TEXTO:', textoNovoAcesso.slice(0, 260))
 
-  // a aba "Meu acesso" das configurações (só o proprietário) precisa abrir
+  // a aba "Meu acesso" das configurações (só do proprietário) precisa abrir
   dom.window.location.hash = '#/configuracoes'
-  await espera(700)
+  await espera(800)
   const abriuAcesso = clicar(raiz, 'Meu acesso')
   await espera(400)
   const textoAcesso = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const acessoOk =
     abriuAcesso &&
     textoAcesso.includes('Trocar a minha senha') &&
-    textoAcesso.includes('Meu nome de usuário') &&
-    // o dono encontra ali o caminho para criar um segundo login de proprietário
     textoAcesso.includes('Outro acesso de proprietário') &&
-    textoAcesso.includes('Abrir Equipe para criar outro proprietário')
+    textoAcesso.includes('Abrir Funcionários e acessos')
   if (!acessoOk) falhas++
-  console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” abre a troca de usuário/senha e o atalho para outro proprietário`)
+  console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” troca a senha do dono e aponta outro proprietário`)
+  if (!acessoOk) console.log('     TEXTO:', textoAcesso.slice(0, 260))
 
   // a aba Nuvem mostra o assistente de conexão (3 passos) quando está no modo local
   await clicar(raiz, 'Nuvem')
@@ -612,9 +588,8 @@ async function main() {
   if (!tabelaOk) falhas++
   console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela oficial e o botão de restaurar`)
 
-  // agora entra como vendedor
-  sessaoDe(vendedor.id)
-  dom.window.location.reload?.()
+  // ---------- equipe sem login: o sistema abre direto, sem pedir senha ----------
+  dom.window.localStorage.removeItem('altoprints:sessao')
   const { StoreProvider: SP2 } = await import('../src/lib/store')
   const { AuthProvider: AP2 } = await import('../src/lib/auth')
   const raiz2 = dom.window.document.createElement('div')
@@ -629,141 +604,88 @@ async function main() {
   )
   await espera(2200)
   dom.window.location.hash = '#/'
-  await espera(700)
-  const textoVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  await espera(900)
+  const textoEquipeSemLogin = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
 
   const checagens: [string, boolean][] = [
-    ['vendedor vê "Minha área"', textoVendedor.includes('Minha área') || textoVendedor.includes('Sua área')],
-    ['vendedor vê o nome dele na saudação', textoVendedor.toLowerCase().includes('vendedor teste')],
-    ['vendedor NÃO vê o Painel do proprietário', !textoVendedor.includes('Painel do proprietário')],
-    ['vendedor não vê Equipe nem Configurações no menu', !textoVendedor.includes('Configurações')],
+    [
+      'sem login o sistema já abre no dia a dia (Pedidos)',
+      textoEquipeSemLogin.includes('Pedidos') && !textoEquipeSemLogin.includes('Entrar no sistema'),
+    ],
+    ['a equipe vê “Login proprietário” no topo', textoEquipeSemLogin.includes('Login proprietário')],
+    ['a equipe NÃO vê o Painel do proprietário', !textoEquipeSemLogin.includes('Painel do proprietário')],
+    ['a equipe não vê Configurações no menu', !textoEquipeSemLogin.includes('Configurações')],
+    ['a equipe vê a fila inteira da loja', textoEquipeSemLogin.includes(outroVendedor)],
   ]
-  console.log('\n  Vendedor (vê só o dele)')
+  console.log('\n  Equipe (usa o sistema sem login)')
   for (const [rotulo, ok] of checagens) {
     if (!ok) falhas++
     console.log(`  ${ok ? '✅' : '❌'} ${rotulo}`)
   }
 
-  const rotasVendedor: { rota: string; esperado: 'liberada' | 'proprietario' | 'nao-liberada' }[] = [
+  const rotasEquipe: { rota: string; esperado: 'liberada' | 'proprietario' }[] = [
     { rota: '/pedidos', esperado: 'liberada' },
     { rota: '/clientes', esperado: 'liberada' },
-    { rota: '/por-vendedor', esperado: 'liberada' },
-    { rota: '/relatorio', esperado: 'liberada' },
+    { rota: '/pedido/novo', esperado: 'liberada' },
     { rota: '/para-imprimir', esperado: 'liberada' },
+    { rota: '/relatorio', esperado: 'proprietario' },
+    { rota: '/por-vendedor', esperado: 'proprietario' },
     { rota: '/equipe', esperado: 'proprietario' },
     { rota: '/configuracoes', esperado: 'proprietario' },
   ]
-  for (const { rota, esperado } of rotasVendedor) {
+  for (const { rota, esperado } of rotasEquipe) {
     const antes = erros.length
     dom.window.location.hash = `#${rota}`
-    await espera(600)
+    await espera(650)
     const texto = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
     const novos = erros.slice(antes)
     const ok =
       texto.length > 200 &&
       !novos.length &&
-      (esperado === 'liberada' ||
-        (esperado === 'proprietario' && texto.includes('do proprietário')) ||
-        (esperado === 'nao-liberada' && texto.includes('não está liberada')))
+      (esperado === 'liberada' || texto.includes('do proprietário'))
     if (!ok) falhas++
     console.log(
-      `  ${ok ? '✅' : '❌'} ${rota.padEnd(28)} ${
-        esperado === 'liberada'
-          ? 'liberada'
-          : esperado === 'proprietario'
-            ? 'só do proprietário'
-            : 'bloqueada (não liberada)'
-      }`,
+      `  ${ok ? '✅' : '❌'} ${rota.padEnd(28)} ${esperado === 'liberada' ? 'liberada' : 'só do proprietário'}`,
     )
     if (!ok) console.log('     TEXTO:', texto.slice(0, 160))
   }
 
-  // o relatório do vendedor só mostra os pedidos dele (sem citar o outro vendedor)
-  dom.window.location.hash = '#/relatorio'
-  await espera(700)
-  clicar(raiz2, 'Meu desempenho')
-  await espera(500)
-  const textoRelatorioVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
-  const relatorioSoDele =
-    textoRelatorioVendedor.includes(nomeDoVinculo) && !textoRelatorioVendedor.includes(outroVendedor)
-  if (!relatorioSoDele) falhas++
-  console.log(`  ${relatorioSoDele ? '✅' : '❌'} relatório do vendedor mostra só os dados de ${nomeDoVinculo}`)
-
-  // a tela de impressão liberada não mostra valores em dinheiro
-  const areaImpressaVendedor = raiz2.querySelector('.print-area')
-  const textoImpressoVendedor = (areaImpressaVendedor?.textContent ?? '').replace(/\s+/g, ' ')
-  const impressoSoDele =
-    textoImpressoVendedor.includes('SUA COMISSÃO NO PERÍODO') &&
-    textoImpressoVendedor.includes(nomeDoVinculo) &&
-    !textoImpressoVendedor.includes(outroVendedor)
-  if (!impressoSoDele) falhas++
-  console.log(
-    `  ${impressoSoDele ? '✅' : '❌'} relatório impresso do funcionário mostra só a comissão de ${nomeDoVinculo}`,
-  )
-
-  // quem cuida da produção (fila liberada) vê a fila de todo mundo em Pedidos
+  // a equipe vê os pedidos e clientes de todos (é uma loja só) e registra a fila
+  // escolhendo o próprio nome na lista de funcionários
   dom.window.location.hash = '#/pedidos'
   await espera(900)
-  const textoFilaVendedor = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
-  const veAFilaToda = textoFilaVendedor.includes(outroVendedor) && textoFilaVendedor.includes('Entregues')
+  const textoFilaEquipe = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const veAFilaToda = textoFilaEquipe.includes(outroVendedor) && textoFilaEquipe.includes('Entregues')
   if (!veAFilaToda) falhas++
-  console.log(
-    `  ${veAFilaToda ? '✅' : '❌'} fila liberada: ${nomeDoVinculo} vê a fila completa (com ${outroVendedor})`,
-  )
+  console.log(`  ${veAFilaToda ? '✅' : '❌'} a equipe vê a fila completa (com ${outroVendedor})`)
 
-  // tela de login (sem sessão)
-  dom.window.localStorage.removeItem('altoprints:sessao')
-  const raiz3 = dom.window.document.createElement('div')
-  dom.window.document.body.appendChild(raiz3)
-  const { StoreProvider: SP3 } = await import('../src/lib/store')
-  const { AuthProvider: AP3 } = await import('../src/lib/auth')
-  const root3 = createRoot(raiz3 as unknown as Element)
-  root3.render(
-    React.createElement(
-      HashRouter,
-      null,
-      React.createElement(SP3, null, React.createElement(AP3, null, React.createElement(App))),
-    ),
-  )
-  await espera(2000)
-  const textoLogin = (raiz3.textContent ?? '').replace(/\s+/g, ' ')
-  const temLogin = textoLogin.includes('Entrar no sistema') || textoLogin.includes('criar meu acesso')
-  if (!temLogin) falhas++
-  console.log(`\n  ${temLogin ? '✅' : '❌'} sem sessão, o sistema pede login`)
+  dom.window.location.hash = '#/clientes'
+  await espera(700)
+  const textoClientesEquipe = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const veClientesTodos = textoClientesEquipe.includes('Clientes') && textoClientesEquipe.length > 500
+  if (!veClientesTodos) falhas++
+  console.log(`  ${veClientesTodos ? '✅' : '❌'} a equipe vê a carteira de clientes da loja`)
 
-  const mostraListaNomes =
-    textoLogin.includes('Quem está usando?') &&
-    textoLogin.includes('VENDEDOR TESTE') &&
-    !textoLogin.includes('DONO TESTE')
-  if (!mostraListaNomes) falhas++
-  console.log(
-    `  ${mostraListaNomes ? '✅' : '❌'} tela inicial mostra os nomes dos funcionários (sem listar o proprietário)`,
-  )
+  dom.window.location.hash = '#/pedido/novo'
+  await espera(900)
+  const textoNovoPedidoEquipe = (raiz2.textContent ?? '').replace(/\s+/g, ' ')
+  const escolheNomeOk =
+    textoNovoPedidoEquipe.includes('Seu nome (funcionário)') &&
+    textoNovoPedidoEquipe.includes(nomeDoVinculo) &&
+    textoNovoPedidoEquipe.includes(outroVendedor) &&
+    !textoNovoPedidoEquipe.includes('Vendedor responsável')
+  if (!escolheNomeOk) falhas++
+  console.log(`  ${escolheNomeOk ? '✅' : '❌'} ao registrar a fila a equipe escolhe o próprio nome na lista`)
+  if (!escolheNomeOk) console.log('     TEXTO:', textoNovoPedidoEquipe.slice(0, 240))
 
-  // a tela comum não pode revelar a porta do proprietário
-  const naoRevelaPorta =
-    !textoLogin.toLowerCase().includes('proprietário') &&
-    !textoLogin.toLowerCase().includes('proprietario') &&
-    !(raiz3.innerHTML ?? '').includes('/administracao')
-  if (!naoRevelaPorta) falhas++
-  console.log(`  ${naoRevelaPorta ? '✅' : '❌'} tela comum não menciona nem aponta para a administração`)
-
-  // a versão aparece na tela de login (é como conferimos se o aparelho está atualizado)
   const { VERSAO } = await import('../src/lib/versao')
-  const mostraVersao = textoLogin.includes(`versão ${VERSAO}`)
+  const mostraVersao = textoEquipeSemLogin.includes(`v${VERSAO}`)
   if (!mostraVersao) falhas++
-  console.log(`  ${mostraVersao ? '✅' : '❌'} tela de login mostra a versão ${VERSAO}`)
-
-  // os exemplos de nome de pessoa saíram dos campos de login
-  const semExemplosDeNome = !raiz3.innerHTML.includes('ex.: jessica') && !raiz3.innerHTML.includes('Ex.: JESSICA')
-  if (!semExemplosDeNome) falhas++
-  console.log(`  ${semExemplosDeNome ? '✅' : '❌'} campos de login sem os exemplos com nome de pessoa`)
+  console.log(`  ${mostraVersao ? '✅' : '❌'} o rodapé mostra a versão ${VERSAO} (conferir se o aparelho está atualizado)`)
 
   // porta administrativa com um dono já existente: pede o login do dono
   // (desmonta as telas anteriores: elas continuariam reagindo ao endereço e mudariam a rota)
   root1.unmount()
-  root2.unmount()
-  root3.unmount()
   await espera(150)
   const raiz4 = dom.window.document.createElement('div')
   dom.window.document.body.appendChild(raiz4)
@@ -782,14 +704,14 @@ async function main() {
   await espera(2000)
   const textoPorta = (raiz4.textContent ?? '').replace(/\s+/g, ' ')
   const portaOk =
-    textoPorta.includes('Administração') &&
-    textoPorta.includes('Entrar como administrador') &&
-    // quem descobrir a porta não encontra lista de nomes nem cadastro na tela
-    !textoPorta.includes('Criar meu acesso') &&
+    textoPorta.includes('Login proprietário') &&
+    textoPorta.includes('Entrar como proprietário') &&
+    // quem descobrir a porta não encontra lista de nomes nem dados na tela
+    !textoPorta.includes('Criar o acesso do proprietário') &&
     !textoPorta.includes(outroVendedor) &&
     !textoPorta.includes('Faturamento')
   if (!portaOk) falhas++
-  console.log(`  ${portaOk ? '✅' : '❌'} porta administrativa pede o login do proprietário (sem dados na tela)`)
+  console.log(`  ${portaOk ? '✅' : '❌'} o canto “Login proprietário” pede usuário e senha (sem dados na tela)`)
   if (!portaOk) console.log('     TEXTO:', textoPorta.slice(0, 220))
 
   // sem nenhum dono cadastrado, a porta oferece criar o primeiro acesso
@@ -815,16 +737,19 @@ async function main() {
   )
   await espera(2000)
   const textoCriar = (raiz5.textContent ?? '').replace(/\s+/g, ' ')
-  const criarOk = textoCriar.includes('Criar acesso do proprietário') && textoCriar.includes('Acesso restrito')
+  const criarOk =
+    textoCriar.includes('Criar o acesso do proprietário') &&
+    textoCriar.includes('Login do proprietário') &&
+    !textoCriar.includes('Entrar como proprietário')
   if (!criarOk) falhas++
   console.log(`  ${criarOk ? '✅' : '❌'} sem dono cadastrado, a porta cria o primeiro acesso do proprietário`)
   if (!criarOk) console.log('     TEXTO:', textoCriar.slice(0, 220))
 
-  // 5 toques no logo (na tela de login) abrem a porta administrativa
+  // 5 toques no logo (no sistema aberto para a equipe) abrem a porta do proprietário
   root5.unmount()
   await espera(150)
   dom.window.localStorage.removeItem('altoprints:sessao')
-  dom.window.location.hash = '#/login'
+  dom.window.location.hash = '#/pedidos'
   await espera(120)
   const raiz6 = dom.window.document.createElement('div')
   dom.window.document.body.appendChild(raiz6)
@@ -838,14 +763,15 @@ async function main() {
     ),
   )
   await espera(2000)
-  const logoTap = [...raiz6.querySelectorAll('button')].find((b) => (b.title ?? '') === 'Altoprints')
+  const logoTap = [...raiz6.querySelectorAll('header button')].find((b) => (b.getAttribute('title') ?? '') === 'Altoprints') ?? null
   for (let i = 0; i < 5; i++) {
     logoTap?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
-    await espera(60)
+    await espera(120)
   }
   await espera(800)
   const textoToques = (raiz6.textContent ?? '').replace(/\s+/g, ' ')
-  const toquesOk = textoToques.includes('Criar acesso do proprietário') || textoToques.includes('Administração')
+  const toquesOk =
+    textoToques.includes('Criar o acesso do proprietário') || textoToques.includes('Entrar como proprietário')
   if (!toquesOk) falhas++
   console.log(`  ${toquesOk ? '✅' : '❌'} 5 toques no logo abrem a porta do proprietário`)
   if (!toquesOk) console.log('     TEXTO:', textoToques.slice(0, 200))

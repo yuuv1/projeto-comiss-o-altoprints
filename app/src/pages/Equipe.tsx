@@ -1,9 +1,10 @@
 import {
   Crown,
   Eye,
+  EyeOff,
   KeyRound,
   Pencil,
-  Save,
+  Plus,
   ShieldCheck,
   ShieldOff,
   Trash2,
@@ -12,644 +13,606 @@ import {
   Users,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
-import { dataBR, moeda } from '../lib/format'
+import { dataBR, moeda, numeroBR } from '../lib/format'
 import { calcularComissao } from '../lib/comissao'
-import {
-  filasDaComissao,
-  DESCRICAO_TELA,
-  FAIXAS_PADRAO,
-  LABEL_PAPEL,
-  LABEL_TELA,
-  TELAS_PADRAO,
-  telasDoUsuario,
-  type TelasAcesso,
-  type Usuario,
-} from '../lib/types'
+import { FAIXAS_PADRAO, filasDaComissao, type Vendedor } from '../lib/types'
 import {
   BarraAcoes,
   Botao,
   Campo,
+  Cartao,
   CartaoResumo,
   Entrada,
   Etiqueta,
   Modal,
-  Selecao,
   TituloPagina,
   Vazio,
   useConfirmacao,
 } from '../components/ui'
 
-/** Equipe também pode aparecer como aba dentro de Configurações */
+/**
+ * Funcionários e acessos (só o proprietário).
+ *
+ *  • FUNCIONÁRIOS — os nomes que aparecem na hora de registrar uma fila. Não têm
+ *    conta nem senha: a pessoa escolhe o próprio nome no pedido.
+ *  • ACESSOS DE PROPRIETÁRIO — quem pode entrar com usuário e senha e ver tudo.
+ */
 export default function Equipe({ embutido = false }: { embutido?: boolean } = {}) {
-  const { db, avisar } = useStore()
-  const navegar = useNavigate()
-  const {
-    usuario: eu,
-    redefinirSenha,
-    removerSenha,
-    atualizarVinculo,
-    salvarTelas,
-    alternarAtivo,
-    excluirUsuario,
-    criarContaComoDono,
-    visualizarComo,
-  } = useAuth()
+  const { db, salvarVendedor, excluirVendedor, avisar } = useStore()
+  const { usuario, criarOutroProprietario, redefinirSenha, alternarAtivo, excluirUsuario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
+
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
+  const mesAtual = new Date().toISOString().slice(0, 7)
+  // mesmo critério do relatório: vale a data do pagamento; sem ela, a do pedido
+  const mesDaVenda = (p: { data_pagamento?: string | null; data_pedido?: string | null }) =>
+    (p.data_pagamento || p.data_pedido || '').slice(0, 7)
 
-  const [editando, setEditando] = useState<Usuario | null>(null)
-  const [vendedorId, setVendedorId] = useState('')
-  const [novaSenha, setNovaSenha] = useState('')
+  /* ------------------------------ funcionários ------------------------------ */
+
+  const [novoNome, setNovoNome] = useState('')
+  const [salvandoNome, setSalvandoNome] = useState(false)
+  const [renomeando, setRenomeando] = useState<Vendedor | null>(null)
+  const [nomeEditado, setNomeEditado] = useState('')
+
+  const funcionarios = useMemo(() => {
+    return db.vendedores
+      .map((v) => {
+        const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
+        const noMes = pedidos.filter((p) => mesDaVenda(p) === mesAtual)
+        const concluidos = filasDaComissao(noMes)
+        const ultima = pedidos
+          .map((p) => p.data_pedido)
+          .filter(Boolean)
+          .sort()
+          .pop()
+        return {
+          vendedor: v,
+          total: pedidos.length,
+          pedidos: noMes.length,
+          faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
+          comissao: calcularComissao(concluidos, faixas, semMetragem).total,
+          ultima: ultima ?? null,
+        }
+      })
+      .sort((a, b) => b.faturamento - a.faturamento || a.vendedor.nome.localeCompare(b.vendedor.nome))
+  }, [db.pedidos, db.vendedores, faixas, mesAtual, semMetragem])
+
+  const adicionarFuncionario = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSalvandoNome(true)
+    try {
+      await salvarVendedor({ nome: novoNome })
+      setNovoNome('')
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
+    } finally {
+      setSalvandoNome(false)
+    }
+  }
+
+  const salvarRenomeado = async () => {
+    if (!renomeando) return
+    setSalvandoNome(true)
+    try {
+      await salvarVendedor({ nome: nomeEditado }, renomeando.id)
+      setRenomeando(null)
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
+    } finally {
+      setSalvandoNome(false)
+    }
+  }
+
+  const pedirExclusaoFuncionario = async (v: Vendedor, pedidos: number) => {
+    if (pedidos > 0) {
+      avisar(
+        `${v.nome} tem ${pedidos} pedido(s) no histórico. Para não perder a comissão já lançada, renomeie em vez de excluir.`,
+        'erro',
+      )
+      return
+    }
+    const ok = await confirmar({
+      titulo: `Excluir ${v.nome}?`,
+      mensagem: 'O nome sai da lista de funcionários. Como não há pedidos no histórico dele, nada é perdido.',
+      textoBotao: 'Excluir',
+    })
+    if (ok) await excluirVendedor(v.id)
+  }
+
+  /* --------------------------- acessos de proprietário --------------------------- */
+
+  const donos = useMemo(
+    () => db.usuarios.filter((u) => u.papel === 'proprietario').sort((a, b) => a.nome.localeCompare(b.nome)),
+    [db.usuarios],
+  )
+
+  const [criandoDono, setCriandoDono] = useState(false)
+  const [donoNome, setDonoNome] = useState('')
+  const [donoUsuario, setDonoUsuario] = useState('')
+  const [donoSenha, setDonoSenha] = useState('')
+  const [donoRepetir, setDonoRepetir] = useState('')
+  const [senhaDe, setSenhaDe] = useState<null | { id: string; nome: string }>(null)
+  const [senhaNova, setSenhaNova] = useState('')
+  const [senhaRepetida, setSenhaRepetida] = useState('')
+  const [mostrarSenha, setMostrarSenha] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
-  const [criando, setCriando] = useState(false)
-  const [novoNome, setNovoNome] = useState('')
-  const [novoUsuario, setNovoUsuario] = useState('')
-  const [senhaNovaConta, setSenhaNovaConta] = useState('')
-  const [novoVendedor, setNovoVendedor] = useState('')
-  const [novoAdmin, setNovoAdmin] = useState(false)
-  /** a equipe entra sem senha (tocando no nome); o dono pode exigir senha por conta */
-  const [novaSemSenha, setNovaSemSenha] = useState(true)
-
-  const abrirNovaConta = () => {
-    setNovoNome('')
-    setNovoUsuario('')
-    setSenhaNovaConta('')
-    setNovoVendedor('')
-    setNovoAdmin(false)
-    setNovaSemSenha(true)
-    setCriando(true)
+  const abrirNovoDono = () => {
+    setDonoNome('')
+    setDonoUsuario('')
+    setDonoSenha('')
+    setDonoRepetir('')
+    setMostrarSenha(false)
+    setCriandoDono(true)
   }
 
-  const salvarNovaConta = async () => {
+  const salvarNovoDono = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (donoSenha !== donoRepetir) return avisar('As duas senhas precisam ser iguais.', 'erro')
     setSalvando(true)
     try {
-      await criarContaComoDono({
-        nome: novoNome,
-        usuario: novoUsuario,
-        senha: senhaNovaConta,
-        vendedorId: novoVendedor,
-        administrador: novoAdmin,
-        semSenha: novaSemSenha && !novoAdmin,
-      })
-      setCriando(false)
-    } catch (e) {
-      avisar((e as Error).message, 'erro')
+      await criarOutroProprietario({ nome: donoNome, usuario: donoUsuario, senha: donoSenha })
+      setCriandoDono(false)
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
     } finally {
       setSalvando(false)
     }
   }
 
-  const [telas, setTelas] = useState<TelasAcesso>(TELAS_PADRAO)
-
-  const abrirEdicao = (u: Usuario) => {
-    setEditando(u)
-    setVendedorId(u.vendedor_id || '')
-    setNovaSenha('')
-    setTelas(telasDoUsuario(u))
-  }
-
-  const salvarPermissoesTelas = async () => {
-    if (!editando) return
+  const salvarNovaSenha = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!senhaDe) return
+    if (senhaNova !== senhaRepetida) return avisar('As duas senhas precisam ser iguais.', 'erro')
     setSalvando(true)
     try {
-      await salvarTelas(editando.id, telas)
+      await redefinirSenha(senhaDe.id, senhaNova)
+      setSenhaDe(null)
+      setSenhaNova('')
+      setSenhaRepetida('')
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
     } finally {
       setSalvando(false)
     }
   }
 
-  const alternarTela = (tela: keyof TelasAcesso) => setTelas((t) => ({ ...t, [tela]: !t[tela] }))
-
-  const salvarVinculo = async () => {
-    if (!editando) return
-    setSalvando(true)
+  const excluirDono = async (id: string, nome: string) => {
+    const ok = await confirmar({
+      titulo: `Excluir o acesso de ${nome}?`,
+      mensagem: 'Esta pessoa deixa de poder entrar como proprietário. Os pedidos e clientes continuam intactos.',
+      textoBotao: 'Excluir acesso',
+    })
+    if (!ok) return
     try {
-      await atualizarVinculo(editando.id, vendedorId)
-      setEditando(null)
-    } finally {
-      setSalvando(false)
+      await excluirUsuario(id)
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
     }
   }
 
-  const salvarNovaSenha = async () => {
-    if (!editando) return
-    setSalvando(true)
+  const alterarAtivo = async (id: string, ativo: boolean) => {
     try {
-      await redefinirSenha(editando.id, novaSenha)
-      setNovaSenha('')
-      setEditando(null)
-    } catch (e) {
-      avisar((e as Error).message, 'erro')
-    } finally {
-      setSalvando(false)
+      await alternarAtivo(id, ativo)
+    } catch (erro) {
+      avisar((erro as Error).message, 'erro')
     }
   }
 
-  const contas = [...db.usuarios].sort((a, b) => a.papel.localeCompare(b.papel) || a.nome.localeCompare(b.nome))
-  const vendedores = contas.filter((c) => c.papel === 'vendedor')
-
-  /** vendedores que ainda não têm acesso (com o histórico, para o dono ver o que a conta vai enxergar) */
-  const semAcesso = useMemo(
-    () =>
-      db.vendedores
-        .filter((v) => !db.usuarios.some((u) => u.vendedor_id === v.id))
-        .map((v) => {
-          const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
-          const pagos = filasDaComissao(pedidos)
-          return {
-            id: v.id,
-            nome: v.nome,
-            pedidos: pedidos.length,
-            faturamento: pagos.reduce((s, p) => s + Number(p.valor || 0), 0),
-          }
-        })
-        .sort((a, b) => b.pedidos - a.pedidos),
-    [db.pedidos, db.usuarios, db.vendedores],
-  )
-  const escolhido = semAcesso.find((v) => v.id === novoVendedor)
-  const comAcesso = db.vendedores.filter((v) => db.usuarios.some((u) => u.vendedor_id === v.id))
+  const totalComissao = funcionarios.reduce((s, f) => s + f.comissao, 0)
 
   return (
     <>
       {embutido ? (
         <BarraAcoes>
-          <Botao icone={UserPlus} onClick={abrirNovaConta}>
-            Nova conta
+          <Botao tamanho="sm" variante="secundario" icone={Plus} onClick={() => document.getElementById('novo-funcionario')?.focus()}>
+            Novo funcionário
+          </Botao>
+          <Botao tamanho="sm" icone={Crown} onClick={abrirNovoDono}>
+            Novo acesso de proprietário
           </Botao>
         </BarraAcoes>
       ) : (
         <TituloPagina
           icone={Users}
-          titulo="Equipe"
-          subtitulo="Contas de acesso, vínculo com o vendedor, senhas e liberação."
+          titulo="Funcionários e acessos"
+          subtitulo="Os funcionários não têm login: escolhem o próprio nome ao registrar uma fila. Só o proprietário entra com usuário e senha."
           acoes={
-            <Botao icone={UserPlus} onClick={abrirNovaConta}>
-              Nova conta
-            </Botao>
+            <>
+              <Botao variante="secundario" icone={Crown} onClick={abrirNovoDono}>
+                Novo acesso de proprietário
+              </Botao>
+              <Botao icone={UserPlus} onClick={() => document.getElementById('novo-funcionario')?.focus()}>
+                Novo funcionário
+              </Botao>
+            </>
           }
         />
       )}
 
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <CartaoResumo titulo="Contas" valor={contas.length} icone={Users} gradiente="from-pink-500 to-purple-600" />
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <CartaoResumo
-          titulo="Vendedores com acesso"
-          valor={vendedores.filter((v) => v.ativo).length}
-          icone={ShieldCheck}
-          gradiente="from-emerald-500 to-green-600"
+          titulo="Funcionários"
+          valor={funcionarios.length}
+          icone={Users}
+          gradiente="from-pink-500 to-purple-600"
+          sub="nomes que aparecem nos pedidos"
         />
         <CartaoResumo
-          titulo="Desativados"
-          valor={contas.filter((c) => !c.ativo).length}
-          icone={ShieldOff}
+          titulo="Comissão do mês"
+          valor={moeda(totalComissao)}
+          icone={UserCheck}
           gradiente="from-amber-500 to-orange-600"
+          sub="filas concluídas"
         />
         <CartaoResumo
-          titulo="Proprietários"
-          valor={contas.filter((c) => c.papel === 'proprietario').length}
+          titulo="Acessos de proprietário"
+          valor={donos.length}
           icone={Crown}
           gradiente="from-violet-500 to-indigo-600"
+          sub="quem entra com usuário e senha"
         />
       </div>
 
-      {contas.length === 0 ? (
-        <Vazio
-          icone={UserPlus}
-          titulo="Nenhuma conta criada ainda"
-          descricao="Use “Nova conta” para registrar quem já trabalha aqui (com a senha que a pessoa escolher) ou peça para cada um criar o próprio acesso na tela de entrada."
-          acao={
-            <Botao icone={UserPlus} onClick={abrirNovaConta}>
-              Nova conta
-            </Botao>
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {contas.map((c) => {
-            const pedidos = db.pedidos.filter((p) => p.vendedor_id === c.vendedor_id)
-            const pagos = filasDaComissao(pedidos)
-            const comissao = calcularComissao(pagos, faixas, semMetragem)
-            const vendedor = db.vendedores.find((v) => v.id === c.vendedor_id)
-            return (
-              <div
-                key={c.id}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-hover dark:border-slate-800 dark:bg-slate-900"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-sm font-black text-white">
-                  {c.nome.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-[190px] flex-1">
-                  <p className="flex flex-wrap items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-                    {c.nome}
-                    {c.papel === 'proprietario' ? (
-                      <Etiqueta className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300" icone={Crown}>
-                        Proprietário
-                      </Etiqueta>
-                    ) : (
-                      <Etiqueta className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300">
-                        Vendedor
-                      </Etiqueta>
-                    )}
-                    {c.papel === 'vendedor' ? (
-                      c.sem_senha ? (
-                        <Etiqueta
-                          className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
-                          icone={UserCheck}
-                        >
-                          entra pelo nome (sem senha)
-                        </Etiqueta>
-                      ) : (
-                        <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400" icone={KeyRound}>
-                          com senha
-                        </Etiqueta>
-                      )
-                    ) : null}
-                    {!c.ativo ? (
-                      <Etiqueta className="border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
-                        Desativado
-                      </Etiqueta>
-                    ) : null}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    usuário: <b>{c.usuario}</b> • desde {dataBR(c.criado_em)}
-                    {c.papel === 'vendedor' ? ` • vendedor: ${vendedor?.nome ?? 'sem vínculo'}` : ''}
-                  </p>
-                </div>
-
-                {c.papel === 'vendedor' ? (
-                  <div className="text-right text-xs">
-                    <p className="font-bold text-emerald-600 dark:text-emerald-400">{moeda(comissao.total)} de comissão</p>
-                    <p className="text-slate-400 dark:text-slate-500">
-                      {pagos.length} na conta • {pedidos.length} pedidos
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-sky-600 dark:text-sky-400">
-                      {(() => {
-                        const liberadas = (Object.keys(LABEL_TELA) as (keyof TelasAcesso)[]).filter(
-                          (t) => telasDoUsuario(c)[t],
-                        )
-                        return liberadas.length
-                          ? `telas: ${liberadas.map((t) => LABEL_TELA[t].split(' (')[0]).join(' · ')}`
-                          : 'sem telas extras liberadas'
-                      })()}
-                    </p>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-wrap gap-1.5">
-                  {c.papel === 'vendedor' && c.ativo ? (
-                    <Botao
-                      tamanho="sm"
-                      variante="secundario"
-                      icone={Eye}
-                      title={`Abrir o sistema exatamente como ${c.nome} vê (só visualização)`}
-                      onClick={() => {
-                        visualizarComo(c.id)
-                        navegar('/')
-                      }}
-                    >
-                      Ver como
-                    </Botao>
-                  ) : null}
-                  <Botao tamanho="sm" variante="secundario" icone={Pencil} onClick={() => abrirEdicao(c)}>
-                    Vínculo e senha
-                  </Botao>
-                  {c.id !== eu?.id ? (
-                    <>
-                      <Botao
-                        tamanho="sm"
-                        variante={c.ativo ? 'ghost' : 'sucesso'}
-                        icone={c.ativo ? ShieldOff : ShieldCheck}
-                        onClick={async () => {
-                          try {
-                            await alternarAtivo(c.id, !c.ativo)
-                          } catch (e) {
-                            avisar((e as Error).message, 'erro')
-                          }
-                        }}
-                      >
-                        {c.ativo ? 'Desativar' : 'Liberar'}
-                      </Botao>
-                      <Botao
-                        tamanho="sm"
-                        variante="ghost"
-                        className="text-rose-500 hover:bg-rose-50"
-                        icone={Trash2}
-                        title={
-                          c.papel === 'proprietario'
-                            ? 'Excluir este acesso de proprietário (o sistema nunca fica sem nenhum)'
-                            : 'Excluir este acesso'
-                        }
-                        onClick={async () => {
-                          const ok = await confirmar({
-                            titulo: `Excluir o acesso de ${c.nome}?`,
-                            mensagem:
-                              c.papel === 'proprietario'
-                                ? 'É um acesso de PROPRIETÁRIO (vê tudo). Os pedidos continuam salvos — só o acesso é apagado. O sistema não permite ficar sem nenhum proprietário ativo.'
-                                : 'Os pedidos dele continuam salvos no sistema — só o acesso é apagado. Se ele saiu da empresa, prefira “Desativar”.',
-                            textoBotao: 'Excluir acesso',
-                          })
-                          if (ok) {
-                            try {
-                              await excluirUsuario(c.id)
-                            } catch (e) {
-                              avisar((e as Error).message, 'erro')
-                            }
-                          }
-                        }}
-                      >
-                        Excluir
-                      </Botao>
-                    </>
-                  ) : (
-                    <Etiqueta className="border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                      é você
-                    </Etiqueta>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* ------------------------------ funcionários ------------------------------ */}
+      <Cartao hover={false} className="mb-4">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Funcionários</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Só o proprietário cadastra nomes novos. Eles não têm senha — escolhem o próprio nome no pedido.
+            </p>
+          </div>
         </div>
-      )}
 
-      <p className="mt-5 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-        <b>Como cada acesso funciona:</b> o vendedor entra <b>tocando no próprio nome</b> (sem senha) e vê apenas os
-        pedidos e a comissão dele. O proprietário entra com usuário e senha e vê tudo. Aqui você pode dar ou tirar a
-        senha de uma conta, desativar quem saiu e ligar cada acesso ao vendedor correspondente — é esse vínculo que
-        define quais pedidos aparecem para cada pessoa.
-        <br />
-        <b>Mais de um proprietário?</b> Pode: use <b>Nova conta</b> e escolha “Proprietário — vê tudo” (útil para sócio,
-        gerente ou para o escritório). O sistema só não deixa ficar <b>sem nenhum</b> proprietário ativo — por isso o
-        último não pode ser desativado nem excluído.
-      </p>
+        <form onSubmit={adicionarFuncionario} className="mb-3 flex flex-wrap items-end gap-2">
+          <Campo label="Novo funcionário" className="min-w-[220px] flex-1">
+            <Entrada
+              id="novo-funcionario"
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              placeholder="Nome (ex.: JESSICA)"
+              maxLength={40}
+            />
+          </Campo>
+          <Botao type="submit" icone={Plus} carregando={salvandoNome} disabled={!novoNome.trim()}>
+            Cadastrar
+          </Botao>
+        </form>
+
+        {funcionarios.length === 0 ? (
+          <Vazio
+            icone={Users}
+            titulo="Nenhum funcionário cadastrado"
+            descricao="Cadastre o primeiro nome acima — ele passa a aparecer na hora de registrar uma fila."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                  <th className="px-2 py-1.5">Funcionário</th>
+                  <th className="px-2 py-1.5 text-right">Pedidos</th>
+                  <th className="px-2 py-1.5 text-right">Faturamento</th>
+                  <th className="px-2 py-1.5 text-right">Comissão</th>
+                  <th className="px-2 py-1.5">Última venda</th>
+                  <th className="px-2 py-1.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {funcionarios.map(({ vendedor, total, pedidos, faturamento, comissao, ultima }) => (
+                  <tr
+                    key={vendedor.id}
+                    className="border-t border-slate-100 text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                  >
+                    <td className="px-2 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-[10px] font-black text-white">
+                          {vendedor.nome.slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="font-bold">{vendedor.nome}</span>
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold">
+                      {pedidos}
+                      <span className="block text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                        {total} no total
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold">{moeda(faturamento)}</td>
+                    <td className="px-2 py-2 text-right font-bold text-amber-600 dark:text-amber-400">
+                      {moeda(comissao)}
+                    </td>
+                    <td className="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">
+                      {ultima ? dataBR(ultima) : 'sem pedidos'}
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <Botao
+                          tamanho="sm"
+                          variante="secundario"
+                          icone={Pencil}
+                          onClick={() => {
+                            setRenomeando(vendedor)
+                            setNomeEditado(vendedor.nome)
+                          }}
+                        >
+                          Renomear
+                        </Botao>
+                        <Botao
+                          tamanho="sm"
+                          variante="ghost"
+                          className="text-rose-500 hover:bg-rose-50"
+                          icone={Trash2}
+                          onClick={() => void pedirExclusaoFuncionario(vendedor, total)}
+                        >
+                          Excluir
+                        </Botao>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Cartao>
+
+      {/* --------------------------- acessos de proprietário --------------------------- */}
+      <Cartao hover={false}>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Acessos de proprietário</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Entram pelo “Login proprietário” (topo da tela) e veem tudo. Dá para ter mais de um (sócio, escritório,
+              celular da dona).
+            </p>
+          </div>
+          <Botao tamanho="sm" variante="secundario" icone={Crown} onClick={abrirNovoDono}>
+            Novo acesso
+          </Botao>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                <th className="px-2 py-1.5">Nome</th>
+                <th className="px-2 py-1.5">Usuário</th>
+                <th className="px-2 py-1.5">Situação</th>
+                <th className="px-2 py-1.5">Criado em</th>
+                <th className="px-2 py-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {donos.map((dono) => {
+                const eu = dono.id === usuario?.id
+                return (
+                  <tr
+                    key={dono.id}
+                    className="border-t border-slate-100 text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                  >
+                    <td className="px-2 py-2">
+                      <span className="flex items-center gap-2 font-bold">
+                        <Crown className="h-3.5 w-3.5 text-violet-500" />
+                        {dono.nome}
+                        {eu ? (
+                          <Etiqueta className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300">
+                            você
+                          </Etiqueta>
+                        ) : null}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">{dono.usuario}</td>
+                    <td className="px-2 py-2">
+                      {dono.ativo ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <ShieldCheck className="h-3.5 w-3.5" /> ativo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                          <ShieldOff className="h-3.5 w-3.5" /> desativado
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-xs text-slate-500 dark:text-slate-400">{dataBR(dono.criado_em)}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {!eu ? (
+                          <Botao
+                            tamanho="sm"
+                            variante="secundario"
+                            icone={KeyRound}
+                            onClick={() => {
+                              setSenhaDe({ id: dono.id, nome: dono.nome })
+                              setSenhaNova('')
+                              setSenhaRepetida('')
+                              setMostrarSenha(false)
+                            }}
+                          >
+                            Redefinir senha
+                          </Botao>
+                        ) : null}
+                        {!eu ? (
+                          <Botao
+                            tamanho="sm"
+                            variante="ghost"
+                            onClick={() => void alterarAtivo(dono.id, !dono.ativo)}
+                          >
+                            {dono.ativo ? 'Desativar' : 'Ativar'}
+                          </Botao>
+                        ) : null}
+                        {!eu && donos.length > 1 ? (
+                          <Botao
+                            tamanho="sm"
+                            variante="ghost"
+                            className="text-rose-500 hover:bg-rose-50"
+                            icone={Trash2}
+                            onClick={() => void excluirDono(dono.id, dono.nome)}
+                          >
+                            Excluir
+                          </Botao>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+          A sua própria senha e o seu usuário ficam em <b>Configurações → Meu acesso</b>. O sistema nunca fica sem
+          nenhum proprietário ativo: o último não pode ser desativado nem excluído.
+        </p>
+      </Cartao>
+
+      {/* ------------------------------ janelas ------------------------------ */}
 
       <Modal
-        aberto={criando}
-        onFechar={() => setCriando(false)}
-        icone={UserPlus}
-        largura="max-w-lg"
-        titulo="Nova conta de acesso"
-        subtitulo="Use para cadastrar quem já trabalha aqui: combine a senha com a pessoa e digite aqui. Para criar mais um acesso de PROPRIETÁRIO (sócio, gerente, escritório), escolha “Proprietário — vê tudo” em Tipo de acesso."
-        rodape={
-          <>
-            <Botao variante="secundario" onClick={() => setCriando(false)}>
+        aberto={criandoDono}
+        onFechar={() => setCriandoDono(false)}
+        icone={Crown}
+        titulo="Novo acesso de proprietário"
+        subtitulo="Esta pessoa poderá entrar pelo “Login proprietário” e ver tudo."
+      >
+        <form onSubmit={salvarNovoDono} className="space-y-3">
+          <Campo label="Nome" obrigatorio>
+            <Entrada value={donoNome} onChange={(e) => setDonoNome(e.target.value)} placeholder="Nome de quem vai usar" required />
+          </Campo>
+          <Campo label="Usuário (login)" obrigatorio dica="Só letras, números, ponto, traço e underline.">
+            <Entrada
+              value={donoUsuario}
+              onChange={(e) => setDonoUsuario(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              placeholder="ex.: dona"
+              required
+            />
+          </Campo>
+          <Campo label="Senha" obrigatorio>
+            <div className="relative">
+              <Entrada
+                type={mostrarSenha ? 'text' : 'password'}
+                value={donoSenha}
+                onChange={(e) => setDonoSenha(e.target.value)}
+                placeholder="••••••"
+                className="pr-11"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarSenha((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                title={mostrarSenha ? 'Esconder senha' : 'Mostrar senha'}
+              >
+                {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </Campo>
+          <Campo label="Repita a senha" obrigatorio>
+            <Entrada
+              type={mostrarSenha ? 'text' : 'password'}
+              value={donoRepetir}
+              onChange={(e) => setDonoRepetir(e.target.value)}
+              placeholder="••••••"
+              required
+            />
+          </Campo>
+          <div className="flex justify-end gap-2 pt-1">
+            <Botao type="button" variante="secundario" onClick={() => setCriandoDono(false)}>
               Cancelar
             </Botao>
-            <Botao
-              icone={ShieldCheck}
-              onClick={salvarNovaConta}
-              carregando={salvando}
-              disabled={
-                !novoNome.trim() ||
-                !novoUsuario.trim() ||
-                ((novoAdmin || !novaSemSenha) && senhaNovaConta.length < 4)
-              }
-            >
+            <Botao type="submit" icone={ShieldCheck} carregando={salvando}>
               Criar acesso
             </Botao>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Campo label="Nome da pessoa" obrigatorio>
-              <Entrada value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome de quem vai usar o sistema" />
-            </Campo>
-            <Campo label="Usuário" obrigatorio dica="Só letras, números, ponto, traço e underline.">
-              <Entrada
-                value={novoUsuario}
-                onChange={(e) => setNovoUsuario(e.target.value)}
-                placeholder="Digite o usuário"
-                autoCapitalize="none"
-                autoCorrect="off"
-              />
-            </Campo>
-            <Campo
-              label="Senha"
-              obrigatorio={novoAdmin || !novaSemSenha}
-              dica={
-                novoAdmin
-                  ? 'O acesso de proprietário sempre usa senha (mínimo 4 caracteres).'
-                  : novaSemSenha
-                    ? 'Sem senha: a pessoa entra tocando no próprio nome.'
-                    : 'A senha que a pessoa escolheu (mínimo 4 caracteres).'
-              }
-            >
-              {novoAdmin || !novaSemSenha ? (
-                <Entrada value={senhaNovaConta} onChange={(e) => setSenhaNovaConta(e.target.value)} placeholder="••••••" />
-              ) : (
-                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  Esta conta vai entrar <b>sem senha</b> (tocando no nome).
-                </p>
-              )}
-            </Campo>
-            <Campo label="Tipo de acesso">
-              <Selecao value={novoAdmin ? 'admin' : 'vendedor'} onChange={(e) => setNovoAdmin(e.target.value === 'admin')}>
-                <option value="vendedor">Vendedor — vê só o que é dele</option>
-                <option value="admin">Proprietário — vê tudo (com senha)</option>
-              </Selecao>
-            </Campo>
           </div>
-
-          {novoAdmin ? null : (
-            <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={novaSemSenha}
-                onChange={(e) => setNovaSemSenha(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
-              />
-              <span>
-                <b>Entrar sem senha</b> (a pessoa toca no próprio nome na tela de entrada, como o resto da equipe).
-                <span className="block text-xs text-slate-400 dark:text-slate-500">
-                  Desmarque para esta conta usar senha. Dá para mudar depois em “Vínculo e senha”.
-                </span>
-              </span>
-            </label>
-          )}
-
-          {novoAdmin ? (
-            <p className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-              Esta conta é de <b>proprietário</b>: entra pela porta administrativa e vê todos os pedidos, relatórios e
-              configurações.
-            </p>
-          ) : (
-            <>
-              <Campo
-                label="Já trabalha aqui? (vínculo)"
-                dica="O vínculo define quais pedidos e comissões esta pessoa vê. Nomes já usados por outra conta não aparecem aqui."
-              >
-                <Selecao value={novoVendedor} onChange={(e) => setNovoVendedor(e.target.value)}>
-                  <option value="">Sou novo/no cadastro — criar vendedor novo com este nome</option>
-                  {semAcesso.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.nome} · {v.pedidos} pedido(s) · {moeda(v.faturamento)}
-                    </option>
-                  ))}
-                </Selecao>
-              </Campo>
-
-              {escolhido ? (
-                <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-                  Esta conta vai entrar vendo <b>{escolhido.pedidos}</b> pedido(s) de {escolhido.nome} —{' '}
-                  <b>{moeda(escolhido.faturamento)}</b> nas filas concluídas.
-                </p>
-              ) : (
-                <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
-                  Sem vínculo escolhido: o sistema cria um vendedor novo com o nome informado (a pessoa começa com a
-                  lista de pedidos vazia).
-                </p>
-              )}
-
-              {comAcesso.length ? (
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  Já têm acesso: {comAcesso.map((v) => v.nome).join(', ')}. Para trocar o vínculo ou a senha de uma
-                  dessas contas, use “Vínculo e senha” na lista abaixo.
-                </p>
-              ) : null}
-            </>
-          )}
-        </div>
+        </form>
       </Modal>
 
       <Modal
-        aberto={Boolean(editando)}
-        onFechar={() => setEditando(null)}
+        aberto={Boolean(senhaDe)}
+        onFechar={() => setSenhaDe(null)}
         icone={KeyRound}
-        largura="max-w-lg"
-        titulo={`Acesso de ${editando?.nome ?? ''}`}
-        subtitulo="Vínculo com o vendedor e redefinição de senha."
-        rodape={
-          <>
-            <Botao variante="secundario" onClick={() => setEditando(null)}>
-              Fechar
-            </Botao>
-            <Botao icone={Pencil} onClick={salvarVinculo} carregando={salvando}>
-              Salvar vínculo
-            </Botao>
-          </>
-        }
+        titulo={`Redefinir a senha de ${senhaDe?.nome ?? ''}`}
+        subtitulo="A pessoa passa a entrar com a senha nova na hora."
       >
-        <div className="space-y-4">
-          <Campo
-            label="Vendedor vinculado"
-            dica="Define quais pedidos e comissões esta pessoa enxerga."
-          >
-            <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-              <option value="">Sem vínculo (não vê pedidos)</option>
-              {db.vendedores.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nome}
-                </option>
-              ))}
-            </Selecao>
+        <form onSubmit={salvarNovaSenha} className="space-y-3">
+          <Campo label="Nova senha" obrigatorio>
+            <Entrada
+              type={mostrarSenha ? 'text' : 'password'}
+              value={senhaNova}
+              onChange={(e) => setSenhaNova(e.target.value)}
+              placeholder="••••••"
+              required
+            />
           </Campo>
-
-          {editando?.papel === 'vendedor' ? (
-            <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/40">
-              <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
-                <ShieldCheck className="h-4 w-4" /> Opções de relatórios e telas
-              </p>
-              <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
-                Marque o que este acesso pode abrir. Os relatórios saem sempre filtrados com os pedidos, a metragem e a
-                comissão <b>dele</b> — nunca os dados dos outros.
-              </p>
-              <div className="space-y-2">
-                {(Object.keys(LABEL_TELA) as (keyof TelasAcesso)[]).map((tela) => (
-                  <label
-                    key={tela}
-                    className="flex cursor-pointer items-start gap-2 rounded-xl border border-sky-100 bg-white p-2.5 text-xs text-slate-700 dark:border-sky-900/60 dark:bg-slate-900 dark:text-slate-200"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(telas[tela])}
-                      onChange={() => alternarTela(tela)}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 dark:border-slate-600"
-                    />
-                    <span>
-                      <b>{LABEL_TELA[tela]}</b>
-                      <br />
-                      <span className="text-slate-500 dark:text-slate-400">{DESCRICAO_TELA[tela]}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <Botao
-                className="mt-3"
-                tamanho="sm"
-                variante="secundario"
-                icone={Save}
-                onClick={salvarPermissoesTelas}
-                carregando={salvando}
-              >
-                Salvar telas liberadas
-              </Botao>
-            </div>
-          ) : (
-            <p className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-              Contas de proprietário têm acesso a tudo — não há telas para liberar.
-            </p>
-          )}
-
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
-            <p className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
-              <KeyRound className="h-4 w-4" /> Senha desta conta
-            </p>
-            <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
-              {editando?.papel === 'proprietario'
-                ? 'Acesso de proprietário: sempre usa senha. Use aqui para redefinir se ele esquecer.'
-                : editando?.sem_senha
-                  ? 'Esta conta entra SEM SENHA (a pessoa toca no próprio nome na tela de entrada). Se quiser passar a pedir senha, defina uma abaixo.'
-                  : 'Esta conta usa senha. Use aqui para redefinir quando a pessoa esquecer — ou tire a senha para ela voltar a entrar pelo nome.'}
-            </p>
-            <div className="flex flex-wrap items-end gap-2">
-              <Campo label="Nova senha" className="w-48">
-                <Entrada value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="mínimo 4 caracteres" />
-              </Campo>
-              <Botao variante="aviso" icone={KeyRound} onClick={salvarNovaSenha} carregando={salvando} disabled={novaSenha.length < 4}>
-                {editando?.sem_senha ? 'Definir senha' : 'Redefinir senha'}
-              </Botao>
-              {editando?.papel === 'vendedor' && !editando?.sem_senha ? (
-                <Botao
-                  variante="secundario"
-                  icone={UserCheck}
-                  carregando={salvando}
-                  onClick={async () => {
-                    const ok = await confirmar({
-                      titulo: `Tirar a senha de ${editando?.nome}?`,
-                      mensagem:
-                        'A pessoa volta a entrar tocando no próprio nome, sem senha. Qualquer pessoa com o link do sistema consegue abrir os pedidos dela.',
-                      textoBotao: 'Tirar a senha',
-                    })
-                    if (!ok || !editando) return
-                    setSalvando(true)
-                    try {
-                      await removerSenha(editando.id)
-                      setEditando(null)
-                    } catch (e) {
-                      avisar((e as Error).message, 'erro')
-                    } finally {
-                      setSalvando(false)
-                    }
-                  }}
-                >
-                  Tirar a senha (entra pelo nome)
-                </Botao>
-              ) : null}
-            </div>
+          <Campo label="Repita a nova senha" obrigatorio>
+            <Entrada
+              type={mostrarSenha ? 'text' : 'password'}
+              value={senhaRepetida}
+              onChange={(e) => setSenhaRepetida(e.target.value)}
+              placeholder="••••••"
+              required
+            />
+          </Campo>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={mostrarSenha}
+              onChange={(e) => setMostrarSenha(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
+            />
+            Mostrar as senhas
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <Botao type="button" variante="secundario" onClick={() => setSenhaDe(null)}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" icone={KeyRound} carregando={salvando}>
+              Salvar nova senha
+            </Botao>
           </div>
-
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Papel: <b>{editando ? LABEL_PAPEL[editando.papel] : ''}</b> • criado em{' '}
-            {editando ? dataBR(editando.criado_em) : ''}
-          </p>
-        </div>
+        </form>
       </Modal>
+
+      <Modal
+        aberto={Boolean(renomeando)}
+        onFechar={() => setRenomeando(null)}
+        icone={Pencil}
+        titulo="Renomear funcionário"
+        subtitulo="O nome muda nos pedidos, no relatório e na lista de escolha."
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void salvarRenomeado()
+          }}
+          className="space-y-3"
+        >
+          <Campo label="Nome" obrigatorio>
+            <Entrada value={nomeEditado} onChange={(e) => setNomeEditado(e.target.value)} required autoFocus />
+          </Campo>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {numeroBR(funcionarios.find((f) => f.vendedor.id === renomeando?.id)?.total ?? 0, 0)} pedido(s) no
+            histórico continuam ligados a este nome.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Botao type="button" variante="secundario" onClick={() => setRenomeando(null)}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" icone={Pencil} carregando={salvandoNome}>
+              Salvar nome
+            </Botao>
+          </div>
+        </form>
+      </Modal>
+
       {dialog}
     </>
   )
