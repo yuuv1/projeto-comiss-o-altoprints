@@ -25,7 +25,6 @@ import { useAuth } from '../lib/auth'
 import {
   FAIXAS_PADRAO,
   filasDaComissao,
-  LABEL_PAPEL,
   pedidoPendenteFinanceiro,
   type Pedido,
 } from '../lib/types'
@@ -43,7 +42,7 @@ const resumoDasFaixas = (faixas: { de: number; ate: number | null; percentual: n
 
 /** Painel do proprietário: tudo, de todos */
 export default function Painel() {
-  const { db, nomeVendedor, vendedorPorId, nuvem } = useStore()
+  const { db, vendedorPorId, nuvem } = useStore()
   const { usuario } = useAuth()
   const navegar = useNavigate()
 
