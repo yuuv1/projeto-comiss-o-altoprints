@@ -16,6 +16,8 @@ type Colunas = {
   numero: number
   cliente: number
   vendedor: number
+  email: number
+  telefone: number
   metragem: number
   valor: number
   dataPedido: number
@@ -29,6 +31,7 @@ type Colunas = {
 const normalizarCabecalho = (valor: string) =>
   valor
     .trim()
+    .replace(/\([^)]*\)/g, '')
     .toLocaleLowerCase('pt-BR')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -111,11 +114,11 @@ const indiceColuna = (cabecalho: string[], nomes: string[]) =>
 function encontrarColunas(linhas: string[][]): { indiceCabecalho: number; colunas: Colunas } {
   for (let i = 0; i < Math.min(linhas.length, 10); i++) {
     const h = linhas[i]
-    const numero = indiceColuna(h, ['n', 'no', 'numero', 'num', 'numeropedido', 'pedidonumero', 'npedido'])
+    const numero = indiceColuna(h, ['n', 'no', 'numero', 'num', 'numeropedido', 'pedidonumero', 'npedido', 'nopedido', 'nropedido'])
     const cliente = indiceColuna(h, ['cliente', 'nomecliente'])
     const vendedor = indiceColuna(h, ['vendedor', 'vendedora', 'funcionario', 'funcionaria', 'responsavel'])
-    const metragem = indiceColuna(h, ['metragem', 'metros', 'metrage'])
-    const valor = indiceColuna(h, ['valor', 'valorpedido', 'faturamento', 'total'])
+    const metragem = indiceColuna(h, ['metragem', 'metros', 'metrage', 'metragemm'])
+    const valor = indiceColuna(h, ['valor', 'valorpedido', 'faturamento', 'total', 'valorr'])
 
     // Só aceita o relatório geral de vendas: evita tratar qualquer CSV como backup.
     if ([numero, cliente, vendedor, metragem, valor].some((indice) => indice < 0)) continue
@@ -126,6 +129,8 @@ function encontrarColunas(linhas: string[][]): { indiceCabecalho: number; coluna
         numero,
         cliente,
         vendedor,
+        email: indiceColuna(h, ['email', 'emailcliente', 'emaildocliente']),
+        telefone: indiceColuna(h, ['telefone', 'celular', 'whatsapp', 'contato']),
         metragem,
         valor,
         dataPedido: indiceColuna(h, ['datadopedido', 'datapedido', 'pedidoem']),
@@ -243,13 +248,25 @@ export function prepararMesclaRelatorioCSV(conteudo: string, atual: DB): MesclaR
   let datasSemOrigem = 0
   const agora = new Date().toISOString()
   const hoje = agora.slice(0, 10)
+  const linhasDados = linhas.slice(indiceCabecalho + 1)
 
-  for (const linha of linhas.slice(indiceCabecalho + 1)) {
+  // Descobre a primeira data válida do arquivo para não jogar pedidos antigos
+  // sem data ("—") na data de hoje quando o relatório tem histórico anterior.
+  const datasPorLinha = linhasDados.map(
+    (l) => dataISO(valorDaCelula(l, colunas.dataPedido)) ?? dataISO(valorDaCelula(l, colunas.dataPagamento)),
+  )
+  const primeiraDataArquivo = datasPorLinha.find((d): d is string => Boolean(d)) ?? null
+  let ultimaDataVista: string | null = null
+
+  for (let idxLinha = 0; idxLinha < linhasDados.length; idxLinha++) {
+    const linha = linhasDados[idxLinha]
     if (!linha.some((celula) => celula.trim())) continue
 
     const numero = numeroPedido(valorDaCelula(linha, colunas.numero))
     const clienteNome = valorDaCelula(linha, colunas.cliente)
     const vendedorNome = valorDaCelula(linha, colunas.vendedor)
+    const emailCliente = valorDaCelula(linha, colunas.email)
+    const telefoneCliente = valorDaCelula(linha, colunas.telefone)
     const valor = numeroBR(valorDaCelula(linha, colunas.valor))
     const metragem = numeroBR(valorDaCelula(linha, colunas.metragem))
 
@@ -260,6 +277,12 @@ export function prepararMesclaRelatorioCSV(conteudo: string, atual: DB): MesclaR
       continue
     }
     pedidosNoArquivo++
+
+    const dataPedidoColuna = dataISO(valorDaCelula(linha, colunas.dataPedido))
+    const dataPagamento = dataISO(valorDaCelula(linha, colunas.dataPagamento))
+    if (dataPedidoColuna || dataPagamento) {
+      ultimaDataVista = dataPagamento ?? dataPedidoColuna
+    }
 
     const existente = pedidoPorNumero.get(numero)
     if (existente || numerosVistos.has(numero)) {
@@ -287,8 +310,8 @@ export function prepararMesclaRelatorioCSV(conteudo: string, atual: DB): MesclaR
       cliente = {
         id: novoId(),
         nome: clienteNome.trim(),
-        telefone: '',
-        email: '',
+        telefone: telefoneCliente,
+        email: emailCliente,
         observacoes: '',
         vendedor_id: vendedor?.id ?? '',
         valor_especial_metro: null,
@@ -299,10 +322,11 @@ export function prepararMesclaRelatorioCSV(conteudo: string, atual: DB): MesclaR
       clientesNovos.push(cliente)
     }
 
-    const dataPedidoColuna = dataISO(valorDaCelula(linha, colunas.dataPedido))
-    const dataPagamento = dataISO(valorDaCelula(linha, colunas.dataPagamento))
-    const dataPedido = dataPedidoColuna ?? dataPagamento ?? hoje
+    const dataPedido = dataPedidoColuna ?? dataPagamento ?? ultimaDataVista ?? primeiraDataArquivo ?? hoje
     if (!dataPedidoColuna && !dataPagamento) datasSemOrigem++
+    const relatorioLegadoPagos = colunas.pago < 0 && colunas.entregue < 0
+    const pago = simNao(valorDaCelula(linha, colunas.pago), relatorioLegadoPagos ? true : Boolean(dataPagamento))
+    const entregue = simNao(valorDaCelula(linha, colunas.entregue), relatorioLegadoPagos ? true : false)
 
     const pedidoBase = {
       ...pedidoVazio(),
@@ -317,11 +341,11 @@ export function prepararMesclaRelatorioCSV(conteudo: string, atual: DB): MesclaR
       valor_modo: 'manual' as const,
       estagio: 'concluido' as const,
       iniciado_em: paraISOComHora(dataPedido),
-      pago: simNao(valorDaCelula(linha, colunas.pago), Boolean(dataPagamento)),
+      pago,
       forma_pagamento: valorDaCelula(linha, colunas.formaPagamento),
-      data_pagamento: dataPagamento,
+      data_pagamento: dataPagamento ?? (relatorioLegadoPagos ? dataPedido : null),
       data_pedido: paraISOComHora(dataPedido),
-      entregue: simNao(valorDaCelula(linha, colunas.entregue), false),
+      entregue,
       created_at: agora,
       updated_at: agora,
     }

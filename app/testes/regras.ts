@@ -724,6 +724,19 @@ igual('relatório: detecta número existente com conteúdo diferente', [mesclaRe
 igual('relatório: cria só cliente e funcionário faltantes pelo nome', [mesclaRelatorio.clientesNovos.length, mesclaRelatorio.vendedoresNovos.map((v) => v.nome)], [2, ['Raíssa']])
 igual('relatório: preserva datas e status informados', [mesclaRelatorio.pedidosNovos[0].data_pedido, mesclaRelatorio.pedidosNovos[0].entregue], ['2025-05-02T12:00:00.000Z', true])
 igual('relatório: linha sem funcionário permanece sem vínculo', mesclaRelatorio.pedidosNovos[1].vendedor_id, '')
+const csvRelatorioPagosLegado =
+  '\uFEFF"Nº Pedido";"Cliente";"Vendedor";"Email";"Telefone";"Descrição";"Metragem (m)";"Valor (R$)";"Data do pagamento"\r\n' +
+  '"#3";"Kelly Ignácio";"";"";"";"";"1,00";"59,90";"—"\r\n' +
+  '"#198";"jackson felipe";"FLAVIA";"";"";"";"4,40";"198,00";"22/05/2026"'
+const mesclaLegado = prepararMesclaRelatorioCSV(csvRelatorioPagosLegado, bancoRelatorio)
+igual(
+  'relatório pagos antigo: aceita cabeçalho Nº Pedido / Metragem (m) / Valor (R$) e infere data histórica',
+  [
+    mesclaLegado.pedidosNovos.map((p) => p.numero),
+    mesclaLegado.pedidosNovos.every((p) => p.pago && p.entregue && p.data_pagamento === '2026-05-22'),
+  ],
+  [[3, 198], true],
+)
 try {
   prepararMesclaRelatorioCSV('arquivo sem CSV', bancoRelatorio)
   falhas.push('arquivo sem CSV deveria ser recusado')
