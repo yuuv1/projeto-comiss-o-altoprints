@@ -21,6 +21,98 @@ export type Registro = Vendedor | Cliente | Pedido | Arquivo | Impressao | Usuar
 
 /** todas as tabelas de dados (usado ao limpar/substituir o banco) */
 const TABELAS: Tabela[] = ['vendedores', 'clientes', 'pedidos', 'arquivos', 'impressoes', 'usuarios']
+const TABELAS_LIMPAR: Tabela[] = ['impressoes', 'arquivos', 'pedidos', 'clientes', 'vendedores', 'usuarios']
+
+/** Colunas aceitas em cada tabela do Supabase (evita que chaves extras de backups antigos quebrem o PostgREST) */
+const COLUNAS_TABELA: Record<Tabela, readonly string[]> = {
+  vendedores: ['id', 'nome', 'created_at'],
+  clientes: [
+    'id',
+    'nome',
+    'telefone',
+    'email',
+    'observacoes',
+    'vendedor_id',
+    'valor_especial_metro',
+    'especial',
+    'created_at',
+  ],
+  pedidos: [
+    'id',
+    'numero',
+    'cliente_nome',
+    'cliente_id',
+    'vendedor_id',
+    'descricao',
+    'metragem',
+    'valor',
+    'valor_modo',
+    'estagio',
+    'iniciado_em',
+    'entregue',
+    'pago',
+    'status_producao',
+    'status_pagamento',
+    'forma_pagamento',
+    'data_pagamento',
+    'data_pedido',
+    'observacoes',
+    'tipo_entrega',
+    'endereco',
+    'cidade',
+    'estado',
+    'cep',
+    'codigo_rastreio',
+    'data_envio',
+    'data_entrega',
+    'retirado_por',
+    'data_retirada',
+    'impresso',
+    'impresso_em',
+    'aviso_visto',
+    'created_at',
+    'updated_at',
+  ],
+  arquivos: ['id', 'pedido_id', 'nome', 'tipo', 'tamanho', 'url', 'created_at'],
+  impressoes: [
+    'id',
+    'pedido_id',
+    'pedido_numero',
+    'cliente_nome',
+    'arquivo_id',
+    'arquivo_nome',
+    'metros',
+    'quem',
+    'usuario_id',
+    'tipo',
+    'motivo',
+    'observacao',
+    'quando',
+    'created_at',
+  ],
+  usuarios: [
+    'id',
+    'nome',
+    'usuario',
+    'senha_hash',
+    'sem_senha',
+    'papel',
+    'vendedor_id',
+    'ativo',
+    'telas',
+    'criado_em',
+    'auth_id',
+  ],
+}
+
+const limparParaTabela = (tabela: Tabela, registro: Registro): Record<string, unknown> => {
+  const origem = registro as unknown as Record<string, unknown>
+  const limpo: Record<string, unknown> = {}
+  for (const coluna of COLUNAS_TABELA[tabela]) {
+    if (origem[coluna] !== undefined) limpo[coluna] = origem[coluna]
+  }
+  return limpo
+}
 
 /**
  * Ajusta a configuração para o padrão atual: quem nunca editou as faixas recebe a
@@ -146,7 +238,7 @@ export async function salvarRegistro(tabela: Tabela, registro: Registro): Promis
     await gravarLocal(db)
     return
   }
-  const { error } = await sb.from(tabela).upsert(registro as never)
+  const { error } = await sb.from(tabela).upsert(limparParaTabela(tabela, registro) as never)
   if (error) tratarErro('Não foi possível salvar', error)
 }
 
@@ -164,8 +256,12 @@ export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promi
     await gravarLocal(db)
     return
   }
-  const { error } = await sb.from(tabela).upsert(registros as never)
-  if (error) tratarErro('Não foi possível salvar', error)
+  const limpos = registros.map((r) => limparParaTabela(tabela, r))
+  for (let i = 0; i < limpos.length; i += 500) {
+    const lote = limpos.slice(i, i + 500)
+    const { error } = await sb.from(tabela).upsert(lote as never)
+    if (error) tratarErro('Não foi possível salvar', error)
+  }
 }
 
 export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
@@ -206,22 +302,25 @@ export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Prom
   if (error) tratarErro('Não foi possível salvar as configurações', error)
 }
 
-/** Apaga tudo (usado pelo botão de limpar dados / recarregar demonstração) */
+/** Apaga tudo (usado pelo botão de limpar dados / recarregar demonstração / restaurar backup) */
 export async function substituirTudo(db: DB): Promise<void> {
   const sb = clienteNuvemObrigatorio()
   if (!sb) {
     await gravarLocal(db)
     return
   }
-  for (const t of TABELAS) {
+  for (const t of TABELAS_LIMPAR) {
     const { error } = await sb.from(t).delete().not('id', 'is', null)
     if (error) tratarErro('Não foi possível limpar os dados', error)
   }
   for (const t of TABELAS) {
-    const linhas = db[t] as Registro[]
+    const linhas = (db[t] as Registro[]).map((r) => limparParaTabela(t, r))
     if (!linhas.length) continue
-    const { error } = await sb.from(t).insert(linhas as never)
-    if (error) tratarErro('Não foi possível gravar os dados', error)
+    for (let i = 0; i < linhas.length; i += 500) {
+      const lote = linhas.slice(i, i + 500)
+      const { error } = await sb.from(t).upsert(lote as never)
+      if (error) tratarErro('Não foi possível gravar os dados', error)
+    }
   }
   await salvarConfiguracoes(db.configuracoes)
 }

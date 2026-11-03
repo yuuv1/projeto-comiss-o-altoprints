@@ -16,6 +16,17 @@ const app = resolve(aqui, '..')
 const destino = resolve(app, '..', 'publicar')
 const dist = resolve(app, 'dist')
 
+const envPublicacao = {
+  ...process.env,
+  VITE_SUPABASE_URL:
+    (process.env.VITE_SUPABASE_URL ?? '').trim() || 'https://eeurdquvrdmoyjgzgpac.supabase.co',
+  VITE_SUPABASE_PUBLISHABLE_KEY:
+    (process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '').trim() ||
+    ((process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+      ? ''
+      : 'sb_publishable_ebcfV_dIMgKSe_d1SlX5aw_EBT3P1pS'),
+}
+
 // Remove qualquer saída anterior primeiro: se a configuração/build falhar,
 // nada antigo fica disponível para ser arrastado ou publicado por engano.
 await rm(destino, { recursive: true, force: true })
@@ -24,12 +35,18 @@ await rm(dist, { recursive: true, force: true })
 console.log('\n➡️  Validando a configuração central do Supabase...\n')
 const validacaoConfig = spawnSync(process.execPath, [resolve(aqui, 'validar-config-supabase.mjs')], {
   cwd: app,
+  env: envPublicacao,
   stdio: 'inherit',
 })
 if (validacaoConfig.status !== 0) process.exit(validacaoConfig.status ?? 1)
 
 console.log('\n➡️  Compilando o site online...\n')
-const r = spawnSync('npx', ['vite', 'build'], { cwd: app, stdio: 'inherit', shell: process.platform === 'win32' })
+const r = spawnSync('npx', ['vite', 'build'], {
+  cwd: app,
+  env: envPublicacao,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+})
 if (r.status !== 0) process.exit(r.status ?? 1)
 
 console.log('\n➡️  Validando a conexão central e o pacote de produção...\n')

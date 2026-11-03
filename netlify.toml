@@ -12,6 +12,8 @@
 [build.environment]
   # os testes e o jsdom 30 precisam do Node 22.22+ (o package.json pede o mesmo)
   NODE_VERSION = "22"
+  VITE_SUPABASE_URL = "https://eeurdquvrdmoyjgzgpac.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ebcfV_dIMgKSe_d1SlX5aw_EBT3P1pS"
 
 # Garante que qualquer endereço abra o sistema (mesmo com caminhos digitados na mão)
 [[redirects]]
