@@ -176,7 +176,7 @@ npm run publicar      # cria a pasta ../publicar (site + _redirects + LEIA-ME.tx
 
 ## Esqueci a senha (login)
 
-O proprietário entra com **e-mail ou nome de usuário + senha**. A equipe não usa login individual. O proprietário resolve a senha de
+O proprietário entra com **usuário + senha**; o usuário pode ser o e-mail habitual, sem um campo separado ou confirmação de e-mail. A equipe não usa login individual. O proprietário resolve a senha de
 qualquer acesso de proprietário em **Funcionários e acessos → Redefinir senha** (não precisa de nada
 técnico).
 
@@ -224,8 +224,7 @@ Se a senha perdida for a **do proprietário**:
   cópias diárias por alguns dias. Também é possível exportar CSV pelo próprio relatório.
 - **Celular**: o sistema é responsivo — dá para usar no celular do vendedor durante a
   venda, e o menu vira um botão no topo.
-- **Segurança**: o sistema tem **login próprio** (e-mail ou usuário + senha, com hash e bloqueio
-  depois de 5 tentativas erradas) e dois perfis — proprietário e vendedor. Ainda assim:
+- **Segurança**: o sistema tem **login próprio** (usuário + senha; o usuário pode ser um e-mail, guardado como hash e com bloqueio depois de 5 tentativas erradas) e dois perfis — proprietário e vendedor. Ainda assim:
   **use senha forte no proprietário**, não publique o link em redes sociais e nunca coloque
   a chave **secreta** do Supabase no site (só a pública). O banco fica com leitura/escrita
   liberada pela chave pública, como é normal em sistema interno; para trancar por login no

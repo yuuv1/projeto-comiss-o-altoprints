@@ -97,15 +97,19 @@ export default function Administracao() {
           ) : null}
 
           <Campo
-            label="E-mail ou usuário"
+            label="Usuário"
             obrigatorio
             className="mb-3"
-            dica={criando ? 'Informe um e-mail completo ou um usuário curto.' : undefined}
+            dica={
+              criando
+                ? 'Digite o usuário do proprietário. Se ele já usa o e-mail como login, informe esse e-mail aqui.'
+                : 'Digite o usuário cadastrado; ele também pode ser o e-mail do proprietário.'
+            }
           >
             <Entrada
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="Digite seu e-mail ou usuário"
+              placeholder="Digite seu usuário"
               autoCapitalize="none"
               autoCorrect="off"
               required

@@ -741,6 +741,7 @@ async function main() {
   const textoPorta = (raiz4.textContent ?? '').replace(/\s+/g, ' ')
   const portaOk =
     textoPorta.includes('Login proprietário') &&
+    textoPorta.includes('Usuário') &&
     textoPorta.includes('Entrar como proprietário') &&
     // quem descobrir a porta não encontra lista de nomes nem dados na tela
     !textoPorta.includes('Criar o acesso do proprietário') &&
