@@ -43,6 +43,15 @@ async function prepararAmbiente() {
   const { novoId } = await import('../src/lib/files')
 
   const banco = gerarDadosDemo()
+  // O teste do relatório precisa de pelo menos uma fila concluída de cada
+  // funcionário no período corrente (a demonstração pode atravessar um mês).
+  const concluidasParaRelatorio = banco.pedidos.filter((p) => p.estagio === 'concluido').slice(0, banco.vendedores.length)
+  concluidasParaRelatorio.forEach((pedido, indice) => {
+    pedido.vendedor_id = banco.vendedores[indice].id
+    pedido.data_pedido = new Date().toISOString()
+    pedido.data_pagamento = pedido.data_pedido
+    pedido.pago = true
+  })
   const dono = {
     id: novoId(),
     nome: 'DONO TESTE',
@@ -316,6 +325,19 @@ async function main() {
   const deVoltaAoCompacto = raizHtml.classList.contains('confortavel') === false
   if (!(clicouCompacto && deVoltaAoCompacto)) falhas++
   console.log(`  ${clicouCompacto && deVoltaAoCompacto ? '✅' : '❌'} “Compacto” volta a apertar a tela`)
+
+  // ---------- instalação PWA ----------
+  const botaoInstalar = raiz?.querySelector<HTMLButtonElement>('button[aria-label="Instalar Altoprints como aplicativo"]')
+  if (!botaoInstalar) falhas++
+  console.log(`  ${botaoInstalar ? '✅' : '❌'} botão para instalar o Altoprints como aplicativo está disponível`)
+  botaoInstalar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
+  await espera(120)
+  const ajudaInstalacao = raiz?.querySelector('[role="dialog"][aria-labelledby="titulo-instalar-app"]')
+  const instrucoesInstalacao = (ajudaInstalacao?.textContent ?? '').includes('Adicionar Altoprints à tela inicial')
+  if (!instrucoesInstalacao) falhas++
+  console.log(`  ${instrucoesInstalacao ? '✅' : '❌'} navegadores sem prompt mostram instruções para adicionar à tela inicial`)
+  ajudaInstalacao?.querySelector<HTMLButtonElement>('button[aria-label="Fechar instruções de instalação"]')?.click()
+  await espera(60)
 
   // ---------- barra de cima: só os 4 atalhos do dia a dia ----------
   dom.window.location.hash = '#/'

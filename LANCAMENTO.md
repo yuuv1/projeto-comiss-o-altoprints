@@ -22,21 +22,21 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 
 ## Parte 0 — Conferir a versão que está na `main` (2 min)
 
-A `main` já está **limpa e pronta para publicar** (versão **1.4.0**): sem pedidos de
+A `main` já está **limpa e pronta para publicar** (versão **1.5.0**): sem pedidos de
 exemplo, sem usuário/senha padrão, **sem login de funcionário** (a equipe escolhe o próprio
-nome ao registrar a fila), com **“Login proprietário”** no topo, Painel do chefe, busca em
-`Ctrl + K` e backup importável em qualquer aparelho.
+nome ao registrar a fila), com **“Login proprietário”**, Painel do chefe, busca em `Ctrl + K`,
+backup importável e instalação do site como aplicativo **PWA**.
 
 1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira se o último
    commit da `main` é o merge mais recente (nada de Pull Request aberto com pendência).
 2. **Como conferir que deu certo:** abra o arquivo
    [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam
-   ser `Altoprints — Sistema de Pedidos DTF (versão 1.4.0)` e
+   ser `Altoprints — Sistema de Pedidos DTF (versão 1.5.0)` e
    `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se aparecer `versão 1.2.0` (ou `usuário: gui`),
    a `main` ainda está com o pacote antigo.
 3. O site publicado se atualiza sozinho a cada envio na `main` (o robô roda os testes, o
    build e a conferência de segurança antes). Para conferir: abra o site e veja se a tela
-   rodapé mostra `v1.4.0`.
+   rodapé mostra `v1.5.0`.
 
 > **Já tinha aberto uma versão antiga em algum aparelho?** Aqueles dados de exemplo (e o
 > acesso `gui`) ficam **naquele navegador**. Para zerar: abra o sistema no aparelho →
@@ -223,8 +223,10 @@ Faça isso **antes** de mandar o link para a equipe.
    - Use uma **senha forte** (ela é a tranca do sistema: quem tem o link chega até a porta,
      mas sem a senha não vê nada).
 3. Clique em **Criar acesso e entrar**. A conta já nasce **no banco da nuvem**.
-4. **Salve o endereço como ícone no celular:** abra `…/#/administracao` no navegador do
-   celular → menu → **“Adicionar à tela de início”**. Daí em diante é 1 toque.
+4. **Instale o aplicativo:** depois de abrir o site publicado pelo celular, toque em
+   **Instalar app** no menu do sistema. No iPhone/iPad, use Safari → **Compartilhar →
+   Adicionar à Tela de Início**. Depois, o ícone abre o Altoprints com 1 toque. Guia em
+   [`app/PWA.md`](app/PWA.md).
 
 ### 3B. Se você usou o Caminho B (site sem as chaves)
 
@@ -284,7 +286,20 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 - [ ] Entrou tocando no nome de uma vendedora (aba anônima) e ela viu **só** os pedidos dela
 - [ ] **Apagou** o pedido de teste
 
-### 4.4 Mensagem pronta para o grupo
+### 4.4 Instalar no celular como aplicativo
+
+1. Abra o site já publicado pelo celular, usando **HTTPS**.
+2. No Android, toque em **Instalar app** no menu do sistema (ou Chrome → **⋮ → Instalar app**).
+3. No iPhone/iPad, abra no **Safari** → **Compartilhar → Adicionar à Tela de Início**.
+4. Confirme o ícone **Altoprints** na tela inicial. A instalação é uma vez por aparelho.
+
+> A instalação não funciona pelo arquivo local `Altoprints.html`. O site precisa estar no ar.
+> O app atualiza sozinho quando uma nova versão do site é publicada. Os dados do Supabase
+> continuam precisando de internet para carregar e sincronizar.
+
+Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
+
+### 4.5 Mensagem pronta para o grupo
 
 > *Oi, meninas! O sistema novo de pedidos está no ar 👇*
 > *Link: (colocar aqui)*
@@ -296,10 +311,11 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 
 ## Parte 5 — Conferência final
 
-- [ ] `main` com a versão **1.4.0** e sem PR pendente (Parte 0)
+- [ ] `main` com a versão **1.5.0** e sem PR pendente (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
 - [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
+- [ ] **Altoprints instalado** como aplicativo no celular principal (Parte 4.4)
 - [ ] *Configurações → Nuvem* mostra **“Banco na nuvem conectado”**
 - [ ] Seu acesso de **proprietário** criado com **senha forte** + ícone salvo no celular
 - [ ] Segundo proprietário criado, se for o caso (Parte 3C)
@@ -310,7 +326,7 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.4.0** aparecendo no rodapé do sistema
+- [ ] Versão **1.5.0** aparecendo no rodapé do sistema
 
 ---
 

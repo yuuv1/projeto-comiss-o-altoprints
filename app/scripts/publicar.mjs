@@ -49,8 +49,12 @@ const lerAssets = async (html) => {
   const scripts = [...saida.matchAll(/<script[^>]*\ssrc="(\.\/assets\/[^"]+)"[^>]*><\/script>/g)]
   for (const [tag, caminho] of scripts) {
     const js = await readFile(resolve(destino, caminho), 'utf8')
+    // O bundle da Supabase contém uma tabela de caracteres escrita com espaços,
+    // tab e quebra de linha dentro de um template literal. Escapamos esses
+    // caracteres para que a linha gerada não pareça ter whitespace acidental.
+    const semEspacoFinalDeTemplate = js.replace(/` \t\n\\r=`/g, '`\\x20\\t\\n\\r=`')
     // "</script" dentro de um texto do programa fecharia a etiqueta antes da hora
-    const seguro = js.replace(/<\/script/gi, '<\\/script')
+    const seguro = semEspacoFinalDeTemplate.trimEnd().replace(/<\/script/gi, '<\\/script')
     // substituição por FUNÇÃO: com texto, os "$" do programa viram comandos e embaralham tudo
     saida = saida.replace(tag, () => `<script type="module">\n${seguro}\n</script>`)
   }
@@ -114,6 +118,13 @@ await writeFile(
     '     3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu',
     '     4. Pronto: o endereço aparece no topo da página',
     '',
+    'INSTALAR COMO APLICATIVO (PWA):',
+    '  - Depois que o site estiver publicado em HTTPS, abra o endereço no celular.',
+    '  - Android: toque em "Instalar app" (ou Chrome → ⋮ → Instalar app).',
+    '  - iPhone/iPad: abra no Safari → Compartilhar → Adicionar à Tela de Início.',
+    '  - O arquivo Altoprints.html, aberto pelo computador, não pode ser instalado como PWA.',
+    '  - Guia completo: app/PWA.md',
+    '',
     'COMO ATUALIZAR DEPOIS:',
     '  - Rode de novo:  npm run publicar',
     '  - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)',
@@ -125,7 +136,8 @@ await writeFile(
     '     Ctrl + Alt + D.',
     '  2. Como ainda não existe proprietário, a tela oferece "Criar o acesso do',
     '     proprietário": digite o seu nome, o usuário e uma SENHA FORTE (guarde-a bem).',
-    '  3. Salve esse endereço como ícone na tela de início do celular: entra com 1 toque.',
+    '  3. No site publicado, toque em "Instalar app"; no iPhone/iPad use Safari → Compartilhar →',
+    '     Adicionar à Tela de Início. O ícone abre o sistema com 1 toque (guia: app/PWA.md).',
     '  4. Quer um segundo login de dono (sócio, gerente, escritório)?',
     '     Configurações → Funcionários e acessos → Novo acesso.',
     '  5. FUNCIONÁRIOS: JESSICA, RAISSA e ANDREIA já vêm prontas (sem conta e sem',
