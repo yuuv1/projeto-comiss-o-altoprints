@@ -52,8 +52,8 @@ Também é possível abrir o menu do navegador e escolher **Instalar Altoprints*
 
 ## Atualizações e funcionamento sem internet
 
-- O PWA confere a versão ao abrir ou voltar ao app e, enquanto fica aberto com internet, a cada 5 minutos. Se uma versão nova foi publicada, ele troca para ela e recarrega a tela.
-- Um aparelho desligado, fechado ou sem internet não pode receber a atualização naquele momento; ao abrir o PWA novamente com internet, ele verifica e atualiza. Se continuar mostrando uma versão antiga, feche o app por completo, abra de novo e confira o número no rodapé.
+- O PWA confere a versão ao abrir ou voltar ao app e, enquanto fica aberto com internet, a cada 5 minutos. Uma versão nova é ativada e a tela recarrega automaticamente — não é preciso apagar o cache.
+- Um aparelho desligado ou sem internet atualiza na próxima abertura online. Se a versão não mudar, feche o app por completo e abra de novo pelo mesmo endereço oficial. Não apague os dados/cache do navegador, pois isso pode remover dados locais e a conexão salva neste aparelho.
 - A atualização do **programa** é diferente da sincronização dos **pedidos**. Para compartilhar dados, todos os aparelhos precisam estar ligados ao mesmo projeto Supabase; o app confere mudanças a cada 15 segundos e também ao voltar para a tela. O SQL mais recente habilita atualização em tempo real.
 - A instalação guarda o **programa** para abrir mais rápido e oferecer a estrutura básica sem rede. Pedidos, clientes, login e alterações no Supabase precisam de internet para carregar e sincronizar; o service worker não guarda respostas do banco no cache offline.
 - A instalação é por aparelho e por endereço do site. Instale todos pelo mesmo endereço (mesmo domínio e caminho); um PWA instalado pelo GitHub Pages não recebe a versão publicada em outro domínio, como um Netlify diferente.

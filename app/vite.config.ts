@@ -36,6 +36,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Como o registro é manual (injectRegister:false), não dependemos dos
+        // padrões automáticos do plugin: a atualização nova precisa ativar sem
+        // esperar todas as janelas antigas fecharem e assumir o controle delas.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // O app shell fica disponível para abrir sem rede; dados e login do

@@ -176,6 +176,14 @@ for (const arquivo of [
   if (tem(arquivo)) certos.push(`PWA: ${arquivo} presente`)
   else problemas.push(`PWA incompleto: falta ${arquivo}`)
 }
+if (tem('sw.js')) {
+  const serviceWorker = await readFile(join(pasta, 'sw.js'), 'utf8')
+  const atualizaSemEsperarFechar = /\bskipWaiting\s*\(/.test(serviceWorker)
+  const assumeAbasAbertas = /\bclientsClaim\s*\(/.test(serviceWorker)
+  if (atualizaSemEsperarFechar && assumeAbasAbertas)
+    certos.push('PWA: atualização instala e assume o app automaticamente (sem limpar cache)')
+  else problemas.push('PWA: sw.js precisa ativar a versão nova e assumir as abas abertas (skipWaiting/clientsClaim)')
+}
 if (tem('manifest.webmanifest')) {
   try {
     const manifest = JSON.parse(await readFile(join(pasta, 'manifest.webmanifest'), 'utf8'))

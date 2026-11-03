@@ -63,7 +63,7 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.5** — reforça a atualização automática do PWA e exibe o estado da sincronização.
+> **Versão atual: 1.5.6** — instala automaticamente as atualizações do PWA ao abrir, sem limpar o cache, e exibe o estado da sincronização.
 > O login do proprietário usa um único campo de usuário e senha; o e-mail dele pode ser o usuário.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
