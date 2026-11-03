@@ -11,7 +11,7 @@ export default defineConfig({
       // O registro é feito em main.tsx para também desativá-lo no arquivo
       // Altoprints.html (file://), que continua sendo uma demonstração local.
       injectRegister: false,
-      includeAssets: ['icons/pwa-icon.svg', 'icons/apple-touch-icon.png'],
+      includeAssets: ['icons/pwa-512x512.png', 'icons/apple-touch-icon.png'],
       manifest: {
         id: './',
         name: 'Altoprints — Sistema de Pedidos DTF',

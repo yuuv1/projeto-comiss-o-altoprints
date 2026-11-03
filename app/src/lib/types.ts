@@ -346,30 +346,33 @@ export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown
     status_producao?: string
     status_pagamento?: string
     impresso?: boolean
+    impresso_em?: string | null
   }
-  if (!p.estagio) {
-    const concluido =
-      bruto.estagio === 'concluido' ||
-      Boolean(bruto.impresso) ||
-      bruto.status_producao === 'dtf_pronto' ||
-      bruto.status_producao === 'imprimir'
+  const estagioAntigo = bruto.estagio
+  const estagioValido = estagioAntigo === 'em_andamento' || estagioAntigo === 'concluido'
+  const statusProducao = typeof bruto.status_producao === 'string' ? bruto.status_producao : ''
+
+  // Consultamos o backup bruto antes dos valores padrão: pedidoVazio() já
+  // preenche estagio/pago/entregue e mascararia os campos das versões antigas.
+  if (estagioValido) {
+    p.estagio = estagioAntigo
+  } else {
+    const concluido = Boolean(bruto.impresso) || statusProducao === 'dtf_pronto'
     p.estagio = concluido ? 'concluido' : 'em_andamento'
   }
-  if (p.iniciado_em === undefined || p.iniciado_em === null) {
-    const antigo = bruto as { status_producao?: string; impresso_em?: string | null }
-    const comecou =
-      p.estagio === 'concluido' ||
-      antigo.status_producao === 'imprimir' ||
-      antigo.status_producao === 'dtf_pronto' ||
-      Boolean(antigo.impresso_em)
-    p.iniciado_em = comecou ? String(antigo.impresso_em || p.data_pedido || new Date().toISOString()) : null
+
+  if (typeof bruto.iniciado_em === 'string' || bruto.iniciado_em === null) {
+    p.iniciado_em = bruto.iniciado_em
+  } else {
+    const comecou = p.estagio === 'concluido' || statusProducao === 'dtf_pronto' || Boolean(p.impresso_em)
+    p.iniciado_em = comecou ? String(p.impresso_em || p.data_pedido || new Date().toISOString()) : null
   }
-  if (p.entregue === undefined || p.entregue === null) {
-    p.entregue = Boolean(p.data_entrega || p.data_retirada)
-  }
-  if (p.pago === undefined || p.pago === null) {
-    p.pago = bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
-  }
+
+  p.entregue =
+    typeof bruto.entregue === 'boolean' ? bruto.entregue : Boolean(p.data_entrega || p.data_retirada)
+  p.pago =
+    typeof bruto.pago === 'boolean' ? bruto.pago : bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
+
   return p
 }
 

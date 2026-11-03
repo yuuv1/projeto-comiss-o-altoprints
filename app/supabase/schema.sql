@@ -48,6 +48,11 @@ create table if not exists public.pedidos (
   metragem         double precision,
   valor            double precision default 0,
   valor_modo       text default 'auto',
+  -- campos atuais da fila; as colunas antigas abaixo são mantidas para migrar backups
+  estagio          text not null default 'em_andamento',
+  iniciado_em      text,
+  entregue         boolean not null default false,
+  pago             boolean not null default false,
   status_producao  text default 'editar_arte',
   status_pagamento text default 'pendente',
   forma_pagamento  text default '',
@@ -145,6 +150,44 @@ insert into public.configuracoes (id, valor) values (1, '{}'::jsonb)
 alter table public.usuarios add column if not exists telas   jsonb default '{}'::jsonb;
 alter table public.usuarios add column if not exists auth_id text;
 alter table public.pedidos  add column if not exists aviso_visto boolean default true;
+
+-- Campos do fluxo atual (fila/etapas), adicionados sem apagar as colunas antigas.
+-- Ao rodar este SQL num banco já usado, traduzimos os estados legados antes de
+-- aplicar os padrões novos, preservando pago/concluído/entregue e a data de início.
+alter table public.pedidos add column if not exists estagio text;
+alter table public.pedidos add column if not exists iniciado_em text;
+alter table public.pedidos add column if not exists entregue boolean;
+alter table public.pedidos add column if not exists pago boolean;
+
+update public.pedidos
+set estagio = case
+  when coalesce(impresso, false) or status_producao = 'dtf_pronto' then 'concluido'
+  else 'em_andamento'
+end
+where estagio is null or estagio not in ('em_andamento', 'concluido');
+
+update public.pedidos
+set iniciado_em = coalesce(nullif(impresso_em, ''), nullif(data_pedido, ''))
+where iniciado_em is null
+  and (coalesce(impresso, false) or status_producao = 'dtf_pronto' or nullif(impresso_em, '') is not null);
+
+update public.pedidos
+set entregue = (
+  coalesce(nullif(data_entrega, ''), nullif(data_retirada, '')) is not null
+)
+where entregue is null;
+
+update public.pedidos
+set pago = (status_pagamento = 'pago' or coalesce(nullif(data_pagamento, ''), '') <> '')
+where pago is null;
+
+alter table public.pedidos alter column estagio set default 'em_andamento';
+alter table public.pedidos alter column estagio set not null;
+alter table public.pedidos alter column entregue set default false;
+alter table public.pedidos alter column entregue set not null;
+alter table public.pedidos alter column pago set default false;
+alter table public.pedidos alter column pago set not null;
+
 -- entrada sem senha (o funcionário toca no próprio nome): entrou na versão 1.2
 alter table public.usuarios add column if not exists sem_senha boolean default false;
 -- (a tabela "impressoes" entrou numa versão nova do sistema: quem já tinha o

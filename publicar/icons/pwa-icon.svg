@@ -1,20 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ec4899"/>
-      <stop offset=".38" stop-color="#a855f7"/>
-      <stop offset=".72" stop-color="#3b82f6"/>
-      <stop offset="1" stop-color="#22c55e"/>
-    </linearGradient>
-    <linearGradient id="s" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-      <stop offset=".55" stop-color="#fff" stop-opacity=".25"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="142" fill="url(#g)"/>
-  <rect width="512" height="512" rx="142" fill="url(#s)"/>
-  <path d="M145 365 235 151c8-20 34-20 42 0l90 214" fill="none" stroke="#fff" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M194 296h124" fill="none" stroke="#fff" stroke-width="36" stroke-linecap="round"/>
-  <circle cx="384" cy="132" r="25" fill="#fff" opacity=".94"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Altoprints</title>
+  <image href="./pwa-512x512.png" width="512" height="512"/>
 </svg>

@@ -29,6 +29,7 @@ import {
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
 import { gerarDadosDemo } from './seed'
+import { prepararBackup } from './backup'
 import {
   espacoNoLocalStorage,
   liberarCopiaAntiga,
@@ -41,7 +42,6 @@ import { limparChavesDoSistema, lsGravar, lsLer, lsRemover } from './local'
 import { CHAVE_EQUIPE_INICIAL, vendedoresDaEquipeInicial } from './equipe-inicial'
 import {
   CONFIG_PADRAO,
-  normalizarPedido,
   type Arquivo,
   type Cliente,
   type Configuracoes,
@@ -530,10 +530,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
    *
    * Aceita o arquivo que o próprio sistema baixa e também backups de versões
    * antigas, inclusive os que vêm embrulhados (`{ versao, dados }`, `{ db }`).
-   * Contas de FUNCIONÁRIO de versões antigas são descartadas — hoje só o
-   * proprietário tem login. Se o arquivo não trouxer nenhuma conta de dono, os
-   * acessos que já existem neste aparelho continuam valendo (ninguém fica de
-   * fora do sistema).
+   * Contas de FUNCIONÁRIO de versões antigas deixam de ser logins — hoje só o
+   * proprietário tem login —, mas seus nomes/vínculos são recuperados para a
+   * lista de funcionários se faltarem no backup. Se o arquivo não trouxer uma
+   * conta de dono, os acessos existentes neste aparelho continuam valendo.
    */
   const restaurarBackup = useCallback(
     async (arquivo: File) => {
@@ -544,34 +544,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } catch {
         throw new Error('Este arquivo não é um backup do sistema (não é um JSON válido).')
       }
-      const embrulho = bruto as Record<string, unknown>
-      // alguns backups vêm dentro de uma capa: { versao, dados: {...} } / { db: {...} }
-      const dados = (embrulho?.dados ?? embrulho?.db ?? embrulho?.data ?? embrulho) as Partial<DB>
-      if (!dados || (!Array.isArray(dados.pedidos) && !Array.isArray(dados.clientes)))
-        throw new Error('Este arquivo não parece ser um backup do sistema (faltam os pedidos e clientes).')
-
-      const donosDoArquivo: Usuario[] = (dados.usuarios ?? [])
-        .filter((u) => u && u.papel !== 'vendedor' && Boolean(u.senha_hash))
-        .map((u) => ({
-          ...u,
-          papel: 'proprietario' as const,
-          ativo: u.ativo ?? true,
-          vendedor_id: '',
-          telas: { ...u.telas },
-        }))
-
-      const restaurado: DB = {
-        vendedores: (dados.vendedores ?? []).map((v) => ({ ...v, id: v.id || novoId() })),
-        clientes: (dados.clientes ?? []).map((c) => ({ ...c, id: c.id || novoId() })),
-        // pedidos de versões antigas (status_producao/impresso) viram o estágio de hoje
-        pedidos: (dados.pedidos ?? []).map((p) =>
-          normalizarPedido(p as unknown as Partial<Pedido> & Record<string, unknown>),
-        ),
-        arquivos: (dados.arquivos ?? []).map((a) => ({ ...a, id: a.id || novoId() })),
-        impressoes: (dados.impressoes ?? []).map((i) => ({ ...i, id: i.id || novoId() })),
-        usuarios: donosDoArquivo.length ? donosDoArquivo : db.usuarios.filter((u) => u.papel === 'proprietario'),
-        configuracoes: { ...CONFIG_PADRAO, ...(dados.configuracoes ?? {}), modo_exemplo: false },
-      }
+      // O importador também reconstrói os nomes de funcionários a partir de
+      // contas antigas, e converte status de pedidos das versões anteriores.
+      const restaurado = prepararBackup(bruto, db.usuarios)
 
       await substituirTudo(restaurado)
       setDb(restaurado)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2400" height="1660" viewBox="0 0 2400 1660" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Altoprints — Impressão em DTF</title>
+  <desc id="descricao">Símbolo colorido da Altoprints sobre fundo preto, com o nome ALTOPRINTS e o slogan IMPRESSÃO EM DTF.</desc>
+  <rect width="2400" height="1660" fill="#000"/>
+  <image href="altoprints-simbolo.png" x="630" y="-18" width="1140" height="1140" preserveAspectRatio="xMidYMid meet"/>
+  <text x="1200" y="1318" text-anchor="middle" textLength="2200" lengthAdjust="spacing" font-family="DejaVu Sans, Arial, Helvetica, sans-serif" font-size="260" font-weight="400" letter-spacing="64" fill="#fff">ALTOPRINTS</text>
+  <text x="1200" y="1490" text-anchor="middle" textLength="1400" lengthAdjust="spacing" font-family="DejaVu Sans, Arial, Helvetica, sans-serif" font-size="98" font-weight="400" letter-spacing="28" fill="#fff">IMPRESSÃO EM DTF</text>
+</svg>
