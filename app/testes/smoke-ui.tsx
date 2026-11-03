@@ -339,9 +339,15 @@ async function main() {
   ajudaInstalacao?.querySelector<HTMLButtonElement>('button[aria-label="Fechar instruções de instalação"]')?.click()
   await espera(60)
 
-  // ---------- barra de cima: só os 4 atalhos do dia a dia ----------
+  // ---------- marca e barra de cima ----------
   dom.window.location.hash = '#/'
   await espera(700)
+  const simboloDaMarca = raiz?.querySelector<HTMLImageElement>('header img[src="./icons/pwa-192x192.png"]')
+  const marcaNovaOk = simboloDaMarca?.getAttribute('alt') === ''
+  if (!marcaNovaOk) falhas++
+  console.log(`\n  ${marcaNovaOk ? '✅' : '❌'} cabeçalho mostra o símbolo colorido da nova marca`)
+
+  // ---------- barra de cima: só os 4 atalhos do dia a dia ----------
   const navTopo = raiz?.querySelector('header nav') ?? null
   const textoNav = (navTopo?.textContent ?? '').replace(/\s+/g, ' ')
   const barraEnxuta =

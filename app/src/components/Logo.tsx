@@ -3,32 +3,14 @@ import { cn } from './ui'
 
 export function MarcaLogo({ className, tamanho = 40 }: { className?: string; tamanho?: number }) {
   return (
-    <svg viewBox="0 0 48 48" width={tamanho} height={tamanho} className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="altoprints-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ec4899" />
-          <stop offset="35%" stopColor="#a855f7" />
-          <stop offset="70%" stopColor="#3b82f6" />
-          <stop offset="100%" stopColor="#22c55e" />
-        </linearGradient>
-        <linearGradient id="altoprints-shine" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="55%" stopColor="#ffffff" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="48" height="48" rx="14" fill="url(#altoprints-grad)" />
-      <rect x="0" y="0" width="48" height="48" rx="14" fill="url(#altoprints-shine)" />
-      <path
-        d="M13 35.5 22.4 13.2c.6-1.4 2.6-1.4 3.2 0L35 35.5"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="4.2"
-        strokeLinecap="round"
-      />
-      <path d="M18.6 28.5h10.8" stroke="#ffffff" strokeWidth="3.6" strokeLinecap="round" />
-      <circle cx="35.6" cy="12.4" r="3.1" fill="#ffffff" opacity=".92" />
-    </svg>
+    <img
+      src="./icons/pwa-192x192.png"
+      alt=""
+      aria-hidden="true"
+      width={tamanho}
+      height={tamanho}
+      className={cn('rounded-[14px] bg-black object-cover', className)}
+    />
   )
 }
 
@@ -45,10 +27,7 @@ export function Logo({ compacto = false, className }: { compacto?: boolean; clas
           className="h-9 w-9 rounded-xl bg-white object-contain shadow-soft ring-1 ring-slate-100"
         />
       ) : (
-        <div className="relative">
-          <MarcaLogo tamanho={34} className="drop-shadow-[0_4px_10px_rgba(168,85,247,0.45)]" />
-          <span className="pointer-events-none absolute inset-0 rounded-[14px] bg-gradient-to-tr from-transparent via-white/40 to-transparent" />
-        </div>
+        <MarcaLogo tamanho={34} className="shadow-soft ring-1 ring-black/10" />
       )}
       {!compacto ? (
         <div className="leading-none">
