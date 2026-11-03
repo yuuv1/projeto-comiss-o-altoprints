@@ -13,7 +13,8 @@
  * proprietário”, com senha.
  */
 import { novoId } from './files'
-import type { DB, Vendedor } from './types'
+import { hojeISO } from './format'
+import type { DB, Pedido, Vendedor } from './types'
 
 /** Quem já trabalha na loja (só o primeiro nome, como aparece nos pedidos) */
 export const EQUIPE_INICIAL = ['JESSICA', 'RAISSA', 'ANDREIA']
@@ -39,4 +40,52 @@ export function vendedoresDaEquipeInicial(db: DB): Vendedor[] {
     faltando.push({ id: novoId(), nome, created_at: agora })
   }
   return faltando
+}
+
+/**
+ * Retorna apenas as funcionárias que efetivamente trabalharam (tiveram pedidos)
+ * na lista de pedidos do mês/período selecionado.
+ */
+export function vendedoresDoPeriodo(vendedores: Vendedor[], pedidosDoPeriodo: Pedido[]): Vendedor[] {
+  const idsComPedido = new Set(pedidosDoPeriodo.map((p) => p.vendedor_id).filter(Boolean))
+  return vendedores.filter((v) => idsComPedido.has(v.id))
+}
+
+/**
+ * Retorna as funcionárias atualmente ativas na empresa (ocultando ex-funcionárias
+ * que só possuem vendas em meses antigos do histórico).
+ *
+ * Considera ativa quem:
+ *  - ainda não tem nenhum pedido (recém-cadastrada na equipe), OU
+ *  - faz parte da EQUIPE_INICIAL atual, OU
+ *  - teve pedido nos últimos 45 dias em relação à data mais recente do sistema.
+ */
+export function vendedoresAtivosAtual(
+  vendedores: Vendedor[],
+  todosPedidos: Pedido[],
+  dataReferenciaISO = hojeISO(),
+): Vendedor[] {
+  const nomesEquipeAtual = new Set(EQUIPE_INICIAL.map((n) => n.trim().toLowerCase()))
+
+  let maiorData = dataReferenciaISO.slice(0, 10)
+  for (const p of todosPedidos) {
+    const d = (p.data_pagamento || p.data_pedido || '').slice(0, 10)
+    if (d && d > maiorData) maiorData = d
+  }
+  const refMs = new Date(`${maiorData}T12:00:00`).getTime()
+  const limiteIso = Number.isNaN(refMs)
+    ? maiorData.slice(0, 7) + '-01'
+    : new Date(refMs - 45 * 86400000).toISOString().slice(0, 10)
+
+  const ativos = vendedores.filter((v) => {
+    if (nomesEquipeAtual.has(v.nome.trim().toLowerCase())) return true
+    const meus = todosPedidos.filter((p) => p.vendedor_id === v.id)
+    if (meus.length === 0) return true
+    return meus.some((p) => {
+      const d = (p.data_pagamento || p.data_pedido || '').slice(0, 10)
+      return d >= limiteIso
+    })
+  })
+
+  return ativos.length > 0 ? ativos : vendedores
 }

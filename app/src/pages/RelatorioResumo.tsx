@@ -31,6 +31,7 @@ import {
 } from '../components/ui'
 import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
+import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { FAIXAS_PADRAO, filasDaComissao, type Pedido, type Vendedor } from '../lib/types'
@@ -151,20 +152,45 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
       })
   }, [base, campo])
 
+  /** Todos os pedidos concluídos do mês/período escolhido (antes do filtro de funcionária) */
+  const pedidosDoPeriodo = useMemo(() => {
+    return base.filter((p) => {
+      const d = dataRef(p, campo)
+      if (!d) return false
+      return d >= inicio && d <= fim
+    })
+  }, [base, campo, fim, inicio])
+
+  /**
+   * Lista no relatório apenas as funcionárias que trabalharam no mês/período selecionado
+   * (evitando mostrar ex-funcionárias que já saíram da empresa).
+   */
+  const vendedoresNoPeriodo = useMemo(() => {
+    const doPeriodo = vendedoresDoPeriodo(db.vendedores, pedidosDoPeriodo)
+    if (doPeriodo.length > 0) return doPeriodo
+    return vendedoresAtivosAtual(db.vendedores, db.pedidos)
+  }, [db.pedidos, db.vendedores, pedidosDoPeriodo])
+
+  const temSemVendedorNoPeriodo = useMemo(
+    () => pedidosDoPeriodo.some((p) => !p.vendedor_id),
+    [pedidosDoPeriodo],
+  )
+
+  const vendedorIdAtivo = useMemo(() => {
+    if (vendedorId === 'todos') return 'todos'
+    if (vendedorId === 'sem-vendedor') return temSemVendedorNoPeriodo ? 'sem-vendedor' : 'todos'
+    return vendedoresNoPeriodo.some((v) => v.id === vendedorId) ? vendedorId : 'todos'
+  }, [temSemVendedorNoPeriodo, vendedorId, vendedoresNoPeriodo])
+
   const filtrados = useMemo(() => {
-    return base
+    return pedidosDoPeriodo
       .filter((p) => {
-        if (vendedorId === 'sem-vendedor') return !p.vendedor_id
-        if (vendedorId !== 'todos') return p.vendedor_id === vendedorId
+        if (vendedorIdAtivo === 'sem-vendedor') return !p.vendedor_id
+        if (vendedorIdAtivo !== 'todos') return p.vendedor_id === vendedorIdAtivo
         return true
       })
-      .filter((p) => {
-        const d = dataRef(p, campo)
-        if (!d) return false
-        return d >= inicio && d <= fim
-      })
       .sort((a, b) => dataRef(b, campo).localeCompare(dataRef(a, campo)) || b.numero - a.numero)
-  }, [base, campo, fim, inicio, vendedorId])
+  }, [campo, pedidosDoPeriodo, vendedorIdAtivo])
 
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
 
@@ -414,14 +440,14 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               </Selecao>
             </Campo>
             <Campo label="Funcionário">
-              <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
-                <option value="todos">Todos os funcionários</option>
-                {db.vendedores.map((v) => (
+              <Selecao value={vendedorIdAtivo} onChange={(e) => setVendedorId(e.target.value)}>
+                <option value="todos">Todos do período ({vendedoresNoPeriodo.length})</option>
+                {vendedoresNoPeriodo.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.nome}
                   </option>
                 ))}
-                <option value="sem-vendedor">Sem funcionário</option>
+                {temSemVendedorNoPeriodo ? <option value="sem-vendedor">Sem funcionário</option> : null}
               </Selecao>
             </Campo>
           </div>
@@ -429,28 +455,28 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           {/* Pílulas rápidas para trocar de funcionário com 1 toque no celular */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
             <span className="mr-1 inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-              <Users className="h-3.5 w-3.5" /> Equipe:
+              <Users className="h-3.5 w-3.5" /> No período:
             </span>
             <button
               type="button"
               onClick={() => setVendedorId('todos')}
               className={cn(
                 'rounded-full border px-2.5 py-1 text-xs font-bold transition',
-                vendedorId === 'todos'
+                vendedorIdAtivo === 'todos'
                   ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
                   : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
               )}
             >
               Todos
             </button>
-            {db.vendedores.map((v) => (
+            {vendedoresNoPeriodo.map((v) => (
               <button
                 key={v.id}
                 type="button"
-                onClick={() => setVendedorId(vendedorId === v.id ? 'todos' : v.id)}
+                onClick={() => setVendedorId(vendedorIdAtivo === v.id ? 'todos' : v.id)}
                 className={cn(
                   'rounded-full border px-2.5 py-1 text-xs font-bold transition',
-                  vendedorId === v.id
+                  vendedorIdAtivo === v.id
                     ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
                     : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
                 )}
@@ -498,7 +524,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Resumo por vendedor</h2>
             <div className="flex items-center gap-2">
-              {vendedorId !== 'todos' ? (
+              {vendedorIdAtivo !== 'todos' ? (
                 <Botao tamanho="sm" variante="secundario" onClick={() => setVendedorId('todos')}>
                   Mostrar todos
                 </Botao>
@@ -513,7 +539,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <div className="space-y-2.5 md:hidden">
             {resumoVendedores.map((linha) => {
               const chaveFiltro = linha.chave === '__sem_vendedor__' ? 'sem-vendedor' : linha.chave
-              const selecionado = vendedorId === chaveFiltro
+              const selecionado = vendedorIdAtivo === chaveFiltro
               return (
                 <div
                   key={linha.chave}

@@ -22,6 +22,7 @@ import {
   validarConexao,
 } from '../src/lib/supabase'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros, percentualBR } from '../src/lib/format'
+import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../src/lib/equipe-inicial'
 import {
   doDia,
   filtrarImpressoes,
@@ -430,6 +431,37 @@ igual('percentualBR formata 3.5 -> 3,5%', percentualBR(3.5), '3,5%')
 igual('percentualBR preserva duas casas decimais exatas (2.75 -> 2,75%)', percentualBR(2.75), '2,75%')
 const faixasCom275 = FAIXAS_PADRAO.map((f, i) => (i === 0 ? { ...f, percentual: 2.75 } : f))
 igual('comissão com faixa exata de 2,75% (R$ 100,00 -> R$ 2,75)', comissaoDoPedido(pedidoCom(2, 100), faixasCom275), 2.75)
+
+const listaVendedoresTeste = [
+  { id: 'v-jessica', nome: 'JESSICA', created_at: '2026-01-01' },
+  { id: 'v-raissa', nome: 'RAISSA', created_at: '2026-01-01' },
+  { id: 'v-andreia', nome: 'ANDREIA', created_at: '2026-11-01' },
+  { id: 'v-flavia', nome: 'FLÁVIA', created_at: '2026-01-01' },
+  { id: 'v-vitoria', nome: 'VITORIA', created_at: '2026-01-01' },
+]
+const pedidosSetembro = [
+  { ...pedidoCom(10, 500), vendedor_id: 'v-jessica', data_pedido: '2026-09-15', data_pagamento: '2026-09-15' },
+  { ...pedidoCom(10, 500), vendedor_id: 'v-raissa', data_pedido: '2026-09-20', data_pagamento: '2026-09-20' },
+]
+const pedidosJunho = [
+  { ...pedidoCom(10, 500), vendedor_id: 'v-flavia', data_pedido: '2026-06-10', data_pagamento: '2026-06-10' },
+  { ...pedidoCom(10, 500), vendedor_id: 'v-vitoria', data_pedido: '2026-06-11', data_pagamento: '2026-06-11' },
+]
+igual(
+  'vendedoresDoPeriodo em setembro mostra apenas quem trabalhou em setembro',
+  vendedoresDoPeriodo(listaVendedoresTeste, pedidosSetembro).map((v) => v.nome),
+  ['JESSICA', 'RAISSA'],
+)
+igual(
+  'vendedoresDoPeriodo em junho mostra quem trabalhou em junho',
+  vendedoresDoPeriodo(listaVendedoresTeste, pedidosJunho).map((v) => v.nome),
+  ['FLÁVIA', 'VITORIA'],
+)
+igual(
+  'vendedoresAtivosAtual oculta ex-funcionárias antigas e mantém equipe atual',
+  vendedoresAtivosAtual(listaVendedoresTeste, [...pedidosSetembro, ...pedidosJunho], '2026-11-03').map((v) => v.nome),
+  ['JESSICA', 'RAISSA', 'ANDREIA'],
+)
 
 const resultado = calcularComissao(
   [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],

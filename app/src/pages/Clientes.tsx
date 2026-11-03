@@ -16,6 +16,7 @@ import {
   useConfirmacao,
 } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { moeda } from '../lib/format'
 import RelatorioClienteEspecial from './RelatorioClienteEspecial'
@@ -278,11 +279,18 @@ export default function Clientes() {
               }}
             >
               <option value="">Sem responsável</option>
-              {db.vendedores.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nome}
-                </option>
-              ))}
+              {vendedoresAtivosAtual(db.vendedores, db.pedidos)
+                .concat(
+                  form.vendedor_id &&
+                    !vendedoresAtivosAtual(db.vendedores, db.pedidos).some((v) => v.id === form.vendedor_id)
+                    ? db.vendedores.filter((v) => v.id === form.vendedor_id)
+                    : [],
+                )
+                .map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome}
+                  </option>
+                ))}
             </Selecao>
           </Campo>
           <Campo
