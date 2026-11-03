@@ -22,24 +22,24 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 
 ## Parte 0 — Conferir a versão que está na `main` (2 min)
 
-A `main` já está **limpa e pronta para publicar** (versão **1.5.1**): sem pedidos de
+A `main` já está **limpa e pronta para publicar** (versão **1.5.2**): sem pedidos de
 exemplo, sem usuário/senha padrão, **sem login de funcionário** (a equipe escolhe o próprio
 nome ao registrar a fila), com **“Login proprietário”**, Painel do chefe, busca em `Ctrl + K`,
 backup antigo compatível e instalação do site como aplicativo **PWA**. A marca foi refeita em alta
-resolução e o PWA usa apenas o símbolo no ícone (sem letras pequenas). A correção de backup
-preserva clientes, funcionários e os estados antigos de pedidos; o SQL também migra as colunas
+resolução; o símbolo colorido está no cabeçalho do app e nos ícones, sem letras pequenas. A
+correção de backup preserva clientes, funcionários e os estados antigos de pedidos; o SQL também migra as colunas
 legadas do Supabase sem apagar dados.
 
 1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira se o último
    commit da `main` é o merge mais recente (nada de Pull Request aberto com pendência).
 2. **Como conferir que deu certo:** abra o arquivo
    [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam
-   ser `Altoprints — Sistema de Pedidos DTF (versão 1.5.1)` e
+   ser `Altoprints — Sistema de Pedidos DTF (versão 1.5.2)` e
    `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se aparecer `versão 1.2.0` (ou `usuário: gui`),
    a `main` ainda está com o pacote antigo.
 3. O site publicado se atualiza sozinho a cada envio na `main` (o robô roda os testes, o
    build e a conferência de segurança antes). Para conferir: abra o site e veja se a tela
-   rodapé mostra `v1.5.1`.
+   rodapé mostra `v1.5.2`.
 
 > **Já tinha aberto uma versão antiga em algum aparelho?** Aqueles dados de exemplo (e o
 > acesso `gui`) ficam **naquele navegador**. Para zerar: abra o sistema no aparelho →
@@ -314,7 +314,7 @@ Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
 
 ## Parte 5 — Conferência final
 
-- [ ] `main` com a versão **1.5.1** e sem PR pendente (Parte 0)
+- [ ] `main` com a versão **1.5.2** e sem PR pendente (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
 - [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
@@ -329,7 +329,7 @@ Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.5.1** aparecendo no rodapé do sistema
+- [ ] Versão **1.5.2** aparecendo no rodapé do sistema
 
 ---
 

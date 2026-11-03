@@ -63,7 +63,7 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.1** — restauração compatível com backups antigos e novo ícone PWA com o símbolo oficial da Altoprints.
+> **Versão atual: 1.5.2** — símbolo da nova identidade visual no cabeçalho do app e nos ícones PWA; inclui restauração compatível com backups antigos.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |

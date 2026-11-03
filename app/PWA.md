@@ -6,10 +6,11 @@ redigitar o endereço.
 
 ## Marca e ícone
 
-O ícone do aplicativo usa somente o símbolo colorido da Altoprints, sem o nome ou o slogan,
-para continuar reconhecível em tamanhos pequenos. A marca completa em alta resolução está em
-`app/public/brand/altoprints-logo-completo.png` (PNG) e `app/public/brand/altoprints-logo-completo.svg`;
-a arte do símbolo gerada para a reconstrução está em `app/public/brand/altoprints-simbolo.png`.
+O cabeçalho do app e os ícones do aplicativo usam somente o símbolo colorido da Altoprints,
+sem o nome ou o slogan, para continuar reconhecível em tamanhos pequenos. A marca completa
+em alta resolução está em `app/public/brand/altoprints-logo-completo.png` (PNG) e
+`app/public/brand/altoprints-logo-completo.svg`; a arte do símbolo está em
+`app/public/brand/altoprints-simbolo.png`.
 
 ## Antes de instalar
 

@@ -87,7 +87,7 @@ ver as tabelas: `vendedores`, `clientes`, `pedidos`, `arquivos`, `usuarios` e
 > repetir este passo (Configurações → Nuvem → Copiar o SQL → colar → Run). Rodar de novo
 > nunca apaga nem sobrescreve nada — só completa o que estiver faltando.
 >
-> **Na versão 1.5.1**, rode o SQL novamente antes de restaurar um backup: ele adiciona os
+> **Desde a versão 1.5.1**, rode o SQL novamente antes de restaurar um backup: ele adiciona os
 > campos atuais da fila e converte os status antigos de impressão, pagamento e entrega.
 > A migração preserva os registros; não apaga pedidos, clientes nem funcionários.
 
