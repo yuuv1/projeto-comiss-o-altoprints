@@ -4,6 +4,13 @@ O Altoprints pode ser instalado pelo navegador no celular ou computador. Ele gan
 ícone na tela inicial/área de aplicativos e abre em uma janela própria, sem precisar
 redigitar o endereço.
 
+## Marca e ícone
+
+O ícone do aplicativo usa somente o símbolo colorido da Altoprints, sem o nome ou o slogan,
+para continuar reconhecível em tamanhos pequenos. A marca completa em alta resolução está em
+`app/public/brand/altoprints-logo-completo.png` (PNG) e `app/public/brand/altoprints-logo-completo.svg`;
+a arte do símbolo gerada para a reconstrução está em `app/public/brand/altoprints-simbolo.png`.
+
 ## Antes de instalar
 
 - Abra o endereço hospedado por HTTPS, por exemplo:

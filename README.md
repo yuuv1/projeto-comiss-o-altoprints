@@ -63,7 +63,7 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.1** — correção para restaurar backups antigos com os clientes, funcionários e estados da fila preservados.
+> **Versão atual: 1.5.1** — restauração compatível com backups antigos e novo ícone PWA com o símbolo oficial da Altoprints.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |

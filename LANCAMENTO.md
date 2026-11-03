@@ -25,7 +25,8 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 A `main` já está **limpa e pronta para publicar** (versão **1.5.1**): sem pedidos de
 exemplo, sem usuário/senha padrão, **sem login de funcionário** (a equipe escolhe o próprio
 nome ao registrar a fila), com **“Login proprietário”**, Painel do chefe, busca em `Ctrl + K`,
-backup antigo compatível e instalação do site como aplicativo **PWA**. A correção de backup
+backup antigo compatível e instalação do site como aplicativo **PWA**. A marca foi refeita em alta
+resolução e o PWA usa apenas o símbolo no ícone (sem letras pequenas). A correção de backup
 preserva clientes, funcionários e os estados antigos de pedidos; o SQL também migra as colunas
 legadas do Supabase sem apagar dados.
 
