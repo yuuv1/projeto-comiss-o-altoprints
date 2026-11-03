@@ -196,17 +196,42 @@ const tratarErro = (contexto: string, erro: { message?: string } | null): never 
 /** true quando a nuvem está conectada (usado pelas telas) */
 export const modoNuvem = () => Boolean(clienteNuvem())
 
+const TAMANHO_PAGINA_SUPABASE = 1000
+
+async function selecionarTodos<T>(
+  sb: NonNullable<ReturnType<typeof clienteNuvemObrigatorio>>,
+  tabela: Tabela,
+  colunaOrdem: string,
+  ascending: boolean,
+): Promise<{ data: T[]; error: { message?: string } | null }> {
+  const acumulado: T[] = []
+  let inicio = 0
+  while (true) {
+    const consulta = sb.from(tabela).select('*').order(colunaOrdem, { ascending })
+    const res =
+      typeof consulta.range === 'function'
+        ? await consulta.range(inicio, inicio + TAMANHO_PAGINA_SUPABASE - 1)
+        : await consulta
+    if (res.error) return { data: [], error: res.error }
+    const lote = (res.data ?? []) as T[]
+    acumulado.push(...lote)
+    if (lote.length < TAMANHO_PAGINA_SUPABASE || typeof consulta.range !== 'function') break
+    inicio += TAMANHO_PAGINA_SUPABASE
+  }
+  return { data: acumulado, error: null }
+}
+
 export async function carregarTudo(): Promise<DB> {
   const sb = clienteNuvemObrigatorio()
   if (!sb) return await lerLocal()
 
   const [vendedores, clientes, pedidos, arquivos, impressoes, usuarios, config] = await Promise.all([
-    sb.from('vendedores').select('*').order('nome', { ascending: true }),
-    sb.from('clientes').select('*').order('nome', { ascending: true }),
-    sb.from('pedidos').select('*').order('numero', { ascending: false }),
-    sb.from('arquivos').select('*').order('created_at', { ascending: false }),
-    sb.from('impressoes').select('*').order('quando', { ascending: false }),
-    sb.from('usuarios').select('*').order('nome', { ascending: true }),
+    selecionarTodos<Vendedor>(sb, 'vendedores', 'nome', true),
+    selecionarTodos<Cliente>(sb, 'clientes', 'nome', true),
+    selecionarTodos<Pedido>(sb, 'pedidos', 'numero', false),
+    selecionarTodos<Arquivo>(sb, 'arquivos', 'created_at', false),
+    selecionarTodos<Impressao>(sb, 'impressoes', 'quando', false),
+    selecionarTodos<Usuario>(sb, 'usuarios', 'nome', true),
     sb.from('configuracoes').select('*').eq('id', 1).maybeSingle(),
   ])
 
