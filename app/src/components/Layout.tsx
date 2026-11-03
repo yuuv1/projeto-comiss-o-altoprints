@@ -29,6 +29,7 @@ import { Logo } from './Logo'
 import { BuscaGlobal } from './BuscaGlobal'
 import { PerfilDialog } from './PerfilDialog'
 import { ReviewModal } from './ReviewModal'
+import { InstalarApp } from './InstalarApp'
 import { Botao, cn } from './ui'
 
 interface ItemMenu {
@@ -177,6 +178,8 @@ export function Layout() {
               {compacto ? 'Compacto' : 'Confortável'}
             </button>
 
+            <InstalarApp />
+
             {ehProprietario ? (
               <>
                 <NavLink
@@ -224,7 +227,7 @@ export function Layout() {
               <NavLink
                 to={ROTA_ADMIN}
                 title="Entrar como proprietário (só o dono tem login)"
-                className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300 dark:hover:bg-violet-900/50 sm:text-[12px]"
+                className="hidden items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300 dark:hover:bg-violet-900/50 sm:inline-flex sm:text-[12px]"
               >
                 <LockKeyhole className="h-3.5 w-3.5" />
                 Login proprietário

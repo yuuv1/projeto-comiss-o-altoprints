@@ -9,8 +9,8 @@
  *      vazio; se algo assim aparecer no build, é porque voltou sem querer.
  *   2. CHAVES — nenhuma chave SECRETA do Supabase pode entrar no pacote
  *      (a chave pública pode; a secreta dá acesso total ao banco).
- *   3. ESTRUTURA — index.html, assets/, _redirects e o LEIA-ME precisam existir
- *      e concordar com a versão do package.json.
+ *   3. ESTRUTURA — index.html, assets/, manifesto e ícones PWA, _redirects e
+ *      LEIA-ME precisam existir e concordar com a versão do package.json.
  *
  * Sai com código 1 quando encontra problema: assim o robô do GitHub e o
  * `npm run publicar` param antes de entregar um pacote sujo.
@@ -162,6 +162,34 @@ if (tem('index.html')) {
   else problemas.push('index.html sem o <div id="root"> (a tela abriria em branco)')
 } else if (pasta === publicar) {
   problemas.push('a pasta publicar/ está sem o index.html')
+}
+
+// A versão hospedada precisa ter o manifesto, o service worker e os ícones
+// requeridos para instalação no Android/iOS/desktop.
+for (const arquivo of [
+  'manifest.webmanifest',
+  'sw.js',
+  'icons/pwa-192x192.png',
+  'icons/pwa-512x512.png',
+  'icons/pwa-maskable-512x512.png',
+]) {
+  if (tem(arquivo)) certos.push(`PWA: ${arquivo} presente`)
+  else problemas.push(`PWA incompleto: falta ${arquivo}`)
+}
+if (tem('manifest.webmanifest')) {
+  try {
+    const manifest = JSON.parse(await readFile(join(pasta, 'manifest.webmanifest'), 'utf8'))
+    if (manifest.display === 'standalone' && manifest.start_url && manifest.icons?.length >= 2)
+      certos.push('manifesto PWA tem modo standalone, start_url e ícones')
+    else problemas.push('manifest.webmanifest sem display/start_url/ícones mínimos')
+  } catch {
+    problemas.push('manifest.webmanifest não é um JSON válido')
+  }
+}
+if (tem('index.html')) {
+  const html = await readFile(join(pasta, 'index.html'), 'utf8')
+  if (/rel=["']manifest["']/.test(html)) certos.push('index.html referencia o manifesto PWA')
+  else problemas.push('index.html não referencia o manifesto PWA')
 }
 
 if (pasta === publicar) {

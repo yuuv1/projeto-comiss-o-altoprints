@@ -2,6 +2,7 @@ import { ArrowLeft, Crown, Eye, EyeOff, KeyRound, Lock, LogIn, ShieldCheck, Spar
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { InstalarApp } from '../components/InstalarApp'
 import { Botao, Campo, Entrada, cn } from '../components/ui'
 import { JanelaConexao } from '../components/Nuvem'
 import { useAuth } from '../lib/auth'
@@ -169,6 +170,10 @@ export default function Administracao() {
             </Link>
           </p>
         </form>
+
+        <div className="mt-3">
+          <InstalarApp variante="menu" />
+        </div>
 
         <div className="mt-4 space-y-2 text-center">
           <p

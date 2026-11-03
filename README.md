@@ -63,8 +63,8 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.4.0** — o número aparece no rodapé do sistema (e na tela de login do dono).
-> Se o aparelho mostrar um número menor, ele está com uma versão antiga em cache: recarregue.
+> **Versão atual: 1.5.0** — agora o site também pode ser instalado como aplicativo (PWA).
+> O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |
 | --- | --- | --- |
@@ -79,8 +79,16 @@ Outros comandos:
 
 Extras: **busca rápida em tudo com `Ctrl + K`** (pedido, cliente, telefone, cidade,
 rastreio e funcionário), **Janela de revisão a cada 3 dias** (o que está fora de "concluído
-e pago"), **Importar comprovante** (a IA lê a foto e preenche o pedido) e **tema
-claro/escuro** (botão no cabeçalho, cada pessoa escolhe o seu).
+e pago"), **Importar comprovante** (a IA lê a foto e preenche o pedido), **tema
+claro/escuro** e instalação como **aplicativo PWA**.
+
+### Instalar no celular ou computador
+
+Abra o site pelo endereço HTTPS e toque em **Instalar app** (no menu do celular ou no
+cabeçalho do computador). No iPhone/iPad, abra no Safari e use **Compartilhar → Adicionar
+à Tela de Início**. Depois, o ícone do Altoprints abre o sistema sem redigitar o endereço.
+O PWA atualiza o programa automaticamente; pedidos e sincronização com o Supabase ainda
+precisam de internet. Veja [`app/PWA.md`](app/PWA.md) para o passo a passo.
 
 ---
 
@@ -214,6 +222,7 @@ O sistema funciona de duas formas, sem mudar nenhuma tela:
 
 ```
 app/
+├── public/           manifesto e ícones do PWA
 ├── src/
 │   ├── lib/            regras e dados (tipos, preços, comissão, senha, tema, banco, arquivos)
 │   ├── components/     telas de apoio (menu, cartões, modais, etiquetas de status, logo)
@@ -231,6 +240,7 @@ app/
 - [x] Recriar o sistema fielmente ao antigo
 - [x] Hospedagem gratuita documentada (`app/DEPLOY.md`) + robô de publicação no GitHub Pages
 - [x] Tema claro/escuro
+- [x] Instalação do site como aplicativo PWA (Android, iOS e computador)
 - [x] Comissão por faixas de metragem, configurável em Configurações → Comissões
 - [x] **Só o proprietário tem login** (a equipe escolhe o próprio nome ao registrar a fila)
 - [x] **“Login proprietário”** no topo + endereço `#/administracao`, 5 toques no logo, Ctrl+Alt+D
