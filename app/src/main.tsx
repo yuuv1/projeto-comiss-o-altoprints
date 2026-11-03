@@ -10,9 +10,9 @@ import { prepararAparicao } from './lib/tema'
 
 // O arquivo Altoprints.html (file://) é uma demonstração local, não um PWA.
 // O service worker só é ativado no site hospedado em HTTPS ou localhost.
-// O modo autoUpdate aplica a versão nova quando ela chega; a verificação abaixo
-// também roda ao abrir/voltar ao app e a cada 5 minutos enquanto estiver aberto.
-// Um PWA fechado ou sem internet só consegue atualizar na próxima abertura online.
+// O modo autoUpdate aplica a versão nova assim que o service worker a instala;
+// as verificações também rodam ao abrir/voltar ao app e a cada 5 minutos online.
+// Workbox usa skipWaiting/clientsClaim na config para não exigir limpeza manual do cache.
 const origemSegura = window.location.protocol === 'https:' || window.location.hostname === 'localhost'
 if (import.meta.env.PROD && origemSegura && 'serviceWorker' in navigator) {
   registerSW({
@@ -29,6 +29,7 @@ if (import.meta.env.PROD && origemSegura && 'serviceWorker' in navigator) {
       window.setInterval(verificarAtualizacao, 5 * 60 * 1000)
       window.addEventListener('online', verificarAtualizacao)
       window.addEventListener('focus', verificarAtualizacao)
+      window.addEventListener('pageshow', verificarAtualizacao)
       document.addEventListener('visibilitychange', verificarAtualizacao)
     },
     onRegisterError(error) {
