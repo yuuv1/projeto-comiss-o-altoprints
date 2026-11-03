@@ -34,6 +34,7 @@ import {
 import { gerarDadosDemo, TAMANHO_DEMO } from '../src/lib/seed'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
 import { prepararBackup } from '../src/lib/backup'
+import { prepararMesclaRelatorioCSV } from '../src/lib/relatorio-backup'
 import {
   combinaFiltro,
   CONFIG_PADRAO,
@@ -47,6 +48,7 @@ import {
   pedidoPendenteFinanceiro,
   podeVerTela,
   telasDoUsuario,
+  type DB,
   type Impressao,
   type Pedido,
 } from '../src/lib/types'
@@ -655,6 +657,44 @@ igual('backup histórico: conta de funcionário vira só nome (sem login)', back
 igual('backup histórico sem proprietário preserva acesso atual', backupHistorico.usuarios.map((u) => u.id), [donoTeste.id])
 igual('backup histórico: pedido continua ligado ao funcionário', backupHistorico.pedidos[0].vendedor_id, 'v-jessica')
 igual('backup histórico: pedido antigo mantém status concluído e pago', [backupHistorico.pedidos[0].estagio, backupHistorico.pedidos[0].pago], ['concluido', true])
+
+const pedidoDaJessica = normalizarPedido({
+  id: 'pedido-jessica-recente',
+  numero: 20,
+  cliente_nome: 'Pedido novo da Jessica',
+  vendedor_id: 'v-jessica',
+  valor: 123.45,
+  estagio: 'em_andamento',
+} as never)
+const bancoRelatorio: DB = {
+  vendedores: [{ id: 'v-jessica', nome: 'Jéssica', created_at: '2024-01-01T00:00:00.000Z' }],
+  clientes: [],
+  pedidos: [pedidoDaJessica],
+  arquivos: [],
+  impressoes: [],
+  usuarios: [donoTeste],
+  configuracoes: CONFIG_PADRAO,
+}
+const csvRelatorio =
+  '\uFEFFNº;Cliente;Vendedor;Metragem;Valor;Comissão;Data do pagamento;% comissão;Data do pedido;Descrição;Forma de pagamento;Pago;Entregue\r\n' +
+  '20;Cliente antigo;JESSICA;1,5;500,00;20,00;01/05/2025;4%;30/04/2025;Pedido antigo;Pix;Sim;Não\r\n' +
+  '21;"Cliente; Novo";Raíssa;2,25;135,00;10,00;03/05/2025;4%;02/05/2025;Camiseta;Pix;Sim;Sim\r\n' +
+  '22;Cliente sem funcionário;Sem vendedor;—;75,50;0,00;;0%;04/05/2025;Arte;Outro;Não;Não\r\n' +
+  'COMISSÃO 1 a 5 m;;;;;;;'
+const mesclaRelatorio = prepararMesclaRelatorioCSV(csvRelatorio, bancoRelatorio)
+igual('relatório: reconhece os pedidos válidos e ignora rodapé de comissão', mesclaRelatorio.pedidosNoArquivo, 3)
+igual('relatório: só acrescenta pedidos com número ausente', mesclaRelatorio.pedidosNovos.map((p) => p.numero), [21, 22])
+igual('relatório: pedido já existente não substitui o da Jessica', mesclaRelatorio.pedidosNovos.some((p) => p.numero === 20), false)
+igual('relatório: detecta número existente com conteúdo diferente', [mesclaRelatorio.duplicados, mesclaRelatorio.conflitos], [1, 1])
+igual('relatório: cria só cliente e funcionário faltantes pelo nome', [mesclaRelatorio.clientesNovos.length, mesclaRelatorio.vendedoresNovos.map((v) => v.nome)], [2, ['Raíssa']])
+igual('relatório: preserva datas e status informados', [mesclaRelatorio.pedidosNovos[0].data_pedido, mesclaRelatorio.pedidosNovos[0].entregue], ['2025-05-02T12:00:00.000Z', true])
+igual('relatório: linha sem funcionário permanece sem vínculo', mesclaRelatorio.pedidosNovos[1].vendedor_id, '')
+try {
+  prepararMesclaRelatorioCSV('arquivo sem CSV', bancoRelatorio)
+  falhas.push('arquivo sem CSV deveria ser recusado')
+} catch (e) {
+  igual('relatório em formato errado é recusado com orientação', (e as Error).message.includes('Exportar CSV'), true)
+}
 
 const sqlSupabase = readFileSync('supabase/schema.sql', 'utf8')
 igual('SQL do Supabase inclui os campos atuais do fluxo', ['estagio', 'iniciado_em', 'entregue', 'pago'].every((campo) => sqlSupabase.includes(campo)), true)

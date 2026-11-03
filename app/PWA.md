@@ -12,6 +12,14 @@ em alta resolução está em `app/public/brand/altoprints-logo-completo.png` (PN
 `app/public/brand/altoprints-logo-completo.svg`; a arte do símbolo está em
 `app/public/brand/altoprints-simbolo.png`.
 
+## Acesso do proprietário e relatório no celular
+
+1. No aparelho do proprietário atual, abra **Configurações → Funcionários e acessos → Novo acesso de proprietário** e crie um usuário e senha separados para o chefe. Não reutilize o acesso da equipe.
+2. No celular do chefe, abra o mesmo endereço, conecte à mesma **Nuvem** da empresa e toque em **Login proprietário** para entrar com esse acesso.
+3. No **Painel**, toque em **Relatório**. Escolha o período (por exemplo, do início até hoje) e deixe **Todos os funcionários**; use **Imprimir / PDF** para visualizar/salvar ou **Exportar CSV** para baixar.
+
+O relatório é protegido para proprietários. Com a Nuvem conectada ao mesmo banco, o chefe vê os pedidos atualizados em qualquer aparelho.
+
 ## Antes de instalar
 
 - Abra o endereço hospedado por HTTPS, por exemplo:

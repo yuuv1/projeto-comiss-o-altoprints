@@ -208,7 +208,7 @@ export default function Painel() {
     { label: 'A receber', sub: moeda(aReceberTodos), icone: Wallet, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=a_pagar' },
     { label: 'Na máquina', sub: `${resumoHoje.naFila} fila(s)`, icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
     { label: 'Equipe', sub: `${db.vendedores.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
-    { label: 'Relatório', sub: 'comissões e faturamento', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
+    { label: 'Relatório', sub: 'ver ou baixar PDF / CSV', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
 
   const numerosDeHoje = [

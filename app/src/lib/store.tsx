@@ -30,6 +30,7 @@ import {
 import { calcularValor, proximoNumero } from './pricing'
 import { gerarDadosDemo } from './seed'
 import { prepararBackup } from './backup'
+import { prepararMesclaRelatorioCSV, type MesclaRelatorio } from './relatorio-backup'
 import {
   espacoNoLocalStorage,
   liberarCopiaAntiga,
@@ -97,8 +98,10 @@ interface Ctx {
   enviarDadosParaNuvem: () => Promise<void>
   /** baixa um arquivo .json com todo o banco */
   baixarBackup: () => void
-  /** restaura um backup baixado antes (substitui tudo) */
+  /** restaura um backup JSON completo (substitui tudo) */
   restaurarBackup: (arquivo: File) => Promise<void>
+  /** importa os pedidos do CSV de relatório sem apagar nem sobrescrever os atuais */
+  mesclarRelatorioCSV: (conteudo: string) => Promise<MesclaRelatorio>
   /* utilidades */
   vendedorPorId: (id: ID | '' | null | undefined) => Vendedor | undefined
   nomeVendedor: (id: ID | '' | null | undefined) => string
@@ -560,6 +563,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [avisar, db.usuarios],
   )
 
+  /** Mescla somente pedidos que ainda não existem; nunca apaga o banco atual. */
+  const mesclarRelatorioCSV = useCallback(async (conteudo: string) => {
+    const atual = await recarregar(true)
+    const resultado = prepararMesclaRelatorioCSV(conteudo, atual)
+    if (!resultado.pedidosNovos.length) return resultado
+
+    // Grava apenas IDs novos, em vez de substituir tabelas: um pedido lançado
+    // no celular enquanto o relatório era preparado não será removido.
+    await salvarVarios('vendedores', resultado.vendedoresNovos)
+    await salvarVarios('clientes', resultado.clientesNovos)
+    await salvarVarios('pedidos', resultado.pedidosNovos)
+
+    setDb((banco) => {
+      const idsVendedores = new Set(banco.vendedores.map((v) => v.id))
+      const idsClientes = new Set(banco.clientes.map((c) => c.id))
+      const numerosPedidos = new Set(banco.pedidos.map((p) => p.numero))
+      return {
+        ...banco,
+        vendedores: [...banco.vendedores, ...resultado.vendedoresNovos.filter((v) => !idsVendedores.has(v.id))],
+        clientes: [...banco.clientes, ...resultado.clientesNovos.filter((c) => !idsClientes.has(c.id))],
+        pedidos: [...banco.pedidos, ...resultado.pedidosNovos.filter((p) => !numerosPedidos.has(p.numero))].sort(
+          (a, b) => b.numero - a.numero,
+        ),
+      }
+    })
+    return resultado
+  }, [recarregar])
+
   /**
    * Carrega os dados de EXEMPLO (fictícios) para treinar a equipe.
    * Nunca toca nos acessos de proprietário nem nas configurações do dono: assim ninguém
@@ -656,6 +687,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
+      mesclarRelatorioCSV,
       vendedorPorId,
       nomeVendedor,
       proximoNumeroPedido: proximoNumero(db.pedidos.map((p) => p.numero)),
@@ -689,6 +721,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       enviarDadosParaNuvem,
       baixarBackup,
       restaurarBackup,
+      mesclarRelatorioCSV,
       vendedorPorId,
       nomeVendedor,
       pedidoPorId,

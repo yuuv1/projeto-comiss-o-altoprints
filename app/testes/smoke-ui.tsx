@@ -466,6 +466,14 @@ async function main() {
   if (!equipeOk) falhas++
   console.log(`  ${equipeOk ? '✅' : '❌'} “Funcionários e acessos” é uma aba dentro de Configurações`)
 
+  dom.window.location.hash = '#/configuracoes?aba=dados'
+  await espera(600)
+  const campoMesclarCSV = raiz?.querySelector<HTMLInputElement>('input[type="file"][accept=".csv,text/csv"]')
+  const textoBackupCSV = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const mesclaCSVVisivel = Boolean(campoMesclarCSV) && textoBackupCSV.includes('Mesclar relatório CSV')
+  if (!mesclaCSVVisivel) falhas++
+  console.log(`  ${mesclaCSVVisivel ? '✅' : '❌'} Configurações → Dados oferece mesclagem segura do relatório CSV`)
+
   // confere se o painel do dono realmente mostra o painel
   dom.window.location.hash = '#/'
   await espera(600)

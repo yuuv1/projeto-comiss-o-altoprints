@@ -31,6 +31,7 @@ import { useSearchParams } from 'react-router-dom'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
 import { useAuth } from '../lib/auth'
 import { prepararBackup } from '../lib/backup'
+import { prepararMesclaRelatorioCSV } from '../lib/relatorio-backup'
 import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { tamanhoLegivel } from '../lib/files'
 import { dataBR, moeda, numeroBR } from '../lib/format'
@@ -79,7 +80,7 @@ const AJUDA_ABA: Record<Aba, string> = {
   equipe: 'Os funcionários que aparecem nos pedidos e os acessos de proprietário (login com senha).',
   empresa: 'Nome e logo da empresa, que aparecem no sistema e nas folhas impressas.',
   ia: 'A chave da IA que lê a foto do comprovante e preenche o pedido automaticamente.',
-  dados: 'Backup, restauração, dados de exemplo e o espaço usado neste aparelho.',
+  dados: 'Backup JSON completo, restauração, mesclagem do relatório CSV e espaço usado neste aparelho.',
   nuvem: 'A conexão com o Supabase, para a equipe toda ver os mesmos pedidos em qualquer aparelho.',
   acesso: 'O seu usuário e a sua senha, e como criar um segundo acesso de proprietário.',
   aparencia: 'Tema claro/escuro e o tamanho dos blocos (só para este aparelho).',
@@ -94,6 +95,8 @@ export default function Configuracoes() {
     carregarDemo,
     baixarBackup,
     restaurarBackup,
+    mesclarRelatorioCSV,
+    recarregar,
     avisar,
     medirEspaco,
     liberarEspaco,
@@ -112,6 +115,50 @@ export default function Configuracoes() {
   useEffect(() => {
     if (ABAS_CONFIG.includes(abaDaUrl as Aba)) setAba(abaDaUrl as Aba)
   }, [abaDaUrl])
+
+  const importarRelatorioCSV = async (arquivo?: File | null) => {
+    if (!arquivo) return
+    try {
+      const conteudo = await arquivo.text()
+      const bancoAtual = await recarregar(true)
+      const previaRelatorio = prepararMesclaRelatorioCSV(conteudo, bancoAtual)
+      if (!previaRelatorio.pedidosNovos.length) {
+        avisar(
+          `Nenhum pedido novo para acrescentar. ${previaRelatorio.duplicados} pedido(s) do relatório já existem e foram mantidos.`,
+          'info',
+        )
+        return
+      }
+
+      const avisoDatas = previaRelatorio.datasSemOrigem
+        ? `\n\nEm ${previaRelatorio.datasSemOrigem} pedido(s), o arquivo não tem data do pedido nem de pagamento; será usada a data da importação.`
+        : ''
+      const avisoConflitos = previaRelatorio.conflitos
+        ? `\n\n${previaRelatorio.conflitos} número(s) já existe(m) com dados diferentes; o pedido atual será mantido.`
+        : ''
+      const avisoModoLocal = !nuvem
+        ? '\n\nEste aparelho está no modo local. Para incluir pedidos de outros aparelhos, conecte-o à mesma Nuvem antes de mesclar.'
+        : ''
+      const ok = await confirmar({
+        titulo: 'Mesclar relatório geral?',
+        mensagem:
+          `O CSV tem ${previaRelatorio.pedidosNoArquivo} pedido(s): serão acrescentados ${previaRelatorio.pedidosNovos.length} pedido(s) ausente(s), ` +
+          `${previaRelatorio.clientesNovos.length} cliente(s) e ${previaRelatorio.vendedoresNovos.length} funcionário(s) que não existiam. ` +
+          `${previaRelatorio.duplicados} pedido(s) com número já cadastrado serão ignorados. Nada será apagado nem sobrescrito. ` +
+          'O CSV só recupera as colunas exportadas (pedidos concluídos, nomes, metragem, valor, datas, descrição, pagamento e entrega); contatos, endereços, pedidos em andamento, acessos, configurações e artes exigem o backup JSON completo.' +
+          avisoDatas + avisoConflitos + avisoModoLocal,
+        textoBotao: 'Mesclar sem apagar',
+      })
+      if (!ok) return
+
+      const resultado = await mesclarRelatorioCSV(conteudo)
+      avisar(
+        `Relatório mesclado: ${resultado.pedidosNovos.length} pedido(s) novo(s), ${resultado.duplicados} já existente(s) mantido(s).`,
+      )
+    } catch (erro) {
+      avisar((erro as Error).message || 'Não foi possível ler esse relatório.', 'erro')
+    }
+  }
 
   /* --------------------------- espaço no aparelho --------------------------- */
   const vazio: DiagnosticoArmazenamento = { localOk: true, idbOk: true, onde: 'nenhum', bytesLocal: 0, ocupantes: [] }
@@ -781,8 +828,8 @@ export default function Configuracoes() {
               <Upload className="h-4 w-4" /> Backup (cópia de segurança)
             </p>
             <p className="mb-3 text-xs text-emerald-800 dark:text-emerald-300">
-              O plano grátis do Supabase <b>não faz backup automático</b>. Baixe um arquivo de vez em quando (ex.: toda
-              semana) e guarde no computador ou na nuvem. Se algo der errado, é só restaurar este arquivo.
+              O plano grátis do Supabase <b>não faz backup automático</b>. O JSON salva o sistema completo; o CSV do
+              relatório pode ser mesclado sem apagar pedidos que já estão no sistema.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Botao tamanho="sm" icone={Download} onClick={baixarBackup}>
@@ -823,12 +870,27 @@ export default function Configuracoes() {
                   }}
                 />
               </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+                <Upload className="h-4 w-4" />
+                Mesclar relatório CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const arquivo = e.target.files?.[0]
+                    e.target.value = ''
+                    void importarRelatorioCSV(arquivo)
+                  }}
+                />
+              </label>
             </div>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              O backup inclui pedidos, clientes, funcionários, arquivos (links) e os acessos de proprietário. Antes de
-              aplicar, o sistema mostra os totais e avisa se o arquivo não tiver clientes nem funcionários. Fotos e artes
-              enviadas ficam no Supabase Storage e continuam lá. Para restaurar um backup em outro computador:
-              abra o sistema nele e use <b>Restaurar backup</b>; com a nuvem conectada, o conteúdo vale para todos.
+              O backup JSON inclui pedidos, clientes, funcionários, arquivos (links), configurações e acessos de proprietário.
+              <b> Restaurar backup</b> substitui os dados atuais. Já <b>Mesclar relatório CSV</b> só acrescenta pedidos
+              concluídos que ainda não existem; pedidos atuais, inclusive os registrados depois do relatório, ficam intactos. O relatório
+              não traz contatos, artes, logins nem configurações — use o JSON para uma cópia completa. Fotos e artes enviadas
+              continuam no Supabase Storage.
             </p>
           </Cartao>
         </div>
