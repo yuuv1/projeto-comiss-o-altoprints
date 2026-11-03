@@ -36,6 +36,7 @@ import {
 } from '../components/ui'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
+import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime, percentualBR } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
@@ -392,11 +393,18 @@ export default function PedidoForm() {
                   required
                 >
                   <option value="">{ehProprietario ? 'Selecione o funcionário' : 'Escolha o seu nome'}</option>
-                  {db.vendedores.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.nome}
-                    </option>
-                  ))}
+                  {vendedoresAtivosAtual(db.vendedores, db.pedidos)
+                    .concat(
+                      form.vendedor_id &&
+                        !vendedoresAtivosAtual(db.vendedores, db.pedidos).some((v) => v.id === form.vendedor_id)
+                        ? db.vendedores.filter((v) => v.id === form.vendedor_id)
+                        : [],
+                    )
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nome}
+                      </option>
+                    ))}
                 </Selecao>
               </Campo>
 

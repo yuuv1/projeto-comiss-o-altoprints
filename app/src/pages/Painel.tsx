@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Abas, Botao, Campo, Cartao, CartaoResumo, Entrada, TituloPagina, cn } from '../components/ui'
 import { calcularComissao, comissaoPorVendedor } from '../lib/comissao'
+import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
 import { dataBR, diasEntre, hojeISO, moeda, numeroBR, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
@@ -33,6 +34,11 @@ const primeiroDiaDoMes = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
+
+const formatarDataISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 const dataPagamento = (p: Pedido) => p.data_pagamento || (p.data_pedido || '').slice(0, 10)
 
@@ -121,28 +127,60 @@ export default function Painel() {
 
   /* ------------------------------ equipe em tabela ------------------------------ */
 
+  const mesesDisponiveis = useMemo(() => {
+    const conjunto = new Set<string>()
+    conjunto.add(hoje.slice(0, 7))
+    for (const p of db.pedidos) {
+      const d = dataPagamento(p)
+      if (/^\d{4}-\d{2}/.test(d)) conjunto.add(d.slice(0, 7))
+    }
+    return [...conjunto]
+      .sort((a, b) => b.localeCompare(a))
+      .slice(0, 12)
+      .map((anoMes) => {
+        const [a, m] = anoMes.split('-').map(Number)
+        const de = `${anoMes}-01`
+        const ultimoDia = formatarDataISO(new Date(a, m, 0))
+        return {
+          id: anoMes,
+          label: `${NOMES_MESES[(m || 1) - 1]}/${String(a).slice(-2)}`,
+          de,
+          ate: ultimoDia > hoje ? hoje : ultimoDia,
+        }
+      })
+  }, [db.pedidos, hoje])
+
   const mesAtual = hoje.slice(0, 7)
   const equipe = useMemo(() => {
-    return db.vendedores
+    const pedidosMesAtual = db.pedidos.filter((p) => dataPagamento(p).startsWith(mesAtual))
+    const basePeriodo = pedidosPeriodo.length > 0 ? pedidosPeriodo : pedidosMesAtual
+    const vendedoresVisiveis =
+      basePeriodo.length > 0
+        ? vendedoresDoPeriodo(db.vendedores, basePeriodo)
+        : vendedoresAtivosAtual(db.vendedores, db.pedidos, hoje)
+
+    const listaBase = vendedoresVisiveis.length > 0 ? vendedoresVisiveis : vendedoresAtivosAtual(db.vendedores, db.pedidos, hoje)
+
+    return listaBase
       .map((conta) => {
         const meus = db.pedidos.filter((p) => p.vendedor_id === conta.id)
-        const noMes = meus.filter((p) => dataPagamento(p).startsWith(mesAtual))
-        const concluidos = filasDaComissao(noMes)
-        const ultima = meus
+        const noPeriodo = pedidosPeriodo.filter((p) => p.vendedor_id === conta.id)
+        const concluidos = filasDaComissao(noPeriodo)
+        const ultima = (noPeriodo.length > 0 ? noPeriodo : meus)
           .map((p) => p.data_pedido)
           .filter(Boolean)
           .sort()
           .pop()
         return {
           conta,
-          pedidos: noMes.length,
+          pedidos: noPeriodo.length,
           faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
           comissao: calcularComissao(concluidos, faixas, semMetragem).total,
           ultima: ultima ?? null,
         }
       })
       .sort((a, b) => b.faturamento - a.faturamento || a.conta.nome.localeCompare(b.conta.nome))
-  }, [db.pedidos, db.vendedores, faixas, mesAtual, semMetragem])
+  }, [db.pedidos, db.vendedores, faixas, hoje, mesAtual, pedidosPeriodo, semMetragem])
 
   const ranking = useMemo(
     () =>
@@ -170,7 +208,7 @@ export default function Painel() {
     { label: 'Novo pedido', sub: 'registrar uma fila', icone: Plus, cor: 'from-pink-500 to-purple-600', to: '/pedido/novo' },
     { label: 'A receber', sub: moeda(aReceberTodos), icone: Wallet, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=a_pagar' },
     { label: 'Na máquina', sub: `${resumoHoje.naFila} fila(s)`, icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
-    { label: 'Equipe', sub: `${db.vendedores.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
+    { label: 'Equipe', sub: `${equipe.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
     { label: 'Relatório', sub: 'ver ou baixar PDF / CSV', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
 
@@ -270,6 +308,38 @@ export default function Painel() {
           { id: 'personalizado', label: 'Escolher datas' },
         ]}
       />
+
+      {mesesDisponiveis.length > 1 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-bold text-slate-500 dark:text-slate-400">Mês:</span>
+          {mesesDisponiveis.map((m) => {
+            const ativo = inicio === m.de && fim === m.ate
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  if (m.id === mesAtual) {
+                    setPeriodo('mes')
+                  } else {
+                    setInicioPersonalizado(m.de)
+                    setFimPersonalizado(m.ate)
+                    setPeriodo('personalizado')
+                  }
+                }}
+                className={cn(
+                  'rounded-lg border px-2.5 py-1 text-xs font-bold transition',
+                  ativo
+                    ? 'border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-950/60 dark:text-purple-200'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                )}
+              >
+                {m.label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
       {periodo === 'personalizado' ? (
         <Cartao hover={false} className="mb-3">
@@ -457,7 +527,7 @@ export default function Painel() {
           <div>
             <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Funcionários · mês atual</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {db.vendedores.length} funcionário(s) • {db.clientes.length} cliente(s) •{' '}
+              {equipe.length} funcionário(s) no período • {db.clientes.length} cliente(s) •{' '}
               {db.usuarios.length} login(s) de proprietário
             </p>
           </div>

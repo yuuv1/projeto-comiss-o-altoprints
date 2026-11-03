@@ -15,6 +15,7 @@ import {
 import { useMemo, useState } from 'react'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
+import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, moeda, numeroBR } from '../lib/format'
 import { calcularComissao } from '../lib/comissao'
 import { FAIXAS_PADRAO, filasDaComissao, type Vendedor } from '../lib/types'
@@ -57,8 +58,14 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
   const [salvandoNome, setSalvandoNome] = useState(false)
   const [renomeando, setRenomeando] = useState<Vendedor | null>(null)
   const [nomeEditado, setNomeEditado] = useState('')
+  const [mostrarExFuncionarios, setMostrarExFuncionarios] = useState(false)
 
-  const funcionarios = useMemo(() => {
+  const idsAtivos = useMemo(
+    () => new Set(vendedoresAtivosAtual(db.vendedores, db.pedidos).map((v) => v.id)),
+    [db.pedidos, db.vendedores],
+  )
+
+  const todosFuncionarios = useMemo(() => {
     return db.vendedores
       .map((v) => {
         const pedidos = db.pedidos.filter((p) => p.vendedor_id === v.id)
@@ -69,8 +76,10 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
           .filter(Boolean)
           .sort()
           .pop()
+        const ativo = noMes.length > 0 || pedidos.length === 0 || idsAtivos.has(v.id)
         return {
           vendedor: v,
+          ativo,
           total: pedidos.length,
           pedidos: noMes.length,
           faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
@@ -79,7 +88,19 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
         }
       })
       .sort((a, b) => b.faturamento - a.faturamento || a.vendedor.nome.localeCompare(b.vendedor.nome))
-  }, [db.pedidos, db.vendedores, faixas, mesAtual, semMetragem])
+  }, [db.pedidos, db.vendedores, faixas, idsAtivos, mesAtual, semMetragem])
+
+  const funcionarios = useMemo(
+    () =>
+      mostrarExFuncionarios
+        ? todosFuncionarios
+        : todosFuncionarios.filter((f) => f.ativo),
+    [mostrarExFuncionarios, todosFuncionarios],
+  )
+  const exFuncionariosCount = useMemo(
+    () => todosFuncionarios.filter((f) => !f.ativo).length,
+    [todosFuncionarios],
+  )
 
   const adicionarFuncionario = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -358,6 +379,23 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
                 ))}
               </tbody>
             </table>
+            {exFuncionariosCount > 0 ? (
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
+                <span>
+                  {mostrarExFuncionarios
+                    ? `Mostrando também ${exFuncionariosCount} ex-funcionária(s) de meses anteriores.`
+                    : `${exFuncionariosCount} ex-funcionária(s) de meses anteriores ocultada(s) para manter a lista limpa.`}
+                </span>
+                <Botao
+                  tamanho="sm"
+                  variante="ghost"
+                  icone={mostrarExFuncionarios ? EyeOff : Eye}
+                  onClick={() => setMostrarExFuncionarios((v) => !v)}
+                >
+                  {mostrarExFuncionarios ? 'Ocultar antigos' : `Ver histórico (${exFuncionariosCount})`}
+                </Botao>
+              </div>
+            ) : null}
           </div>
         )}
       </Cartao>
