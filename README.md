@@ -63,7 +63,8 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.4** — reforça a atualização automática do PWA, exibe o estado da sincronização e aceita e-mail como login do proprietário.
+> **Versão atual: 1.5.5** — reforça a atualização automática do PWA e exibe o estado da sincronização.
+> O login do proprietário usa um único campo de usuário e senha; o e-mail dele pode ser o usuário.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |

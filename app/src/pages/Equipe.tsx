@@ -485,13 +485,17 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
           <Campo label="Nome" obrigatorio>
             <Entrada value={donoNome} onChange={(e) => setDonoNome(e.target.value)} placeholder="Nome de quem vai usar" required />
           </Campo>
-          <Campo label="E-mail ou usuário (login)" obrigatorio dica="Informe um e-mail completo ou um usuário curto.">
+          <Campo
+            label="Usuário (login)"
+            obrigatorio
+            dica="Use o usuário habitual; se ele já usa o e-mail para entrar, informe esse e-mail aqui. Não há campo de e-mail separado."
+          >
             <Entrada
               value={donoUsuario}
               onChange={(e) => setDonoUsuario(e.target.value)}
               autoCapitalize="none"
               autoCorrect="off"
-              placeholder="ex.: nome@empresa.com"
+              placeholder="Digite o usuário para login"
               required
             />
           </Campo>
