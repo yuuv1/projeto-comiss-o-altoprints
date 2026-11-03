@@ -2,12 +2,24 @@ async function main() {
   const global = globalThis as typeof globalThis & {
     window: { location: { search: string; pathname: string; hash: string; origin: string } }
     history: { replaceState: () => void }
-    localStorage: { getItem: () => null; setItem: () => void; removeItem: () => void }
+    localStorage: { getItem: (key: string) => null; setItem: () => void; removeItem: () => void }
     indexedDB: IDBFactory
+    fetch: typeof fetch
   }
   global.window = { location: { search: '', pathname: '/', hash: '', origin: 'https://teste.invalid' } }
   global.history = { replaceState: () => {} }
-  global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  let leuBancoLegado = false
+  global.localStorage = {
+    getItem: (key) => {
+      if (key === 'altoprints:db:v1') leuBancoLegado = true
+      return null
+    },
+    setItem: () => {},
+    removeItem: () => {},
+  }
+  global.fetch = async () => {
+    throw new TypeError('Failed to fetch')
+  }
 
   let tentouLerIndexedDB = false
   global.indexedDB = {
@@ -16,6 +28,18 @@ async function main() {
       throw new Error('registro legado de arte')
     },
   } as unknown as IDBFactory
+
+  const { carregarTudo } = await import('../src/lib/backend')
+  let leituraOnlineFalhou = false
+  try {
+    await carregarTudo()
+  } catch {
+    leituraOnlineFalhou = true
+  }
+  if (!leituraOnlineFalhou) throw new Error('o teste deveria simular indisponibilidade do Supabase')
+  if (leuBancoLegado || tentouLerIndexedDB)
+    throw new Error('falha de rede no Supabase fez produção consultar o banco local legado')
+  console.log('✅ falha de rede no Supabase não consulta o banco local legado')
 
   const { urlDoArquivo } = await import('../src/lib/files')
   const url = await urlDoArquivo({

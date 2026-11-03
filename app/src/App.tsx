@@ -43,22 +43,40 @@ function Carregando() {
   )
 }
 
-function SiteSemConexaoOnline() {
+function SiteSemConexaoOnline({ erro }: { erro?: string | null }) {
+  const configuracaoAusente = !erro
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-fuchsia-50 to-sky-50 p-4 dark:from-slate-950 dark:to-slate-900">
       <section className="w-full max-w-xl rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
           <Cloud className="h-6 w-6" />
         </div>
-        <h1 className="text-xl font-black text-slate-900 dark:text-white">Conexão com o banco online necessária</h1>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-          O Altoprints oficial usa um único banco na nuvem para todos os aparelhos. Esta publicação está sem a
-          configuração central do Supabase; por segurança, o sistema não lê nem grava pedidos, clientes, arquivos ou outros dados operacionais neste navegador.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-          O responsável pelo site precisa configurar <b>VITE_SUPABASE_URL</b> e a chave pública do Supabase nas
-          variáveis de publicação e publicar novamente.
-        </p>
+        <h1 className="text-xl font-black text-slate-900 dark:text-white">
+          {configuracaoAusente ? 'Conexão com o banco online necessária' : 'Banco online indisponível'}
+        </h1>
+        {configuracaoAusente ? (
+          <>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              O Altoprints oficial usa um único banco na nuvem para todos os aparelhos. Esta publicação está sem a
+              configuração central do Supabase; por segurança, o sistema não lê nem grava dados operacionais neste navegador.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              O responsável pelo site precisa configurar <b>VITE_SUPABASE_URL</b> e a chave pública do Supabase nas
+              variáveis de publicação e publicar novamente.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              A conexão central está configurada, mas não foi possível carregar os dados do Supabase. O site não muda
+              para modo local nem grava registros neste aparelho.
+            </p>
+            <p className="mt-3 break-words text-xs text-rose-700 dark:text-rose-300">{erro}</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              Confira a internet e se o projeto está ativo; tente novamente quando o banco voltar.
+            </p>
+          </>
+        )}
         <button
           type="button"
           onClick={() => window.location.reload()}
@@ -112,13 +130,14 @@ function Inicio() {
 export default function App() {
   const navegar = useNavigate()
   const { carregando } = useAuth()
-  const { nuvem } = useStore()
+  const { nuvem, ultimaSincronizacao, erro } = useStore()
 
   // atalho do proprietário no teclado: Ctrl + Alt + D
   useAtalhoAdmin(() => navegar(ROTA_ADMIN))
 
   if (carregando) return <Carregando />
   if (nuvemObrigatoria && !nuvem) return <SiteSemConexaoOnline />
+  if (nuvemObrigatoria && !ultimaSincronizacao) return <SiteSemConexaoOnline erro={erro} />
 
   return (
     <>
