@@ -133,7 +133,21 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
 
   const exportarCSV = () => {
     const linhas: (string | number)[][] = [
-      ['Nº', 'Cliente', 'Vendedor', 'Metragem', 'Valor', 'Comissão', 'Data do pagamento', '% comissão'],
+      [
+        'Nº',
+        'Cliente',
+        'Vendedor',
+        'Metragem',
+        'Valor',
+        'Comissão',
+        'Data do pagamento',
+        '% comissão',
+        'Data do pedido',
+        'Descrição',
+        'Forma de pagamento',
+        'Pago',
+        'Entregue',
+      ],
       ...visiveis.map((p) => [
         p.numero,
         p.cliente_nome,
@@ -143,6 +157,11 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
         p.data_pagamento ? dataBR(p.data_pagamento) : '',
         `${numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 2)}%`,
+        dataBR(p.data_pedido),
+        p.descricao,
+        p.forma_pagamento,
+        p.pago ? 'Sim' : 'Não',
+        p.entregue ? 'Sim' : 'Não',
       ]),
       [],
       ...resultado.porFaixa
