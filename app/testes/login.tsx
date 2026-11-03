@@ -67,7 +67,7 @@ async function main() {
   const { createRoot } = await import('react-dom/client')
   const React = await import('react')
   const { StoreProvider } = await import('../src/lib/store')
-  const { AuthProvider, useAuth, normalizarUsuario, validarUsuario } = await import('../src/lib/auth')
+  const { AuthProvider, useAuth, emailInterno, normalizarUsuario, validarUsuario } = await import('../src/lib/auth')
   const { FAIXAS_PADRAO } = await import('../src/lib/types')
   const { EQUIPE_INICIAL, CHAVE_EQUIPE_INICIAL, vendedoresDaEquipeInicial } = await import('../src/lib/equipe-inicial')
   const { validarSenha } = await import('../src/lib/usuario')
@@ -78,6 +78,12 @@ async function main() {
   /* ------------------------ funções puras do acesso ------------------------ */
   igual('usuario normalizado (acentos e maiúsculas)', normalizarUsuario('  Jéssica Alves '), 'jessicaalves')
   igual('usuario remove símbolos estranhos', normalizarUsuario('jé$sica@2026'), 'jesica2026')
+  igual('e-mail de login fica completo e minúsculo', normalizarUsuario('  Dona.Exemplo@Empresa.com  '), 'dona.exemplo@empresa.com')
+  igual('e-mail longo não é truncado como nome de usuário', normalizarUsuario('financeiro.altoprints70@exemplo.com'), 'financeiro.altoprints70@exemplo.com')
+  igual('e-mail completo é aceito como login', validarUsuario('Dona.Exemplo@Empresa.com'), '')
+  igual('e-mail incompleto é recusado', validarUsuario('dona@empresa'), 'Digite um e-mail válido para usar como login.')
+  igual('emailInterno preserva o e-mail real', emailInterno('Dona@Empresa.com'), 'dona@empresa.com')
+  igual('usuario antigo mantém e-mail interno', emailInterno('carla'), 'carla@altoprints.local')
   igual('usuario curto é recusado', validarUsuario('ab'), 'O nome de usuário precisa ter pelo menos 3 letras.')
   igual('usuario válido passa', validarUsuario('carla'), '')
   igual('senha curta é recusada', validarSenha('12'), 'A senha precisa ter pelo menos 4 caracteres.')
@@ -223,11 +229,11 @@ async function main() {
 
   /* ---------------- o dono cria outros acessos de proprietário --------------- */
   const sessaoAntes = pegar().usuario?.usuario
-  await pegar().criarOutroProprietario({ nome: 'Sócio', usuario: 'socio', senha: '1234' })
+  await pegar().criarOutroProprietario({ nome: 'Sócio', usuario: 'Socio@Exemplo.com', senha: '1234' })
   await respirar()
   igual('criar outro dono não troca a sessão de quem criou', pegar().usuario?.usuario, sessaoAntes)
-  igual('o segundo dono foi criado', Boolean(conta('socio')), true)
-  igual('o segundo dono entra como proprietário', conta('socio')?.papel, 'proprietario')
+  igual('o segundo dono foi criado', Boolean(conta('socio@exemplo.com')), true)
+  igual('o segundo dono entra como proprietário', conta('socio@exemplo.com')?.papel, 'proprietario')
   await esperaErro(
     'nome de usuário repetido é recusado',
     pegar().criarOutroProprietario({ nome: 'Outra', usuario: 'DONA', senha: '1111' }),
@@ -246,7 +252,7 @@ async function main() {
   await respirar()
   igual('senha nova funciona', pegar().usuario?.usuario, 'dona')
 
-  const idSocio = conta('socio').id
+  const idSocio = conta('socio@exemplo.com').id
   await esperaErro(
     'redefinir a própria senha é pela tela Meu acesso',
     pegar().redefinirSenha(pegar().usuario?.id ?? '', '9999'),
@@ -256,9 +262,9 @@ async function main() {
   await respirar()
   await pegar().sair()
   await respirar()
-  await pegar().entrar('socio', '4321', true)
+  await pegar().entrar('SOCIO@EXEMPLO.COM', '4321', true)
   await respirar()
-  igual('a senha redefinida pelo dono funciona', pegar().usuario?.usuario, 'socio')
+  igual('login por e-mail funciona após a redefinição', pegar().usuario?.usuario, 'socio@exemplo.com')
 
   /* ------------- vários proprietários: desativar e excluir -------------- */
   const idDona = conta('dona').id
@@ -271,7 +277,7 @@ async function main() {
   await pegar().sair()
   await respirar()
   await esperaErro('dono desativado não entra', pegar().entrar('dona', '5555', true), 'desativado')
-  await pegar().entrar('socio', '4321', true)
+  await pegar().entrar('SOCIO@EXEMPLO.COM', '4321', true)
   await respirar()
   await pegar().alternarAtivo(idDona, true)
   await respirar()
@@ -291,13 +297,13 @@ async function main() {
   await respirar()
   for (let i = 0; i < 5; i++) {
     try {
-      await pegar().entrar('socio', 'senhaerrada', true)
+      await pegar().entrar('SOCIO@EXEMPLO.COM', 'senhaerrada', true)
     } catch {
       /* esperado */
     }
     await espera(20)
   }
-  await esperaErro('bloqueia depois de várias tentativas', pegar().entrar('socio', '4321', true), 'Muitas tentativas')
+  await esperaErro('bloqueia depois de várias tentativas', pegar().entrar('SOCIO@EXEMPLO.COM', '4321', true), 'Muitas tentativas')
 
   /* ---------------------- aparência (tema e densidade) ---------------------- */
   {

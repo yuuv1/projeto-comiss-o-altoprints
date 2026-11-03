@@ -90,7 +90,7 @@ export interface AuthContexto {
   criarOutroProprietario: (dados: { nome: string; usuario: string; senha: string }) => Promise<void>
   trocarMinhaSenha: (senhaAtual: string, nova: string) => Promise<void>
   atualizarMeuPerfil: (dados: { nome: string }) => Promise<void>
-  /** troca o próprio nome de usuário (login) */
+  /** troca o próprio identificador de login (e-mail ou nome de usuário) */
   trocarMeuUsuario: (novoUsuario: string) => Promise<void>
   /** redefine a senha de outro acesso de proprietário */
   redefinirSenha: (usuarioId: string, novaSenha: string) => Promise<void>
@@ -221,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nomeUsuario = normalizarUsuario(dados.usuario)
       const noBanco = await lerUsuarios()
       const lista = noBanco.length ? noBanco : usuarios
-      if (lista.some((u) => u.usuario === nomeUsuario)) throw new Error('Este nome de usuário já está em uso.')
+      if (lista.some((u) => u.usuario === nomeUsuario)) throw new Error('Este login já está em uso.')
 
       const conta: Usuario = {
         id: novoId(),
@@ -293,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalizado = normalizarUsuario(novo)
     const noBanco = await lerUsuarios()
     if (noBanco.some((u) => u.id !== usuario.id && u.usuario === normalizado))
-      throw new Error('Este nome de usuário já está em uso.')
+      throw new Error('Este login já está em uso.')
     const alvo = noBanco.find((u) => u.id === usuario.id) ?? usuario
     await salvarRegistro('usuarios', { ...alvo, usuario: normalizado })
     await recarregar()

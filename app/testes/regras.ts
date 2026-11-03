@@ -698,6 +698,7 @@ try {
 
 const sqlSupabase = readFileSync('supabase/schema.sql', 'utf8')
 igual('SQL do Supabase inclui os campos atuais do fluxo', ['estagio', 'iniciado_em', 'entregue', 'pago'].every((campo) => sqlSupabase.includes(campo)), true)
+igual('SQL inclui as tabelas do sistema na publicação Realtime sem duplicar', sqlSupabase.includes('pg_publication_tables') && sqlSupabase.includes('alter publication supabase_realtime add table public.%I'), true)
 igual('SQL converte o status antigo em concluído durante a migração', /status_producao = 'dtf_pronto'/.test(sqlSupabase), true)
 
 try {

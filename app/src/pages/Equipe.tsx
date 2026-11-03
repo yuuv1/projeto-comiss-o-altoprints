@@ -382,7 +382,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
             <thead>
               <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 <th className="px-2 py-1.5">Nome</th>
-                <th className="px-2 py-1.5">Usuário</th>
+                <th className="px-2 py-1.5">E-mail / usuário</th>
                 <th className="px-2 py-1.5">Situação</th>
                 <th className="px-2 py-1.5">Criado em</th>
                 <th className="px-2 py-1.5" />
@@ -485,13 +485,13 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
           <Campo label="Nome" obrigatorio>
             <Entrada value={donoNome} onChange={(e) => setDonoNome(e.target.value)} placeholder="Nome de quem vai usar" required />
           </Campo>
-          <Campo label="Usuário (login)" obrigatorio dica="Só letras, números, ponto, traço e underline.">
+          <Campo label="E-mail ou usuário (login)" obrigatorio dica="Informe um e-mail completo ou um usuário curto.">
             <Entrada
               value={donoUsuario}
               onChange={(e) => setDonoUsuario(e.target.value)}
               autoCapitalize="none"
               autoCorrect="off"
-              placeholder="ex.: dona"
+              placeholder="ex.: nome@empresa.com"
               required
             />
           </Campo>

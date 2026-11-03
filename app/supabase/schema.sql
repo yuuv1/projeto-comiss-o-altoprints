@@ -194,8 +194,8 @@ alter table public.usuarios add column if not exists sem_senha boolean default f
 --  banco criado a recebe agora, sem perder nenhum pedido)
 
 -- --------------------------- acesso (RLS) ----------------------------------
--- O sistema é de uso interno e o login é o do próprio sistema (nome de usuário
--- + senha). Mantemos a leitura/escrita liberada pela chave pública (publishable
+-- O sistema é de uso interno e o login é o do próprio sistema (e-mail ou nome
+-- de usuário + senha). Mantemos a leitura/escrita liberada pela chave pública (publishable
 -- ou anon) — use uma senha forte para o proprietário e não torne o link público.
 -- Se quiser trancar mais, troque as políticas abaixo pelas do Supabase Auth.
 alter table public.vendedores    enable row level security;
@@ -216,6 +216,26 @@ begin
       t
     );
   end loop;
+end $$;
+
+-- --------------------- sincronização em tempo real -------------------------
+-- Inclui as tabelas do app na publicação do Supabase Realtime. O bloco é
+-- idempotente: pode ser executado novamente sem duplicar tabelas. Se a
+-- publicação não existir (fora do Supabase), o app continua usando a checagem
+-- periódica como alternativa.
+do $$
+declare t text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime' and not puballtables) then
+    foreach t in array array['vendedores','clientes','pedidos','arquivos','impressoes','usuarios','configuracoes'] loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+      ) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
+  end if;
 end $$;
 
 -- ---------------------------- espaço das artes -----------------------------

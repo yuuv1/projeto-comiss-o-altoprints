@@ -987,8 +987,8 @@ export default function Configuracoes() {
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-              <Campo label="Meu nome de usuário (login)" dica={nuvem ? 'No modo nuvem, para trocar o usuário é preciso refazer a conexão do Supabase.' : 'Só letras, números, ponto, traço e underline.'}>
-                <Entrada value={meuUsuario} onChange={(e) => setMeuUsuario(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="Digite seu usuário" />
+              <Campo label="Meu e-mail ou nome de usuário (login)" dica="Aceita um e-mail completo ou um nome de usuário curto; a alteração é salva no banco conectado.">
+                <Entrada value={meuUsuario} onChange={(e) => setMeuUsuario(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="Digite seu e-mail ou usuário" />
               </Campo>
               <Botao
                 variante="secundario"
