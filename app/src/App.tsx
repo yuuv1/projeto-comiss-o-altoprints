@@ -1,9 +1,10 @@
-import { AlertTriangle, Loader2, LockKeyhole, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, Cloud, Loader2, LockKeyhole, RefreshCw, ShieldAlert } from 'lucide-react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { ROTA_ADMIN, useAtalhoAdmin } from './lib/admin'
 import { Layout } from './components/Layout'
 import { Toaster, Vazio } from './components/ui'
 import { useAuth } from './lib/auth'
+import { nuvemObrigatoria } from './lib/supabase'
 import { useStore } from './lib/store'
 import Administracao from './pages/Administracao'
 import Clientes from './pages/Clientes'
@@ -39,6 +40,34 @@ function Carregando() {
       <Loader2 className="h-5 w-5 animate-spin text-purple-600 dark:text-purple-400" />
       <span className="text-sm font-semibold">Carregando o sistema...</span>
     </div>
+  )
+}
+
+function SiteSemConexaoOnline() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-fuchsia-50 to-sky-50 p-4 dark:from-slate-950 dark:to-slate-900">
+      <section className="w-full max-w-xl rounded-3xl border border-white/70 bg-white/90 p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+          <Cloud className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-black text-slate-900 dark:text-white">Conexão com o banco online necessária</h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          O Altoprints oficial usa um único banco na nuvem para todos os aparelhos. Esta publicação está sem a
+          configuração central do Supabase; por segurança, o sistema não lê nem grava pedidos, clientes, arquivos ou outros dados operacionais neste navegador.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          O responsável pelo site precisa configurar <b>VITE_SUPABASE_URL</b> e a chave pública do Supabase nas
+          variáveis de publicação e publicar novamente.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-bold text-white shadow-soft"
+        >
+          <RefreshCw className="h-4 w-4" /> Verificar novamente
+        </button>
+      </section>
+    </main>
   )
 }
 
@@ -83,11 +112,13 @@ function Inicio() {
 export default function App() {
   const navegar = useNavigate()
   const { carregando } = useAuth()
+  const { nuvem } = useStore()
 
   // atalho do proprietário no teclado: Ctrl + Alt + D
   useAtalhoAdmin(() => navegar(ROTA_ADMIN))
 
   if (carregando) return <Carregando />
+  if (nuvemObrigatoria && !nuvem) return <SiteSemConexaoOnline />
 
   return (
     <>

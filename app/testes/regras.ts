@@ -507,8 +507,8 @@ igual('conta sem telas definidas fica no padrão', podeVerTela({ ...vendedorTest
 igual('proprietário nunca é bloqueado', podeVerTela(donoTeste, 'clienteEspecial'), true)
 
 /* ---------------------- chaves do Supabase ----------------------------- */
-igual('sem chave: modo local', conferirChave(''), 'faltando')
-igual('sem chave (undefined): modo local', conferirChave(undefined), 'faltando')
+igual('sem chave: não configurada', conferirChave(''), 'faltando')
+igual('sem chave (undefined): não configurada', conferirChave(undefined), 'faltando')
 igual('chave publishable (nova) é aceita', conferirChave('sb_publishable_abc123'), 'ok')
 igual('chave anon (antiga) é aceita', conferirChave('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc'), 'ok')
 igual('chave secret é recusada (não pode ir para o site)', conferirChave('sb_secret_abc123'), 'secreta')

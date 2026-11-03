@@ -8,7 +8,7 @@ import { AuthProvider } from './lib/auth'
 import { StoreProvider } from './lib/store'
 import { prepararAparicao } from './lib/tema'
 
-// O arquivo Altoprints.html (file://) é uma demonstração local, não um PWA.
+// O app oficial funciona no site HTTPS e usa somente o banco Supabase central.
 // O service worker só é ativado no site hospedado em HTTPS ou localhost.
 // O modo autoUpdate aplica a versão nova assim que o service worker a instala;
 // as verificações também rodam ao abrir/voltar ao app e a cada 5 minutos online.

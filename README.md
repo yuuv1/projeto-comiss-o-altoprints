@@ -12,9 +12,7 @@ no sistema antigo (artastic-printflow.lovable.app): mesma navegação em "pílul
 mesmos cartões de resumo, as mesmas etiquetas de status, os mesmos cálculos de preço
 por metragem e os mesmos relatórios prontos para a contabilidade.
 
-> 🚀 **Quer colocar no ar agora?** Siga o **[LANCAMENTO.md](LANCAMENTO.md)** — é o guia
-> curto (10 minutos) com a ordem certa: publicar, criar o acesso do dono (senha), cadastrar
-> os funcionários e conectar a nuvem.
+> 🚀 **Quer colocar no ar agora?** Siga o **[LANCAMENTO.md](LANCAMENTO.md)**. O site oficial só publica com o Supabase central configurado; todos os aparelhos usam o mesmo banco online.
 
 ---
 
@@ -26,44 +24,30 @@ npm install
 npm run dev      # abre em http://localhost:8080
 ```
 
-### Quer só abrir o sistema para ver e usar? (sem instalar nada)
+### Publicação oficial (somente online)
 
-Rode `npm run publicar` e clique **duas vezes** em **`publicar/Altoprints.html`**.
-É um arquivo único (programa + visual embutidos) que abre no navegador já funcionando,
-sem internet e sem instalar nada — os dados ficam salvos nesse computador.
+`npm run publicar` gera apenas o pacote do site hospedado e exige `VITE_SUPABASE_URL` mais uma chave pública (`VITE_SUPABASE_PUBLISHABLE_KEY` ou `VITE_SUPABASE_ANON_KEY`). Sem essa conexão central, a publicação é bloqueada e o app não usa armazenamento local como alternativa para pedidos, clientes, arquivos ou outros dados operacionais. Não existe mais um arquivo para abrir offline.
 
-> **O sistema começa vazio, do zero:** nenhum pedido, cliente ou conta vem pronto e
-> **não existe usuário nem senha padrão**. A equipe (JESSICA, RAISSA, ANDREIA) já vem como
-> lista de nomes, **sem login**: cada um escolhe o próprio nome ao registrar uma fila. O
-> acesso do **proprietário** (único com senha) é criado em *“Login proprietário”*, no canto
-> do topo (ou em `#/administracao`, 5 toques no logo, `Ctrl + Alt + D`).
->
-> **Dados de exemplo** são opcionais e **fictícios** (`CLIENTE EXEMPLO 01`, telefone
-> `(00) 90000-0001`): entram só quando o proprietário pede em *Configurações → Dados →
-> Carregar demonstração*, e a tela fica com um aviso amarelo *“dados de exemplo — não são
-> reais”* até serem apagados. Eles não criam nenhuma conta de acesso.
+> **O sistema começa vazio:** não há pedidos de exemplo nem senha padrão. A equipe escolhe o próprio nome ao registrar as filas; o proprietário cria o acesso em **Login proprietário**. Dados de treinamento são fictícios e só entram se forem solicitados em Configurações → Dados.
 
-> ⚠️ **Não abra o `publicar/index.html` com dois cliques** — a tela fica em branco. Esse
-> arquivo serve para **hospedar** (ele busca o programa na pasta `assets/`, e o navegador
-> bloqueia esse carregamento quando o arquivo é aberto direto do disco). Detalhes em
-> [`app/DEPLOY.md`](app/DEPLOY.md).
+`npm run dev` serve apenas para desenvolvimento; não é o site oficial nem uma forma de compartilhar dados entre aparelhos.
 
 Outros comandos:
 
 | Comando | O que faz |
 | --- | --- |
 | `npm run dev` | abre o sistema no seu computador (desenvolvimento, atualiza ao salvar) |
-| `npm run build` | gera a versão final na pasta `dist/` |
-| `npm run preview` | testa a versão final |
-| `npm run testar` | roda os testes das regras (preço, comissão, senha) e das telas |
-| `npm run publicar` | monta a pasta `publicar/` (site pronto) + o arquivo `Altoprints.html` |
-| `npm run checar` | confere se o pacote pode ir para o ar (sem senha de exemplo, dado real ou chave secreta) |
+| `npm run build` | compila a versão de produção na pasta `dist/` |
+| `npm run preview` | testa a versão compilada (online-only) |
+| `npm run testar` | roda as regras, telas e validação da configuração de publicação |
+| `npm run publicar` | monta a pasta hospedável `publicar/`; exige a conexão central do Supabase |
+| `npm run checar` | bloqueia pacote sem URL/chave pública, com segredos ou dados proibidos |
 
 ---
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.6** — instala automaticamente as atualizações do PWA ao abrir, sem limpar o cache, e exibe o estado da sincronização.
+> **Versão atual: 1.5.7** — fixa a conexão do site ao Supabase central e bloqueia qualquer fallback para modo local; o PWA segue atualizando automaticamente.
 > O login do proprietário usa um único campo de usuário e senha; o e-mail dele pode ser o usuário.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
@@ -212,14 +196,9 @@ conta as filas **concluídas** do período; o "pago" é orientação da equipe.
 
 ## Onde ficam os dados
 
-O sistema funciona de duas formas, sem mudar nenhuma tela:
+O site oficial tem **um único modo: online, no Supabase central**. Pedidos, clientes, acessos e arquivos são lidos e gravados nesse mesmo banco em todos os aparelhos. Se a conexão não estiver configurada ou a internet cair, o sistema bloqueia as gravações — não cria uma cópia local divergente. A publicação também falha se faltar a URL ou a chave pública do Supabase.
 
-1. **Modo local (padrão)** — os dados ficam salvos no próprio navegador. Bom para
-   conhecer o sistema e testar. Os arquivos de arte ficam no navegador também.
-   ⚠️ Cada aparelho guarda os **próprios** dados: sem a nuvem, o celular não vê os pedidos
-   do computador (dá para levar os dados de um para o outro com **Backup → Restaurar**).
-2. **Modo nuvem (Supabase, grátis)** — os dados ficam num banco na nuvem e aparecem
-   iguais em todos os computadores e celulares. Para ativar, veja **[app/DEPLOY.md](app/DEPLOY.md)**.
+O armazenamento local aparece somente nos testes e no desenvolvimento (`npm run dev`); ele não é incluído como opção de uso no site publicado.
 
 ---
 
@@ -263,9 +242,9 @@ app/
 - [x] **Busca rápida (Ctrl + K)** em todo o sistema, respeitando o que cada acesso pode ver
 - [x] Abrir Configurações direto numa aba (`?aba=equipe`, `?aba=nuvem`…) e explicação curta
       em cada aba
-- [ ] **Conectar o Supabase** (mesmos dados para a equipe toda) — plano em
-      **[`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md)**
-- [ ] Conectar o Supabase (guia: `app/CONECTAR-NUVEM.md`) para a equipe compartilhar os dados
+- [x] Site oficial online-only: um Supabase central, sem fallback nem gravação local
+- [x] Publicação bloqueada quando faltam URL/chave pública ou quando a chave é secreta
+- [ ] Configurar/verificar `VITE_SUPABASE_URL` + chave pública em GitHub Actions Secrets/Variables (os valores não são lidos nem versionados no repositório)
 - [ ] Enviar o logo oficial (Configurações → Empresa)
 - [ ] Ajustes finos depois de usar no dia a dia
 

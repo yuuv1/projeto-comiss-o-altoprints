@@ -21,6 +21,7 @@ import {
   configNuvem,
   extrairConexaoDoTexto,
   linkDeConexao,
+  nuvemObrigatoria,
   nuvemTravadaPeloEnv,
   validarConexao,
 } from '../lib/supabase'
@@ -113,7 +114,9 @@ export function JanelaConexao({ aberto, onFechar }: { aberto: boolean; onFechar:
           </p>
         ) : null}
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Sem o código, o sistema continua funcionando com os dados salvos <b>neste aparelho</b> (modo local).
+          {nuvemObrigatoria
+            ? 'No site oficial, a conexão é única e vem da publicação; códigos por aparelho não são aceitos.'
+            : 'Sem o código, este ambiente de desenvolvimento permanece sem conexão com o banco de teste.'}
         </p>
       </div>
     </Modal>
@@ -228,7 +231,9 @@ export function AbaNuvem() {
                 </Etiqueta>
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {travada ? 'Configurado pelo arquivo .env deste site.' : 'Este aparelho está ligado ao banco da empresa.'}{' '}
+                {travada
+                  ? 'Conexão central definida na publicação; todos os aparelhos usam este mesmo banco.'
+                  : 'Este ambiente de desenvolvimento está ligado ao banco da empresa.'}{' '}
                 {db.pedidos.length} pedido(s) carregado(s).
               </p>
             </div>
@@ -258,7 +263,7 @@ export function AbaNuvem() {
             <RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Diagnóstico da sincronização
           </p>
           <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-            <p>Projeto Supabase deste aparelho: <b className="break-all">{projeto}</b></p>
+            <p>Projeto Supabase central: <b className="break-all">{projeto}</b></p>
             <p>Última leitura confirmada: <b>{sincronizadoEm}</b></p>
             <p>
               Atualização dos dados: <b>{realtimeAtivo ? 'ao vivo' : 'checagem automática a cada 15 segundos'}</b>
@@ -276,43 +281,50 @@ export function AbaNuvem() {
           ) : null}
         </Cartao>
 
-        <Cartao hover={false}>
-          <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
-            <Link2 className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Conectar os aparelhos da equipe
-          </p>
-          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-            Mande este link no grupo. Quem abrir <b>uma vez</b> fica conectado ao banco da empresa naquele aparelho —
-            não precisa digitar nada. O código é a alternativa para quem não consegue abrir o link.
-          </p>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Entrada value={link} readOnly className="min-w-[220px] flex-1 bg-slate-50 text-xs dark:bg-slate-800" />
-              <Botao icone={Copy} onClick={() => areaDeTransferencia(link, 'Link')}>
-                Copiar link
-              </Botao>
+        {!travada ? (
+          <Cartao hover={false}>
+            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+              <Link2 className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Conectar aparelhos de desenvolvimento
+            </p>
+            <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              Recurso de desenvolvimento: compartilha uma conexão de teste, não necessária no site oficial.
+            </p>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Entrada value={link} readOnly className="min-w-[220px] flex-1 bg-slate-50 text-xs dark:bg-slate-800" />
+                <Botao icone={Copy} onClick={() => areaDeTransferencia(link, 'Link')}>
+                  Copiar link
+                </Botao>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Entrada value={codigoAtual} readOnly className="min-w-[220px] flex-1 bg-slate-50 text-xs dark:bg-slate-800" />
+                <Botao variante="secundario" icone={Copy} onClick={() => areaDeTransferencia(codigoAtual, 'Código')}>
+                  Copiar código
+                </Botao>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Entrada value={codigoAtual} readOnly className="min-w-[220px] flex-1 bg-slate-50 text-xs dark:bg-slate-800" />
-              <Botao variante="secundario" icone={Copy} onClick={() => areaDeTransferencia(codigoAtual, 'Código')}>
-                Copiar código
-              </Botao>
-            </div>
-          </div>
-          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Este link carrega a chave <b>pública</b> do projeto — a mesma que qualquer site publicado usa. Ele não dá
-            acesso aos dados sem o login de cada pessoa (e nunca use a chave secreta aqui).
-          </p>
-        </Cartao>
+          </Cartao>
+        ) : (
+          <Cartao hover={false}>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Conexão central protegida</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Todos os aparelhos deste site usam o mesmo projeto Supabase. Não é necessário nem permitido conectá-los
+              por códigos diferentes.
+            </p>
+          </Cartao>
+        )}
 
         <Cartao hover={false}>
           <p className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
             <Send className="h-4 w-4 text-violet-600 dark:text-violet-400" /> Cuidados e manutenção
           </p>
           <ul className="mb-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-            <li>
-              • <b>Enviar os dados deste aparelho para a nuvem:</b> use se você cadastrou pedidos no modo local e quer
-              levá-los para o banco da empresa.
-            </li>
+            {!travada ? (
+              <li>
+                • <b>Enviar dados de teste para a nuvem:</b> recurso apenas de desenvolvimento; nunca use para substituir
+                o banco oficial.
+              </li>
+            ) : null}
             <li>
               • <b>Baixar backup:</b> na aba <b>Dados</b>. O plano grátis do Supabase não faz backup automático — baixe
               um por semana.
@@ -331,26 +343,28 @@ export function AbaNuvem() {
             <Botao variante="secundario" icone={Copy} onClick={() => areaDeTransferencia(sqlSchema, 'SQL')}>
               Copiar o SQL
             </Botao>
-            <Botao
-              variante="secundario"
-              icone={Send}
-              onClick={async () => {
-                const ok = await confirmar({
-                  titulo: 'Enviar os dados deste aparelho para a nuvem?',
-                  mensagem:
-                    'Tudo o que está aqui (pedidos, clientes, vendedores, contas e configurações) será enviado para o banco da nuvem. Os dados que já estão na nuvem serão substituídos por estes.',
-                  textoBotao: 'Enviar para a nuvem',
-                })
-                if (!ok) return
-                try {
-                  await enviarDadosParaNuvem()
-                } catch (e) {
-                  avisar((e as Error).message, 'erro')
-                }
-              }}
-            >
-              Enviar dados deste aparelho para a nuvem
-            </Botao>
+            {!travada ? (
+              <Botao
+                variante="secundario"
+                icone={Send}
+                onClick={async () => {
+                  const ok = await confirmar({
+                    titulo: 'Enviar dados de desenvolvimento para o Supabase de teste?',
+                    mensagem:
+                      'Use somente em ambiente de desenvolvimento. Esta operação substitui tabelas do projeto de teste e nunca deve ser executada contra o banco oficial.',
+                    textoBotao: 'Enviar dados de teste',
+                  })
+                  if (!ok) return
+                  try {
+                    await enviarDadosParaNuvem()
+                  } catch (e) {
+                    avisar((e as Error).message, 'erro')
+                  }
+                }}
+              >
+                Enviar dados de teste
+              </Botao>
+            ) : null}
             {!travada ? (
               <Botao
                 variante="ghost"
@@ -380,10 +394,10 @@ export function AbaNuvem() {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
-        <p className="font-bold">Para que serve conectar a nuvem?</p>
+        <p className="font-bold">Ambiente de desenvolvimento sem Supabase</p>
         <p className="mt-0.5 text-xs">
-          Hoje os dados ficam salvos <b>neste navegador</b>: cada celular/PC teria a sua própria lista. Com o banco na
-          nuvem, todos veem os mesmos pedidos de qualquer aparelho. São <b>3 passos</b> e é de graça.
+          O site oficial nunca chega a esta tela: ele exige a conexão central na publicação e bloqueia o modo local. Use
+          este assistente somente para configurar um ambiente de teste.
         </p>
       </div>
 

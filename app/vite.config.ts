@@ -8,8 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // O registro é feito em main.tsx para também desativá-lo no arquivo
-      // Altoprints.html (file://), que continua sendo uma demonstração local.
+      // O registro é feito manualmente em main.tsx para controlar as atualizações.
       injectRegister: false,
       includeAssets: ['icons/pwa-512x512.png', 'icons/apple-touch-icon.png'],
       manifest: {

@@ -4,13 +4,11 @@
  * Uso:  npm run checar          (depois de npm run build ou npm run publicar)
  *
  * O que ele olha (e por quê):
- *   1. ARQUIVO GERADO — procura no pacote publicado qualquer rastro de
- *      usuário/senha de exemplo ou de dado de pessoa real. O sistema já nasce
- *      vazio; se algo assim aparecer no build, é porque voltou sem querer.
- *   2. CHAVES — nenhuma chave SECRETA do Supabase pode entrar no pacote
- *      (a chave pública pode; a secreta dá acesso total ao banco).
- *   3. ESTRUTURA — index.html, assets/, manifesto e ícones PWA, _redirects e
- *      LEIA-ME precisam existir e concordar com a versão do package.json.
+ *   1. CONEXÃO — exige a URL e a chave pública do Supabase no bundle, para
+ *      todos os aparelhos usarem o mesmo banco e o site nunca cair no local.
+ *   2. CHAVES — nenhuma chave SECRETA do Supabase pode entrar no pacote.
+ *   3. SEGURANÇA/ESTRUTURA — bloqueia dados de exemplo/pessoa real e confere
+ *      index.html, assets/, manifesto, ícones PWA, _redirects e LEIA-ME.
  *
  * Sai com código 1 quando encontra problema: assim o robô do GitHub e o
  * `npm run publicar` param antes de entregar um pacote sujo.
@@ -50,17 +48,18 @@ const PROIBIDOS = [
  * papel dele. A publishable (sb_publishable_) não é JWT e não entra aqui.
  */
 const JWT = /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g
-const ehChaveSecreta = (jwt) => {
+const payloadJWT = (jwt) => {
   try {
-    const payload = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return Buffer.from(payload, 'base64').toString('utf8').includes('service_role')
+    return JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString('utf8'))
   } catch {
-    return false
+    return null
   }
 }
+const ehChaveSecreta = (jwt) => payloadJWT(jwt)?.role === 'service_role'
+const ehChaveAnonPublica = (jwt) => payloadJWT(jwt)?.role === 'anon'
 
 /** arquivos que jamais podem estar dentro da pasta publicada */
-const ARQUIVOS_PROIBIDOS = ['.env', '.env.local', '.env.production', '.npmrc', '.git']
+const ARQUIVOS_PROIBIDOS = ['.env', '.env.local', '.env.production', '.npmrc', '.git', 'Altoprints.html']
 
 /* ------------------------------------------------------------------ */
 /* utilidades                                                          */
@@ -146,6 +145,18 @@ for (const caminho of textoChecados) {
 }
 if (!achados) certos.push(`nenhuma credencial de exemplo nem dado de pessoa real nos ${textoChecados.length} arquivos do pacote`)
 
+// O pacote oficial precisa vir preso a uma única conexão central; sem URL e
+// chave pública o runtime ficaria bloqueado (nunca poderia cair no modo local).
+const jsBundles = arquivos.filter((c) => /assets\/[^/]+\.js$/i.test(c))
+const codigoBundles = (await Promise.all(jsBundles.map((c) => readFile(c, 'utf8')))).join('\n')
+const urlsSupabase = [...codigoBundles.matchAll(/https:\/\/([a-z0-9-]+)\.supabase\.(co|in)/gi)]
+const urlCentralValida = urlsSupabase.some(([, projeto]) => !['seuprojeto', 'xxxxxxxx', 'xxxx'].includes(projeto.toLowerCase()))
+const publishableNoPacote = /sb_publishable_[A-Za-z0-9_-]{8,}/.test(codigoBundles)
+const anonNoPacote = (codigoBundles.match(JWT) ?? []).some(ehChaveAnonPublica)
+if (jsBundles.length && urlCentralValida && (publishableNoPacote || anonNoPacote))
+  certos.push('conexão central do Supabase presente (URL + chave pública; site online-only)')
+else problemas.push('faltam URL e chave pública centrais do Supabase no bundle; publicação online bloqueada')
+
 /* ------------------------------------------------------------------ */
 /* 4) estrutura do pacote                                              */
 /* ------------------------------------------------------------------ */
@@ -216,13 +227,6 @@ if (pasta === publicar) {
     avisos.push('sem LEIA-ME.txt na pasta publicar/')
   }
 
-  if (tem('Altoprints.html')) {
-    const unico = await readFile(join(pasta, 'Altoprints.html'), 'utf8')
-    if (/(src|href)="\.\/assets\//.test(unico)) problemas.push('Altoprints.html ainda depende da pasta assets (abriria em branco)')
-    else certos.push('Altoprints.html é um arquivo único (abre com dois cliques)')
-  } else {
-    avisos.push('sem Altoprints.html (o arquivo que abre com dois cliques, sem servidor)')
-  }
 }
 
 /* ------------------------------------------------------------------ */

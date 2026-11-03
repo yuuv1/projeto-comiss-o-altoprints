@@ -38,6 +38,7 @@ import { dataBR, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { DESCRICAO_DENSIDADE, LABEL_DENSIDADE, useTema } from '../lib/tema'
 import { VERSAO } from '../lib/versao'
+import { nuvemObrigatoria } from '../lib/supabase'
 import {
   FAIXAS_PADRAO,
   FAIXAS_PRECO_PADRAO,
@@ -80,7 +81,7 @@ const AJUDA_ABA: Record<Aba, string> = {
   equipe: 'Os funcionários que aparecem nos pedidos e os acessos de proprietário (login com senha).',
   empresa: 'Nome e logo da empresa, que aparecem no sistema e nas folhas impressas.',
   ia: 'A chave da IA que lê a foto do comprovante e preenche o pedido automaticamente.',
-  dados: 'Backup JSON completo, restauração, mesclagem do relatório CSV e espaço usado neste aparelho.',
+  dados: 'Backup JSON completo, restauração e mesclagem do relatório CSV; dados operacionais ficam no banco central.',
   nuvem: 'A conexão com o Supabase, para a equipe toda ver os mesmos pedidos em qualquer aparelho.',
   acesso: 'O seu usuário e a sua senha, e como criar um segundo acesso de proprietário.',
   aparencia: 'Tema claro/escuro e o tamanho dos blocos (só para este aparelho).',
@@ -137,7 +138,7 @@ export default function Configuracoes() {
         ? `\n\n${previaRelatorio.conflitos} número(s) já existe(m) com dados diferentes; o pedido atual será mantido.`
         : ''
       const avisoModoLocal = !nuvem
-        ? '\n\nEste aparelho está no modo local. Para incluir pedidos de outros aparelhos, conecte-o à mesma Nuvem antes de mesclar.'
+        ? '\n\nEste ambiente de desenvolvimento está sem conexão online; o site oficial bloqueia o uso sem o Supabase central.'
         : ''
       const ok = await confirmar({
         titulo: 'Mesclar relatório geral?',
@@ -165,7 +166,7 @@ export default function Configuracoes() {
   const [espaco, setEspaco] = useState<DiagnosticoArmazenamento>(vazio)
   const medir = async () => setEspaco(await medirEspaco())
   useEffect(() => {
-    if (aba === 'dados') void medir()
+    if (aba === 'dados' && !nuvemObrigatoria) void medir()
   }, [aba])
 
   /* ------------------------------ meu acesso ----------------------------- */
@@ -628,11 +629,11 @@ export default function Configuracoes() {
           >
             {nuvem ? <Cloud className="mt-0.5 h-5 w-5" /> : <Database className="mt-0.5 h-5 w-5" />}
             <div>
-              <p className="font-bold">{nuvem ? 'Banco na nuvem (Supabase) conectado' : 'Modo local (navegador)'}</p>
+              <p className="font-bold">{nuvem ? 'Banco central na nuvem (Supabase) conectado' : 'Conexão online não configurada'}</p>
               <p className="text-xs">
                 {nuvem
-                  ? 'Os dados ficam no banco na nuvem e são iguais em todos os aparelhos.'
-                  : 'Atenção: no modo local cada navegador tem os seus próprios dados e logins. Para a equipe toda usar junto, configure o Supabase (veja SUPABASE.md).'}
+                  ? 'Este ambiente usa o banco central online, igual para todos os aparelhos.'
+                  : 'Use esta conexão somente em desenvolvimento/testes; o site oficial bloqueia o uso sem o Supabase central.'}
               </p>
             </div>
           </div>
@@ -705,70 +706,87 @@ export default function Configuracoes() {
       {/* ------------------------------ DADOS ------------------------------- */}
       {aba === 'dados' ? (
         <div className="space-y-4">
-          <Cartao hover={false}>
-            <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
-              <Database className="h-4 w-4" /> Onde os dados ficam neste aparelho
-            </p>
-            <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
-              {espaco.onde === 'IndexedDB'
-                ? 'Estão no armazenamento novo (IndexedDB), que tem espaço de sobra — o problema de “sem espaço” não volta.'
-                : espaco.onde === 'localStorage'
-                  ? 'Ainda estão no armazenamento antigo, que é pequeno (cerca de 5 MB) e pode encher.'
-                  : 'Nenhum dado guardado neste aparelho ainda.'}
-            </p>
-
-            {!espaco.localOk && !espaco.idbOk ? (
-              <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
-                <b>Este navegador não está deixando salvar nada.</b> Isso acontece em janela anônima/privada ou com o
-                armazenamento bloqueado. Abra o sistema numa janela normal para os dados serem salvos.
-              </div>
-            ) : null}
-
-            <div className="mb-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-              <p>
-                Armazenamento antigo (localStorage): <b>{espaco.localOk ? 'funcionando' : 'bloqueado'}</b> ·{' '}
-                {tamanhoLegivel(espaco.bytesLocal)}
+          {nuvemObrigatoria ? (
+            <Cartao hover={false}>
+              <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
+                <Database className="h-4 w-4" /> Dados operacionais no banco central
               </p>
-              <p>
-                Armazenamento novo (IndexedDB): <b>{espaco.idbOk ? 'funcionando' : 'indisponível'}</b>
+              <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
+                Pedidos, clientes, equipe, arquivos, acessos e configurações ficam no Supabase compartilhado. A conexão
+                está {nuvem ? 'configurada' : 'indisponível'}; sem internet ou banco, o site não salva esses dados neste
+                aparelho.
               </p>
-              {espaco.ocupantes.length ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Maiores ocupantes: {espaco.ocupantes.map((o) => `${o.chave} (${tamanhoLegivel(o.bytes)})`).join(' · ')}
-                </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Dados antigos que eventualmente estejam no armazenamento do navegador não são lidos, migrados nem
+                apagados automaticamente. Preferências de aparência e sessão podem continuar salvas localmente.
+              </p>
+            </Cartao>
+          ) : (
+            <Cartao hover={false}>
+              <p className="mb-1 flex items-center gap-2 text-sm font-bold text-sky-900 dark:text-sky-200">
+                <Database className="h-4 w-4" /> Onde os dados ficam neste aparelho
+              </p>
+              <p className="mb-3 text-xs text-sky-800 dark:text-sky-300">
+                {espaco.onde === 'IndexedDB'
+                  ? 'Estão no armazenamento novo (IndexedDB), que tem espaço de sobra — o problema de “sem espaço” não volta.'
+                  : espaco.onde === 'localStorage'
+                    ? 'Ainda estão no armazenamento antigo, que é pequeno (cerca de 5 MB) e pode encher.'
+                    : 'Nenhum dado guardado neste aparelho ainda.'}
+              </p>
+
+              {!espaco.localOk && !espaco.idbOk ? (
+                <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  <b>Este navegador não está deixando salvar nada.</b> Isso acontece em janela anônima/privada ou com o
+                  armazenamento bloqueado. Abra o sistema numa janela normal para os dados serem salvos.
+                </div>
               ) : null}
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Botao
-                tamanho="sm"
-                variante="secundario"
-                icone={RefreshCw}
-                onClick={async () => {
-                  await medir()
-                }}
-              >
-                Testar de novo
-              </Botao>
-              {espaco.onde === 'localStorage' ? (
+              <div className="mb-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                <p>
+                  Armazenamento antigo (localStorage): <b>{espaco.localOk ? 'funcionando' : 'bloqueado'}</b> ·{' '}
+                  {tamanhoLegivel(espaco.bytesLocal)}
+                </p>
+                <p>
+                  Armazenamento novo (IndexedDB): <b>{espaco.idbOk ? 'funcionando' : 'indisponível'}</b>
+                </p>
+                {espaco.ocupantes.length ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Maiores ocupantes: {espaco.ocupantes.map((o) => `${o.chave} (${tamanhoLegivel(o.bytes)})`).join(' · ')}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <Botao
                   tamanho="sm"
                   variante="secundario"
                   icone={RefreshCw}
                   onClick={async () => {
-                    await liberarEspaco()
                     await medir()
                   }}
                 >
-                  Liberar espaço
+                  Testar de novo
                 </Botao>
-              ) : null}
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              “Liberar espaço” passa os dados para o armazenamento novo e tira a cópia antiga — nenhum pedido é
-              apagado.
-            </p>
-          </Cartao>
+                {espaco.onde === 'localStorage' ? (
+                  <Botao
+                    tamanho="sm"
+                    variante="secundario"
+                    icone={RefreshCw}
+                    onClick={async () => {
+                      await liberarEspaco()
+                      await medir()
+                    }}
+                  >
+                    Liberar espaço
+                  </Botao>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                “Liberar espaço” passa os dados para o armazenamento novo e tira a cópia antiga — nenhum pedido é
+                apagado.
+              </p>
+            </Cartao>
+          )}
 
           <Cartao hover={false}>
             <p className="mb-1 flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">

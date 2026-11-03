@@ -194,7 +194,7 @@ export default function Administracao() {
             )}
           >
             {nuvem ? <ShieldCheck className="h-3.5 w-3.5" /> : <KeyRound className="h-3.5 w-3.5" />}
-            {nuvem ? 'Banco na nuvem (Supabase) conectado' : 'Modo local: os dados ficam neste navegador'}
+            {nuvem ? 'Banco central na nuvem (Supabase) conectado' : 'Conexão online não configurada neste ambiente de desenvolvimento'}
           </p>
           {!nuvem ? (
             <p className="mx-auto mt-1 max-w-sm text-[11px] leading-snug text-slate-500 dark:text-slate-400">

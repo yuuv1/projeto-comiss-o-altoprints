@@ -34,7 +34,8 @@ const pluginBruto = {
   },
 }
 
-async function compilar(entrada, saida) {
+async function compilar(entrada, saida, producao = false) {
+  const envTeste = typeof producao === 'object' ? producao : producao ? { PROD: true } : {}
   await build({
     plugins: [pluginBruto],
     entryPoints: [resolve(aqui, entrada)],
@@ -44,7 +45,7 @@ async function compilar(entrada, saida) {
     format: 'cjs',
     loader: { '.css': 'empty' },
     external: ['jsdom'],
-    define: { 'import.meta.env': '{}' },
+    define: { 'import.meta.env': JSON.stringify(envTeste) },
     logLevel: 'error',
   })
   return resolve(raiz, 'node_modules/.cache', saida)
@@ -57,6 +58,23 @@ function executar(arquivo) {
 
 console.log('\n➡️  Regras de negócio (preços, datas, formatação, dados de exemplo)\n')
 executar(await compilar('regras.ts', 'regras.cjs'))
+
+console.log('\n➡️  Publicação online (configuração obrigatória do Supabase)\n')
+const testePublicacao = spawnSync(process.execPath, [resolve(aqui, 'config-publicacao.mjs')], {
+  stdio: 'inherit',
+  cwd: raiz,
+})
+if (testePublicacao.status !== 0) process.exit(testePublicacao.status ?? 1)
+
+console.log('\n➡️  Produção online-only (sem fallback para dados locais)\n')
+executar(await compilar('online-obrigatorio.ts', 'online-obrigatorio.cjs', true))
+executar(
+  await compilar('arquivo-online-obrigatorio.ts', 'arquivo-online-obrigatorio.cjs', {
+    PROD: true,
+    VITE_SUPABASE_URL: 'https://altoprints-validacao.supabase.co',
+    VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_validacao1234567890',
+  }),
+)
 
 if (existsSync(resolve(raiz, 'node_modules/fake-indexeddb'))) {
   console.log('\n➡️  Armazenamento do navegador (espaço cheio e migração dos dados)\n')

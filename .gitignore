@@ -4,6 +4,7 @@ dist/
 dist-ssr/
 build/
 coverage/
+/publicar/
 
 # Variáveis de ambiente (chaves do Supabase) — nunca subir para o Git
 .env

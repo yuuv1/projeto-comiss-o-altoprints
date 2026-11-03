@@ -26,6 +26,7 @@ import {
   desconectar as desconectarSupabase,
   emNuvem,
   limparAvisoDeConexao,
+  nuvemObrigatoria,
 } from './supabase'
 import { calcularValor, proximoNumero } from './pricing'
 import { gerarDadosDemo } from './seed'
@@ -95,7 +96,7 @@ interface Ctx {
   carregarDemo: () => Promise<void>
   /** conecta o sistema ao banco na nuvem (Supabase) neste aparelho */
   conectarNuvem: (url: string, chave: string) => Promise<void>
-  /** sai da nuvem neste aparelho (volta ao modo local) */
+  /** desconexão disponível somente no ambiente de desenvolvimento */
   desconectarNuvem: () => void
   /** envia os dados deste aparelho para a nuvem (usado logo depois de conectar) */
   enviarDadosParaNuvem: () => Promise<void>
@@ -302,7 +303,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setUltimaSincronizacao(null)
     setErroSincronizacao(null)
     setRealtimeAtivo(false)
-    avisar('Este aparelho voltou ao modo local (os dados da nuvem continuam salvos).', 'info')
+    avisar('Conexão removida no ambiente de desenvolvimento.', 'info')
   }, [avisar])
 
   const enviarDadosParaNuvem = useCallback(async () => {
@@ -334,13 +335,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setUltimaSincronizacao(new Date().toISOString())
           setErroSincronizacao(null)
         }
-        // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
-        // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
-        try {
-          const liberado = await liberarCopiaAntiga(JSON.stringify(dados))
-          if (liberado > 0) console.info(`[altoprints] ${Math.round(liberado / 1024)} KB liberados no navegador.`)
-        } catch {
-          /* sem problema: o sistema segue funcionando com o que tem */
+        // Migração/limpeza do banco antigo só existe em desenvolvimento. No site
+        // oficial, dados legados do navegador ficam intocados e nunca são usados.
+        if (!nuvemObrigatoria) {
+          try {
+            const liberado = await liberarCopiaAntiga(JSON.stringify(dados))
+            if (liberado > 0) console.info(`[altoprints] ${Math.round(liberado / 1024)} KB liberados no navegador.`)
+          } catch {
+            /* sem problema: o sistema segue funcionando com o que tem */
+          }
         }
         setErro(null)
       } catch (e) {
@@ -673,12 +676,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /* ------------------------- espaço no aparelho ------------------------- */
 
   const medirEspaco = useCallback(async () => {
+    // A versão oficial não consulta o banco legado do navegador.
+    if (nuvemObrigatoria)
+      return { localOk: false, idbOk: false, onde: 'nenhum' as const, bytesLocal: 0, ocupantes: [] }
     // no armazenamento novo o que interessa é o tamanho dos dados; no antigo, o
     // total do navegador (que inclui tudo o que este site guardou)
     return testarArmazenamento()
   }, [])
 
   const liberarEspaco = useCallback(async () => {
+    if (nuvemObrigatoria)
+      throw new Error('O site oficial usa o banco online e não migra nem apaga dados operacionais antigos deste aparelho.')
     const liberado = await liberarCopiaAntiga(JSON.stringify(db))
     avisar(
       liberado
@@ -690,6 +698,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [avisar, db])
 
   const comecarLimpoNesteAparelho = useCallback(async () => {
+    if (nuvemObrigatoria)
+      throw new Error('A versão online não apaga dados operacionais salvos em versões antigas deste aparelho.')
     // 1) backup primeiro (a pessoa pode restaurar depois em Configurações → Dados)
     baixarBackup()
     // 2) limpa só as chaves do sistema neste aparelho — apagar sempre funciona,

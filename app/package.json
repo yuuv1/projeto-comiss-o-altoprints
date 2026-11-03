@@ -1,7 +1,7 @@
 {
   "name": "altoprints-sistema",
   "private": true,
-  "version": "1.5.6",
+  "version": "1.5.7",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"
