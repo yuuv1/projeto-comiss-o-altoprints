@@ -34,7 +34,7 @@ import { prepararBackup } from '../lib/backup'
 import { prepararMesclaRelatorioCSV } from '../lib/relatorio-backup'
 import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { tamanhoLegivel } from '../lib/files'
-import { dataBR, moeda, numeroBR } from '../lib/format'
+import { dataBR, moeda, numeroBR, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { DESCRICAO_DENSIDADE, LABEL_DENSIDADE, useTema } from '../lib/tema'
 import { VERSAO } from '../lib/versao'
@@ -178,7 +178,10 @@ export default function Configuracoes() {
 
   /* ------------------------------ comissões ------------------------------ */
   const [faixas, setFaixas] = useState<FaixaComissao[]>(db.configuracoes.faixas_comissao ?? FAIXAS_PADRAO)
-  const [semMetragem, setSemMetragem] = useState(String(db.configuracoes.comissao_sem_metragem ?? 3))
+  const [rascunhoPercentual, setRascunhoPercentual] = useState<Record<string, string>>({})
+  const [semMetragem, setSemMetragem] = useState(
+    String(db.configuracoes.comissao_sem_metragem ?? 0).replace('.', ','),
+  )
   const problemas = useMemo(() => validarFaixas(faixas), [faixas])
 
   const pagosDoMes = useMemo(() => {
@@ -337,7 +340,10 @@ export default function Configuracoes() {
                         'As faixas atuais serão substituídas por 1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · 50–100 m 2% · acima de 100 m 1,5%.',
                       textoBotao: 'Usar tabela oficial',
                     })
-                    if (ok) setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
+                    if (ok) {
+                      setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
+                      setRascunhoPercentual({})
+                    }
                   }}
                 >
                   Usar tabela oficial
@@ -381,18 +387,31 @@ export default function Configuracoes() {
                         onChange={(e) => atualizarFaixa(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })}
                       />
                     </Campo>
-                    <Campo label="Comissão (%)" className="w-28">
+                    <Campo label="Comissão (%)" className="w-32">
                       <Entrada
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.1"
-                        value={f.percentual}
-                        onChange={(e) => atualizarFaixa(f.id, { percentual: Number(e.target.value) })}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ex.: 2,75"
+                        value={rascunhoPercentual[f.id] ?? String(f.percentual).replace('.', ',')}
+                        onChange={(e) => {
+                          const texto = e.target.value.replace(/[^0-9.,]/g, '')
+                          setRascunhoPercentual((atual) => ({ ...atual, [f.id]: texto }))
+                          const numero = Number(texto.replace(',', '.'))
+                          if (!Number.isNaN(numero)) {
+                            atualizarFaixa(f.id, { percentual: numero })
+                          }
+                        }}
+                        onBlur={() => {
+                          setRascunhoPercentual((atual) => {
+                            const copia = { ...atual }
+                            delete copia[f.id]
+                            return copia
+                          })
+                        }}
                       />
                     </Campo>
-                    <div className="flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {rotuloFaixa(f.de, f.ate)} → {numeroBR(f.percentual, f.percentual % 1 === 0 ? 0 : 1)}%
+                    <div className="min-w-[120px] flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {rotuloFaixa(f.de, f.ate)} → <b className="text-purple-600 dark:text-purple-400">{percentualBR(f.percentual)}</b>
                     </div>
                     <Botao
                       tamanho="sm"
@@ -410,16 +429,15 @@ export default function Configuracoes() {
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <Campo
                 label="Comissão de pedidos sem metragem (%)"
-                className="w-64"
-                dica="Usado quando o pedido não tem metragem informada."
+                className="w-full sm:w-64"
+                dica="Usado quando o pedido não tem metragem informada (aceita vírgula, ex.: 2,75)."
               >
                 <Entrada
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ex.: 0 ou 2,75"
                   value={semMetragem}
-                  onChange={(e) => setSemMetragem(e.target.value)}
+                  onChange={(e) => setSemMetragem(e.target.value.replace(/[^0-9.,]/g, ''))}
                 />
               </Campo>
               <Botao
@@ -427,7 +445,8 @@ export default function Configuracoes() {
                 icone={RefreshCw}
                 onClick={() => {
                   setFaixas(FAIXAS_PADRAO)
-                  setSemMetragem('3')
+                  setRascunhoPercentual({})
+                  setSemMetragem('0')
                 }}
               >
                 Restaurar padrão
@@ -447,6 +466,12 @@ export default function Configuracoes() {
                 <Check className="h-3.5 w-3.5" /> Faixas válidas
               </p>
             )}
+
+            <div className="mt-3 flex justify-end">
+              <Botao icone={Save} onClick={salvarComissoes} carregando={salvando} disabled={problemas.length > 0}>
+                Salvar comissões
+              </Botao>
+            </div>
           </Cartao>
 
           <Cartao hover={false}>
@@ -477,7 +502,7 @@ export default function Configuracoes() {
                     .map((l) => (
                       <tr key={l.id}>
                         <td className="py-1.5 font-semibold text-slate-700 dark:text-slate-200">{l.rotulo}</td>
-                        <td className="py-1.5 text-right text-slate-600 dark:text-slate-300">{numeroBR(l.percentual, 1)}%</td>
+                        <td className="py-1.5 text-right text-slate-600 dark:text-slate-300">{percentualBR(l.percentual)}</td>
                         <td className="py-1.5 text-right text-slate-600 dark:text-slate-300">{l.pedidos}</td>
                         <td className="py-1.5 text-right text-slate-600 dark:text-slate-300">{numeroBR(l.metragem)} m</td>
                         <td className="py-1.5 text-right text-slate-600 dark:text-slate-300">{moeda(l.faturamento)}</td>

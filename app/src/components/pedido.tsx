@@ -37,12 +37,12 @@ export function PedidoCartao({
         pronto ? 'border-emerald-100' : 'border-slate-100',
       )}
     >
-      <div className="min-w-[190px] flex-1">
+      <div className="min-w-0 flex-1 basis-[190px]">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-2 py-0.5 text-xs font-black text-white">
+          <span className="shrink-0 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-2 py-0.5 text-xs font-black text-white">
             #{pedido.numero}
           </span>
-          <span className="truncate text-base font-extrabold text-slate-800">{pedido.cliente_nome}</span>
+          <span className="min-w-0 max-w-full break-words text-base font-extrabold text-slate-800">{pedido.cliente_nome}</span>
           {pedido.tipo_entrega === 'correios' ? (
             <Etiqueta className="border-sky-200 bg-sky-50 text-sky-700" icone={Truck}>
               Correios
@@ -53,7 +53,7 @@ export function PedidoCartao({
             </Etiqueta>
           )}
         </div>
-        <p className="mt-0.5 truncate text-xs text-slate-500">
+        <p className="mt-0.5 break-words text-xs text-slate-500">
           {pedido.descricao ? pedido.descricao : 'Sem descrição'} • {metros(pedido.metragem)}
           {mostrarVendedor ? ` • ${nomeVendedor(pedido.vendedor_id)}` : ''}
         </p>

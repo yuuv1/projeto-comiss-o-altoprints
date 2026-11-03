@@ -97,7 +97,7 @@ export function Layout() {
       ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-10 transition-colors print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-20 transition-colors xl:pb-10 print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-100 transition-opacity print:hidden dark:opacity-25">
         <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-pink-300/40 to-purple-300/30 blur-3xl" />
         <div className="absolute -right-24 top-32 h-80 w-80 rounded-full bg-gradient-to-br from-sky-300/40 to-emerald-200/30 blur-3xl" />
@@ -306,7 +306,7 @@ export function Layout() {
         ) : null}
       </header>
 
-      <main className="relative mx-auto max-w-[1900px] px-3 py-2">
+      <main className="relative mx-auto max-w-[1900px] overflow-x-hidden px-2.5 py-2 sm:px-3">
         {db.configuracoes.modo_exemplo ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">
@@ -333,6 +333,74 @@ export function Layout() {
           : `modo equipe (sem login) · ${db.pedidos.length} pedidos • ${db.vendedores.length} funcionários`}{' '}
         · v{VERSAO}
       </footer>
+
+      {/* Barra inferior fixa para celular/tablet (navegação rápida com uma mão) */}
+      <nav
+        aria-label="Navegação rápida mobile"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-1.5 py-1 backdrop-blur-xl xl:hidden print:hidden dark:border-slate-800 dark:bg-slate-950/95"
+      >
+        <div
+          className={cn(
+            'mx-auto grid max-w-lg gap-1',
+            ehProprietario ? 'grid-cols-5' : 'grid-cols-3',
+          )}
+        >
+          {menu.map(({ to, label, icone: Icone, badge }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'relative flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  isActive
+                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                )
+              }
+            >
+              <Icone className="h-4 w-4 shrink-0" />
+              <span className="max-w-full truncate leading-tight">{label}</span>
+              {badge ? (
+                <span className="absolute right-1.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-amber-950">
+                  {badge}
+                </span>
+              ) : null}
+            </NavLink>
+          ))}
+          {ehProprietario ? (
+            <NavLink
+              to="/configuracoes"
+              className={({ isActive }) =>
+                cn(
+                  'flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  isActive
+                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                )
+              }
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="max-w-full truncate leading-tight">Ajustes</span>
+            </NavLink>
+          ) : (
+            <NavLink
+              to={ROTA_ADMIN}
+              className={({ isActive }) =>
+                cn(
+                  'flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  isActive
+                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                    : 'text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800',
+                )
+              }
+            >
+              <LockKeyhole className="h-4 w-4 shrink-0" />
+              <span className="max-w-full truncate leading-tight">Dono</span>
+            </NavLink>
+          )}
+        </div>
+      </nav>
 
       {ehProprietario ? <PerfilDialog aberto={perfilAberto} onFechar={() => setPerfilAberto(false)} /> : null}
       <BuscaGlobal aberto={buscaAberta} onFechar={() => setBuscaAberta(false)} />

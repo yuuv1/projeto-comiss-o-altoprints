@@ -17,6 +17,10 @@ export const metros = (v: number | null | undefined) =>
 export const numeroBR = (v: number | null | undefined, dec = 2) =>
   (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 
+/** Percentual preservando casas decimais exatas (ex.: 4 -> "4%", 3.5 -> "3,5%", 2.75 -> "2,75%") */
+export const percentualBR = (v: number | null | undefined) =>
+  `${(Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}%`
+
 /** Converte 'YYYY-MM-DD' ou ISO em Date local sem sustos de fuso */
 export const parseData = (valor?: string | null): Date | null => {
   if (!valor) return null

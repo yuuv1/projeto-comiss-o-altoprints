@@ -503,9 +503,9 @@ async function main() {
   if (!atalhosGrandesOk) falhas++
   console.log(`  ${atalhosGrandesOk ? '✅' : '❌'} painel tem os 5 atalhos grandes do dia a dia`)
 
-  const checklistOk = painel.includes('Primeiros passos') && /\d de 6 prontos/.test(painel)
-  if (!checklistOk) falhas++
-  console.log(`  ${checklistOk ? '✅' : '❌'} checklist de primeiros passos aparece (e some quando terminar)`)
+  const checklistRemovidoOk = !painel.includes('Primeiros passos')
+  if (!checklistRemovidoOk) falhas++
+  console.log(`  ${checklistRemovidoOk ? '✅' : '❌'} bloco "Primeiros passos" foi removido do painel do proprietário`)
 
   const equipeTabelaOk = painel.includes('Funcionários · mês atual') && painel.includes('Última venda')
   if (!equipeTabelaOk) falhas++
