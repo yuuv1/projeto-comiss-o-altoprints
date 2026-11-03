@@ -597,12 +597,12 @@ async function main() {
   console.log(`  ${acessoOk ? '✅' : '❌'} Configurações → “Meu acesso” troca a senha do dono e aponta outro proprietário`)
   if (!acessoOk) console.log('     TEXTO:', textoAcesso.slice(0, 260))
 
-  // a aba Nuvem mostra o assistente de conexão (3 passos) quando está no modo local
+  // em desenvolvimento sem conexão, a aba Nuvem mostra o assistente de teste (3 passos)
   await clicar(raiz, 'Nuvem')
   await espera(400)
   const textoNuvem = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const nuvemOk =
-    textoNuvem.includes('Para que serve conectar a nuvem') &&
+    textoNuvem.includes('Ambiente de desenvolvimento sem Supabase') &&
     textoNuvem.includes('Copiar o SQL') &&
     textoNuvem.includes('Conectar à nuvem') &&
     textoNuvem.includes('Já tenho um código de conexão') &&

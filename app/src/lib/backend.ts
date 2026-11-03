@@ -1,7 +1,7 @@
-// Camada de persistência: funciona com Supabase (nuvem) ou com o navegador (modo local)
+// Camada de persistência. O site publicado usa só o Supabase central; armazenamento local fica restrito a dev/testes.
 import { gravarBancoBruto, lerBancoBruto } from './armazenamento'
 import { migrarFaixas } from './comissao'
-import { clienteNuvem } from './supabase'
+import { clienteNuvem, clienteNuvemObrigatorio } from './supabase'
 import {
   CONFIG_PADRAO,
   type Arquivo,
@@ -48,7 +48,7 @@ const dbVazio = (): DB => ({
 })
 
 /* ------------------------------------------------------------------ */
-/* Modo local (IndexedDB; localStorage só quando ele não existe)       */
+/* Armazenamento de desenvolvimento/testes (nunca usado pelo site)     */
 /* ------------------------------------------------------------------ */
 
 const lerLocal = async (): Promise<DB> => {
@@ -105,7 +105,7 @@ const tratarErro = (contexto: string, erro: { message?: string } | null): never 
 export const modoNuvem = () => Boolean(clienteNuvem())
 
 export async function carregarTudo(): Promise<DB> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) return await lerLocal()
 
   const [vendedores, clientes, pedidos, arquivos, impressoes, usuarios, config] = await Promise.all([
@@ -136,7 +136,7 @@ export async function carregarTudo(): Promise<DB> {
 }
 
 export async function salvarRegistro(tabela: Tabela, registro: Registro): Promise<void> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     const db = await lerLocal()
     const lista = db[tabela] as Registro[]
@@ -152,7 +152,7 @@ export async function salvarRegistro(tabela: Tabela, registro: Registro): Promis
 
 export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promise<void> {
   if (!registros.length) return
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     const db = await lerLocal()
     const lista = db[tabela] as Registro[]
@@ -169,7 +169,7 @@ export async function salvarVarios(tabela: Tabela, registros: Registro[]): Promi
 }
 
 export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     const db = await lerLocal()
     db[tabela] = (db[tabela] as Registro[]).filter((r) => r.id !== id) as never
@@ -181,7 +181,7 @@ export async function removerRegistro(tabela: Tabela, id: ID): Promise<void> {
 }
 
 export async function removerArquivosDoPedido(pedidoId: ID): Promise<void> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     const db = await lerLocal()
     db.arquivos = db.arquivos.filter((a) => a.pedido_id !== pedidoId)
@@ -193,7 +193,7 @@ export async function removerArquivosDoPedido(pedidoId: ID): Promise<void> {
 }
 
 export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Promise<void> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     const db = await lerLocal()
     db.configuracoes = { ...db.configuracoes, ...parcial }
@@ -208,7 +208,7 @@ export async function salvarConfiguracoes(parcial: Partial<Configuracoes>): Prom
 
 /** Apaga tudo (usado pelo botão de limpar dados / recarregar demonstração) */
 export async function substituirTudo(db: DB): Promise<void> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (!sb) {
     await gravarLocal(db)
     return

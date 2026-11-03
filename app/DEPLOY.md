@@ -1,245 +1,90 @@
-# Como colocar o sistema online (de graça)
+# Publicação e manutenção do Altoprints
 
-> 🚀 **Só quer o passo a passo do lançamento?** Use o
-> **[LANCAMENTO.md](../LANCAMENTO.md)** (guia curto, na ordem certa). Este arquivo aqui é a
-> **referência completa**: todas as opções de hospedagem, o banco na nuvem, recuperação de
-> senha e manutenção.
+> O site oficial tem **um único modo: online**, ligado a um único projeto Supabase. Não há
+> fallback para dados locais, arquivo offline `Altoprints.html` nem conexão diferente por
+> aparelho. Se a conexão não estiver no build, a publicação falha; se o app antigo estiver
+> sem conexão, ele bloqueia o uso em vez de salvar uma cópia neste navegador.
+>
+> Guia de lançamento na ordem certa: [`../LANCAMENTO.md`](../LANCAMENTO.md).
 
-O sistema é um site estático (arquivos HTML/JS/CSS). Isso significa que ele pode ser
-hospedado de graça em vários serviços. O banco de dados é separado — e também tem
-opção gratuita (Supabase).
+## 1. Preparar o Supabase
 
-**O sistema sobe limpo:** sem dados de exemplo carregados sozinhos, sem usuário e sem
-senha padrão. O primeiro acesso de proprietário é criado no endereço
-`…/#/administracao` (ou 5 toques no logo, ou `Ctrl + Alt + D`).
+1. Crie um projeto Supabase na região South America (São Paulo).
+2. No **SQL Editor**, execute [`supabase/schema.sql`](supabase/schema.sql). O script cria
+   as tabelas e o bucket necessário sem apagar pedidos existentes.
+3. Em **Project Settings → API**, copie a **Project URL** e uma chave pública:
+   - `VITE_SUPABASE_URL` = Project URL;
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_...`; ou
+   - `VITE_SUPABASE_ANON_KEY` = JWT público `anon`, se o projeto usa a chave antiga.
 
----
+Nunca use a senha do banco, `service_role` ou `sb_secret_`. A chave publishable/anon é
+pública por definição e será incorporada ao bundle do site; a chave secreta não pode ser
+publicada.
 
-## Antes de tudo: como só VER e TESTAR o sistema (sem publicar)
+## 2. Configurar o host antes de publicar
 
-**Forma 1 — arquivo único, dois cliques (não precisa de internet nem instalar nada):**
+Configure as duas variáveis no host que realmente publica o site:
 
-Rode `npm run publicar` (dentro de `app/`) e clique **duas vezes** no arquivo
-`publicar/Altoprints.html`. Ele abre no navegador já funcionando e guarda os dados nesse
-computador. É o jeito mais fácil de mostrar o sistema para alguém.
+- **GitHub Pages**: repositório → **Settings → Secrets and variables → Actions** → crie
+  `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (ou `VITE_SUPABASE_ANON_KEY`).
+  O workflow também aceita Repository Variables com os mesmos nomes. Depois execute
+  **Actions → Publicar sistema (GitHub Pages)**.
+- **Netlify**: **Site configuration → Environment variables**; salve as variáveis e faça
+  um novo deploy.
+- **Vercel**: **Project → Settings → Environment Variables**; salve as variáveis e faça
+  um novo deploy.
 
-> **Não abra o `publicar/index.html` com dois cliques** — ele fica em branco. Esse arquivo
-> é feito para ser **hospedado** (ele carrega o programa da pasta `assets/`, e o navegador
-> bloqueia isso quando o arquivo é aberto direto do disco). O `Altoprints.html` já tem o
-> programa embutido justamente por isso.
+A verificação do pacote exige que URL e chave pública apareçam no build. Sem elas, a
+publicação é bloqueada. O app oficial ignora chaves antigas guardadas no navegador ou
+recebidas em links: assim todos os aparelhos permanecem vinculados ao mesmo banco central.
 
-**Forma 2 — modo desenvolvimento (atualiza sozinho a cada alteração):**
+## 3. Netlify Drop (deploy manual)
 
-```bash
-cd app
-npm install
-npm run dev     # abre em http://localhost:8080
-```
-
----
-
-Você pode fazer em duas etapas:
-
-- **Etapa 1 (5 minutos)** — publicar o site. Nesta etapa os dados ficam salvos no
-  navegador de cada pessoa (bom para mostrar o sistema).
-- **Etapa 2 (10 minutos)** — criar o banco na nuvem, para que todos vejam os mesmos
-  pedidos de qualquer computador ou celular.
-
----
-
-## Etapa 1 — Publicar o site
-
-### Opção A: GitHub Pages (automático, mas exige conta paga)
-
-> **Atenção:** este repositório é **privado** e, em repositório privado, o GitHub Pages
-> só funciona em conta **paga** (GitHub Pro). Com a conta gratuita o robô de publicação
-> não consegue ligar o Pages e o site não sai do ar — nesse caso use a **Opção B (Netlify)**,
-> que é de graça. O robô não atrapalha: ele testa e gera a versão de produção de qualquer
-> forma e, se o Pages não estiver disponível, apenas avisa e segue em frente.
-
-1. No GitHub, abra o repositório e vá em **Settings → Pages**.
-2. Em **Source**, escolha **GitHub Actions**.
-3. Vá em **Actions → "Publicar sistema (GitHub Pages)" → Run workflow**
-   (ou faça qualquer alteração na branch `main`).
-4. Em 1 a 2 minutos o link aparece no próprio GitHub
-   (algo como `https://seu-usuario.github.io/projeto-comiss-o-altoprints/`).
-
-O arquivo `.github/workflows/publicar.yml` cuida de instalar, testar e publicar. Se o
-Pages não estiver ligado, ele mostra no resumo da execução (e num aviso amarelo) o que
-fazer — publicar a pasta `publicar/` no Netlify Drop.
-
-### Opção B: Netlify
-
-O Netlify é confiável (empresa grande, CDN mundial, HTTPS grátis) e o plano Free permite
-uso comercial: **100 GB de tráfego e 300 minutos de build por mês**. Para um sistema
-interno isso é muito mais do que o necessário. Se estourar o limite do mês, o site fica
-pausado até o dia 1º do mês seguinte (não gera cobrança surpresa).
-
-**B1 — Recomendado: Netlify conectado ao GitHub (atualiza sozinho)**
-
-Uma vez conectado, toda alteração enviada ao repositório publica o sistema automaticamente
-(e dá para voltar para uma versão anterior com um clique):
-
-1. Já existe o arquivo [`netlify.toml`](../netlify.toml) na raiz do repositório com tudo
-   configurado (pasta `app`, comando de build e pasta publicada).
-2. Em <https://app.netlify.com> crie a conta (dá para entrar com o GitHub).
-3. Clique em **Add new site → Import an existing project → GitHub** e escolha este repositório.
-4. Confirme as opções detectadas (o Netlify lê o `netlify.toml` sozinho) e clique em **Deploy**.
-5. Se estiver usando o Supabase, antes de publicar adicione em
-   **Site configuration → Environment variables**: `VITE_SUPABASE_URL` e
-   `VITE_SUPABASE_ANON_KEY`.
-6. Depois é só: **eu altero o sistema → envio para o GitHub → o Netlify publica sozinho.**
-
-**B2 — Netlify Drop (só para testar rápido, sem conta)**
-
-1. No seu computador: `cd app && npm install && npm run build`
-2. Abra <https://app.netlify.com/drop> e arraste a pasta `app/dist`.
-   - Atalho: a pasta [`publicar/`](../publicar) já vem pronta no repositório (gerada por
-     `npm run publicar`) — dá para arrastar essa pasta direto, sem precisar buildar.
-3. ⚠️ **Importante:** o site criado sem login é temporário — ele é apagado se você não
-   **reivindicar ("Claim")** ele para uma conta Netlify. Clique no botão de claim e crie a
-   conta na hora; depois disso o endereço fica firme.
-4. No Drop a atualização é manual: gere o build de novo e arraste em
-   **Deploys → drag and drop**. Para atualizar sozinho, conecte o repositório (opção B1).
-
-### Opção C: Vercel (alternativa)
-
-1. Abra <https://vercel.com>, clique em **Add New → Project** e importe este repositório.
-2. Configure **Root Directory: `app`** e **Build Command: `npm run build`**.
-3. Em **Environment Variables** coloque as chaves do Supabase (etapa 2) e clique em **Deploy**.
-
----
-
-## Etapa 2 — Banco de dados na nuvem (Supabase, grátis)
-
-1. Crie uma conta em <https://supabase.com> e clique em **New project**.
-   - Nome: `altoprints` · Senha do banco: guarde em lugar seguro · Região: South America (São Paulo).
-2. No menu lateral, abra **SQL Editor → New query**, cole todo o conteúdo do arquivo
-   [`app/supabase/schema.sql`](supabase/schema.sql) e clique em **Run**.
-   Isso cria as tabelas `vendedores`, `clientes`, `pedidos`, `arquivos` e `configuracoes`.
-3. No menu lateral, abra **Storage → New bucket**:
-   - Nome: `artes` · marque **Public bucket** → **Save**.
-   - É aqui que os arquivos de arte dos pedidos são guardados.
-4. Abra **Project Settings → API** e copie:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public** (Project API keys) → `VITE_SUPABASE_ANON_KEY`
-5. Coloque essas duas variáveis onde você publicou:
-
-   - **No seu computador**: crie o arquivo `app/.env` (copie de `app/.env.example`) com:
-     ```
-     VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
-     VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-     ```
-     Depois rode `npm run dev` novamente.
-
-   - **No GitHub Pages**: no repositório, vá em
-     **Settings → Secrets and variables → Actions → New repository secret** e crie os
-     dois segredos com os mesmos nomes (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`).
-     Depois rode o workflow de publicação novamente.
-
-   - **No Netlify/Vercel**: em *Environment Variables* do projeto, adicione as duas
-     variáveis e faça um novo deploy.
-
-Pronto! Ao abrir o site, em ⚙️ **Configurações** aparece a mensagem
-"Banco na nuvem (Supabase) conectado".
-
-> ⚠️ Use sempre a chave **pública** do projeto: a nova `sb_publishable_...` ou a antiga
-> `anon` (a sequência longa que começa com `eyJ`). **Nunca** a `sb_secret_...` /
-> `service_role` — o sistema se recusa a conectar com ela (é de propósito). Se você já tinha contas criadas no modo local,
-elas ficam no navegador: recrie as contas pelo primeiro acesso ou cadastre em
-**Equipe** (só o proprietário entra nessa tela). A partir daí tudo o que for salvo aparece igual
-em todos os aparelhos.
-
----
-
-## Publicar pela pasta pronta (Netlify Drop)
-
-Se você prefere não conectar o GitHub, o sistema gera uma pasta pronta para arrastar:
+O pacote só pode ser gerado com as variáveis da conexão presentes no ambiente de build:
 
 ```bash
 cd app
-npm run publicar      # cria a pasta ../publicar (site + _redirects + LEIA-ME.txt)
+npm ci
+npm run publicar
 ```
 
-1. Abra <https://app.netlify.com/drop>
-2. Arraste a **pasta `publicar`** inteira para a área pontilhada
-3. Clique em **Claim site** para o site ficar seu (site não reivindicado é apagado pelo Netlify)
-4. Para atualizar depois: `npm run publicar` e arraste a pasta de novo em *Deploys*
+O comando valida o bundle antes de criar `../publicar/`. Se faltar a conexão, ele remove o
+pacote antigo e termina com erro, para ninguém arrastar por engano uma versão local ou
+obsoleta. Também é possível baixar o artefato `Altoprints-pronto-para-publicar` de uma
+execução bem-sucedida em **GitHub → Actions** e arrastá-lo no Netlify Drop. O pacote não
+inclui um arquivo para abrir com dois cliques.
 
-> **Sem instalar nada no seu computador:** a pasta `publicar/` também é gerada pelo robô do
-> GitHub. Na aba **Actions** do repositório, abra a última execução de
-> *“Publicar sistema (GitHub Pages)”* e baixe o artefato
-> **`Altoprints-pronto-para-publicar`** — é só descompactar e arrastar a pasta.
+## 4. O que acontece quando o Supabase não responde
 
-> Sem o Supabase configurado, cada aparelho guarda os próprios dados. Para a equipe ver os mesmos
-> pedidos, vale o passo do Supabase (acima) e então gerar a pasta com as chaves no `.env`.
+- O app não salva pedidos, usuários ou arquivos em IndexedDB/localStorage como alternativa.
+- Ações de leitura/gravação exibem erro e tentam novamente quando a conexão volta.
+- Se URL/chave não estiverem no build, o site mostra **“Conexão com o banco online
+  necessária”**; não existe modo local de produção.
+- Não apague o armazenamento do navegador para atualizar. Dados operacionais ficam no
+  Supabase; o cache PWA contém apenas arquivos do app.
 
-## Esqueci a senha (login)
+## Esqueci a senha do proprietário
 
-O proprietário entra com **usuário + senha**; o usuário pode ser o e-mail habitual, sem um campo separado ou confirmação de e-mail. A equipe não usa login individual. O proprietário resolve a senha de
-qualquer acesso de proprietário em **Funcionários e acessos → Redefinir senha** (não precisa de nada
-técnico).
+O login usa usuário e senha (o usuário também pode ser o e-mail). Outro proprietário pode
+redefinir o acesso em **Configurações → Funcionários e acessos → Redefinir senha**.
 
-Se a senha perdida for a **do proprietário**:
+Se a senha perdida for a única conta de proprietário, no **SQL Editor** do projeto correto
+rode a instrução abaixo, trocando `SEU_USUARIO`:
 
-- **Modo nuvem (Supabase):** abra o **SQL Editor** e rode (troque `SEU_USUARIO` e
-  `NOVA_SENHA`); a linha apaga a senha, então o próximo login com esse usuário aceita
-  qualquer senha e você já troca em *Meu perfil* → Trocar minha senha:
-  ```sql
-  update public.usuarios set senha_hash = '' where lower(usuario) = lower('SEU_USUARIO');
-  ```
-- **Modo local:** no navegador do computador, abra o console (F12) e rode (troque
-  `SEU_USUARIO`):
-  ```js
-  const db = JSON.parse(localStorage.getItem('altoprints:db:v1'))
-  const u = db.usuarios.find((x) => x.usuario === 'SEU_USUARIO')
-  u.ativo = true
-  u.senha_hash = ''
-  localStorage.setItem('altoprints:db:v1', JSON.stringify(db))
-  localStorage.removeItem('altoprints:sessao')
-  ```
-  Depois recarregue e entre — troque a senha em seguida.
+```sql
+update public.usuarios
+set senha_hash = ''
+where lower(usuario) = lower('SEU_USUARIO');
+```
 
-> Se nem isso resolver (ou você ficou sem nenhum proprietário ativo), o caminho é limpar
-> o banco de contas em **Configurações → Dados** (ou recriar o projeto no Supabase) e
-> criar o proprietário de novo pelo primeiro acesso.
+Depois entre com esse usuário e defina imediatamente uma senha forte e exclusiva. Não
+compartilhe a senha no chat nem a coloque no código.
 
-## Dicas importantes
+## Manutenção
 
-- **Logo oficial**: envie em ⚙️ Configurações (PNG/JPG até 400 KB). Ele aparece no
-  cabeçalho e nos relatórios impressos em A4.
-- **Imprimir/PDF**: nas telas de Relatório use o botão *Imprimir / PDF* e escolha
-  "Salvar como PDF" no navegador. A folha já sai em A4 em pé, preto e branco, com o
-  logo no cabeçalho e os totais no final.
-- **Dados de exemplo (opcionais e fictícios)**: em ⚙️ *Configurações → Dados* existe
-  *Carregar demonstração* — nomes como `CLIENTE EXEMPLO 01`, telefones `(00) 90000-0001`,
-  nenhuma conta de acesso criada — e *Apagar todos os dados* para começar de verdade.
-  Enquanto os exemplos estiverem carregados, um aviso amarelo fica no topo da tela
-  (ninguém confunde treino com produção).
-- **Atualizar o sistema publicado**: com o GitHub conectado (GitHub Pages ou Netlify B1)
-  basta enviar a alteração para o repositório que o site se atualiza sozinho, em 1 a 2
-  minutos. As alterações **não apagam nada**: os pedidos ficam no Supabase (nuvem) ou,
-  no modo local, continuam salvos no navegador do usuário.
-- **Backup**: no Supabase, em **Database → Backups**, os planos gratuitos guardam
-  cópias diárias por alguns dias. Também é possível exportar CSV pelo próprio relatório.
-- **Celular**: o sistema é responsivo — dá para usar no celular do vendedor durante a
-  venda, e o menu vira um botão no topo.
-- **Segurança**: o sistema tem **login próprio** (usuário + senha; o usuário pode ser um e-mail, guardado como hash e com bloqueio depois de 5 tentativas erradas) e dois perfis — proprietário e vendedor. Ainda assim:
-  **use senha forte no proprietário**, não publique o link em redes sociais e nunca coloque
-  a chave **secreta** do Supabase no site (só a pública). O banco fica com leitura/escrita
-  liberada pela chave pública, como é normal em sistema interno; para trancar por login no
-  próprio banco, o caminho é ligar o *Supabase Auth* e trocar as políticas do
-  `schema.sql` — nenhuma tela muda.
-- **Guarda de publicação**: `npm run checar` (rodado automaticamente pelo
-  `npm run publicar` e pelo GitHub Actions) confere o pacote antes de ele ir para o ar —
-  barra senha de exemplo, dado de pessoa real, chave secreta do Supabase, `.env` dentro da
-  pasta e arquivos quebrados.
-
----
-
-## Domínio próprio (opcional, depois)
-
-Se a empresa já tem um domínio (ex.: `altoprints.com.br`), dá para apontar um subdomínio
-como `sistema.altoprints.com.br` para o GitHub Pages, Netlify ou Vercel — sem custo extra
-além do domínio. O passo a passo fica em *Settings → Pages → Custom domain* (GitHub) ou
-*Domain management* (Netlify/Vercel).
+- Baixe backup em **Configurações → Dados → Baixar backup**. O plano gratuito pode não
+  manter backups por tempo suficiente para a rotina da empresa.
+- Para adicionar colunas/tabelas, consulte o esquema em `supabase/schema.sql` e execute
+  somente as migrações compatíveis no projeto correto; não apague pedidos existentes.
+- As novas versões do PWA são instaladas ao abrir/retomar o site online; não é necessário
+  limpar cache.

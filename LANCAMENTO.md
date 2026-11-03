@@ -22,33 +22,31 @@ fazer se algo sair diferente. Tempo total: **~25 minutos**.
 
 ## Parte 0 — Conferir a versão que está na `main` (2 min)
 
-A `main` já está **limpa e pronta para publicar** (versão **1.5.6**): sem pedidos de
-exemplo, sem usuário/senha padrão, **sem login de funcionário** (a equipe escolhe o próprio
-nome ao registrar a fila), com **“Login proprietário”**, Painel do chefe, busca em `Ctrl + K`,
-backup antigo compatível, instalação do site como aplicativo **PWA** e mesclagem do relatório CSV sem apagar pedidos existentes, sincronização em tempo real e login do proprietário por usuário e senha (o e-mail pode ser usado como usuário, sem campo separado). A marca foi refeita em alta resolução; o símbolo colorido está no cabeçalho do app e nos ícones, sem letras pequenas. A correção de backup preserva clientes, funcionários e os estados antigos de pedidos; o SQL também migra as colunas legadas do Supabase sem apagar dados.
+A versão **1.5.7** bloqueia o modo local no site oficial: o build de produção exige a URL
+mais uma chave pública do Supabase e os aparelhos usam a mesma conexão central. Também
+mantém PWA com atualização automática, mesclagem do CSV sem apagar pedidos existentes,
+login do proprietário por usuário e senha, equipe sem logins individuais e dados de exemplo
+opcionais. Nenhuma conta, chave ou dado real foi criado ou alterado por esta correção.
 
-1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira se o último
-   commit da `main` é o merge mais recente (nada de Pull Request aberto com pendência).
-2. **Como conferir que deu certo:** abra o arquivo
-   [`publicar/LEIA-ME.txt`](publicar/LEIA-ME.txt) no GitHub. As primeiras linhas precisam
-   ser `Altoprints — Sistema de Pedidos DTF (versão 1.5.6)` e
-   `O SISTEMA COMEÇA VAZIO, DO ZERO`. Se aparecer `versão 1.2.0` (ou `usuário: gui`),
-   a `main` ainda está com o pacote antigo.
-3. O site publicado se atualiza sozinho a cada envio na `main` (o robô roda os testes, o
-   build e a conferência de segurança antes). Para conferir: abra o site e veja se a tela
-   rodapé mostra `v1.5.6`.
+1. Abra <https://github.com/yuuv1/projeto-comiss-o-altoprints> e confira o merge mais recente.
+2. Em **Settings → Secrets and variables → Actions**, confirme que existem
+   `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (ou `VITE_SUPABASE_ANON_KEY`).
+   Os valores precisam ser o mesmo projeto Supabase usado pela empresa; não use senha do
+   banco, `service_role` nem chave `sb_secret_`.
+3. O workflow valida a conexão antes de compilar e confere que ela entrou no pacote. Sem
+   essas variáveis, falha sem publicar uma versão local. Para conferir o release, abra o
+   site oficial e veja `v1.5.7` no rodapé.
 
-> **Já tinha aberto uma versão antiga em algum aparelho?** Aqueles dados de exemplo (e o
-> acesso `gui`) ficam **naquele navegador**. Para zerar: abra o sistema no aparelho →
-> *Configurações → Dados → **Apagar todos os dados***. Se quiser apagar inclusive o seu
-> acesso antigo, use **“Começar limpo neste aparelho”** (ele baixa um backup antes).
+> **Dados de versões antigas:** pedidos ou anexos que eventualmente tenham ficado salvos
+> em um navegador antigo não são lidos, migrados nem apagados pela versão online. Não limpe
+> o armazenamento do navegador para atualizar. Se houver dados locais importantes, preserve
+> uma cópia antes de descontinuar a versão antiga; a aplicação não altera esses dados.
 
 ---
 
 ## Parte 1 — Criar o banco na nuvem (Supabase, grátis) — 8 min
 
-O Supabase é quem guarda os pedidos para **todos os aparelhos verem os mesmos dados**.
-Sem ele, o sistema até funciona no ar, mas cada celular/computador guarda a própria lista.
+O Supabase guarda os pedidos para **todos os aparelhos verem os mesmos dados**. O site oficial só é publicado quando este banco está configurado; sem ele, não há modo local nem gravação de dados operacionais no navegador.
 
 ### 1.1 Criar a conta e o projeto
 
@@ -96,9 +94,9 @@ Sem ele, o sistema até funciona no ar, mas cada celular/computador guarda a pr�
 
 ## Parte 2 — Publicar o site (grátis) — 5 a 10 min
 
-Escolha **um** dos três caminhos. O **A** (Netlify ligado ao GitHub) é o recomendado para
-quem quer o site já conectado ao banco. O **C** (GitHub Pages) é o mais automático: tudo
-roda dentro do próprio GitHub. O **B** é o mais rápido para ver no ar hoje.
+Escolha um host: Netlify ligado ao GitHub (A) ou GitHub Pages (C) atualizam automaticamente;
+Netlify Drop (B) é manual. **Todos exigem a mesma conexão central do Supabase** antes de
+publicar. Se as variáveis faltarem, o deploy falha — nunca sobe em modo local.
 
 ### Caminho A (recomendado) — Netlify ligado ao GitHub
 
@@ -124,20 +122,17 @@ roda dentro do próprio GitHub. O **B** é o mais rápido para ver no ar hoje.
 > Daqui para frente: **eu altero o sistema → envio para a `main` → o Netlify publica
 > sozinho** em 1–2 minutos. Para voltar uma versão: *Deploys → Rollback*.
 
-### Caminho B (mais rápido) — Netlify Drop, arrastando a pasta
+### Caminho B — Netlify Drop, arrastando o pacote online
 
-1. Tenha a pasta **`publicar`** em mãos (ela já vem pronta no repositório, gerada e
-   conferida). Sem instalar nada: no GitHub, aba **Actions** → última execução →
-   artefato **`Altoprints-pronto-para-publicar`**. Ou, no seu computador:
-   `cd app && npm install && npm run publicar`.
-2. Abra **<https://app.netlify.com/drop>**.
-3. **Arraste a pasta `publicar` inteira** para a área pontilhada.
-4. Quando o deploy terminar, clique em **Claim site** e crie a conta grátis.
-   ⚠️ **Sem esse clique o Netlify apaga o site** depois de um tempo.
-5. Neste caminho o site sobe **sem** as chaves do banco: você conecta na **Parte 3,
-   passo 3B** (por dentro do sistema, em 1 minuto) — e cada aparelho da equipe usa o
-   **link de conexão** da Parte 4.
-6. Para atualizar depois: `npm run publicar` e arraste a pasta de novo em
+1. Configure `VITE_SUPABASE_URL` e a chave pública nos Secrets/Variables do GitHub Actions
+   (como no Caminho C), ou no ambiente local antes de rodar `npm run publicar`.
+2. Baixe o artefato **Altoprints-pronto-para-publicar** da última execução bem-sucedida em
+   **GitHub → Actions**. O repositório não guarda um build pré-configurado.
+3. Abra **<https://app.netlify.com/drop>**, arraste a pasta do artefato e clique em
+   **Claim site** para manter o endereço.
+4. Todos os aparelhos devem usar esse mesmo endereço e o mesmo banco. Sem URL/chave válida,
+   `npm run publicar` e o workflow falham; não existe conexão por aparelho nem modo local.
+5. Para atualizar depois, baixe o artefato da execução mais recente e publique-o em
    *Deploys → drag and drop*.
 
 ---
@@ -154,25 +149,22 @@ conferência (`npm run checar`) que **barra** qualquer senha, dado de pessoa rea
 secreta antes de publicar — e o sistema já nasce vazio, do zero. (Se preferir manter o
 código fechado, use o Caminho A ou B.)
 
-1. **Deixar o repositório público:** no GitHub → repositório
-   **`yuuv1/projeto-comiss-o-altoprints`** → **Settings** → **General** → role até o fim
-   (*Danger Zone*) → **Change visibility** → **Public**.
-2. **Publicar:** aba **Actions** → **Publicar sistema (GitHub Pages)** →
-   **Run workflow** → **main** → **Run workflow**. (Daqui para frente, qualquer envio para
-   a `main` já publica sozinho — não precisa repetir.)
-   - Na primeira vez o próprio robô liga o Pages (Settings → Pages → Source:
-     *GitHub Actions*). Se quiser adiantar: ligue lá antes.
-3. Espere o **✓ verde** (uns 2 minutos na primeira vez) e abra
-   **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>**.
-4. **Como conferir:** abre a tela de login do sistema com a versão no rodapé.
-   Se aparecer a página **404** do GitHub, espere 1–2 minutos e atualize — o primeiro
-   deploy demora um pouquinho para propagar.
+1. **Deixar o repositório público** (se a conta não tiver Pages pago): GitHub →
+   repositório → **Settings → General → Danger Zone → Change visibility → Public**.
+2. **Configurar o banco central antes da publicação:** em **Settings → Secrets and
+   variables → Actions**, crie `VITE_SUPABASE_URL` e uma chave pública:
+   `VITE_SUPABASE_PUBLISHABLE_KEY` (ou `VITE_SUPABASE_ANON_KEY` para chave antiga).
+   Use a URL e a chave pública do mesmo projeto Supabase da Parte 1. Nunca use senha,
+   `service_role` ou `sb_secret_`.
+3. **Publicar:** aba **Actions → Publicar sistema (GitHub Pages) → Run workflow → main →
+   Run workflow**. Depois, qualquer envio para a `main` publica automaticamente.
+   Na primeira vez, confirme **Settings → Pages → Source: GitHub Actions**.
+4. Espere o **✓ verde** e abra **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>**.
+   Se a validação do Supabase falhar, o site antigo continua no ar e o log informa qual
+   variável pública está ausente/inválida; não é publicada uma versão em modo local.
 
-**Onde ficam os dados neste caminho:** o GitHub Pages guarda **o site**. Os pedidos ficam
-no **Supabase** (Parte 1) — que é o que mantém o conteúdo salvo e igual em todos os
-aparelhos. Neste caminho o site sobe sem as chaves do banco: conecte a nuvem por dentro
-do sistema na **Parte 3, passo 3B** (1 minuto) e mande o **link de conexão** da Parte 4
-para os celulares da equipe.
+**Dados:** o GitHub Pages só hospeda o app; todo o conteúdo operacional fica no único
+Supabase central. Configuração por link ou por aparelho é ignorada no site oficial.
 
 ---
 
@@ -228,21 +220,10 @@ Faça isso **antes** de mandar o link para a equipe.
    Adicionar à Tela de Início**. Depois, o ícone abre o Altoprints com 1 toque. Guia em
    [`app/PWA.md`](app/PWA.md).
 
-### 3B. Se você usou o Caminho B (site sem as chaves)
+A conexão vem do build do site. Não cole URL/código em cada aparelho: se faltar conexão,
+o site bloqueia o acesso em vez de criar dados locais.
 
-**Conecte este aparelho ao banco ANTES de criar a conta** (assim ela não fica só neste
-navegador):
-
-1. Abra **`/#/administracao`** e, logo abaixo do formulário, use **“Conectar este aparelho
-   ao banco da empresa”** (esse ajuste é do proprietário — a equipe nunca precisa).
-2. No campo de colar, **cole a URL e a chave pública juntas** (pode colar a mensagem
-   inteira do painel do Supabase): o sistema mostra *“Encontrei a URL e a chave!”*.
-   Confira os dois campos e clique em **Conectar à nuvem**.
-   - Alternativa: cole o **código** (começa com `ALT1.`) ou o **link** de conexão.
-3. Deve aparecer **“Banco na nuvem (Supabase) conectado”**.
-4. Agora siga o **3A** (criar o acesso do proprietário).
-
-### 3C. Um segundo login de proprietário (sócio, gerente, escritório)
+### 3B. Um segundo login de proprietário (sócio, gerente, escritório)
 
 Dentro do sistema: **Configurações → Funcionários e acessos → Novo acesso** (ou o atalho em
 **Configurações → Meu acesso → Outro acesso de proprietário**).
@@ -265,17 +246,12 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 - **Não existe mais** senha, “tela de entrada pelo nome” ou permissão por funcionário: a
   equipe vê os pedidos e os clientes da loja; as telas de gestão são do proprietário.
 
-### 4.2 Conectar os aparelhos da equipe (1 clique para cada um)
+### 4.2 Usar o mesmo site e banco em todos os aparelhos
 
-1. **Configurações → Nuvem → “Conectar os aparelhos da equipe” → Copiar link**.
-2. Mande no grupo do WhatsApp: *“Abram este link uma vez para o sistema ficar conectado.”*
-3. Quem abrir o link já fica conectado naquele celular — não precisa digitar nada.
-4. Se o link não abrir em algum aparelho: mande o **código** (botão *Copiar código*); no
-   aparelho, abra `/#/administracao` → **“Conectar este aparelho ao banco da empresa”** e
-   cole ali (é uma configuração do dono, feita uma vez por aparelho).
-
-> No **Caminho A** (chaves no Netlify) isso nem é necessário: todo aparelho que abrir o
-> site já nasce conectado. O link serve para o **Caminho B**.
+1. Mande à equipe o endereço oficial publicado.
+2. Todos devem abrir esse mesmo endereço; a conexão central do Supabase já vem na publicação.
+3. Não há link/código de conexão por aparelho. Se o site estiver sem a conexão central,
+   ele bloqueia o uso e não salva pedidos em armazenamento local.
 
 ### 4.3 Testar antes de divulgar
 
@@ -293,9 +269,8 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
 3. No iPhone/iPad, abra no **Safari** → **Compartilhar → Adicionar à Tela de Início**.
 4. Confirme o ícone **Altoprints** na tela inicial. A instalação é uma vez por aparelho.
 
-> A instalação não funciona pelo arquivo local `Altoprints.html`. O site precisa estar no ar.
-> O app atualiza sozinho quando uma nova versão do site é publicada. Os dados do Supabase
-> continuam precisando de internet para carregar e sincronizar.
+> O Altoprints é somente online: não há arquivo `Altoprints.html` nem operação de pedidos sem internet.
+> O PWA atualiza sozinho e os dados do Supabase carregam/sincronizam quando a conexão está disponível.
 
 Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
 
@@ -303,18 +278,19 @@ Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
 
 > *Oi, meninas! O sistema novo de pedidos está no ar 👇*
 > *Link: (colocar aqui)*
-> *Abra o link uma vez para conectar o seu celular.*
-> *Abra o link uma vez e já está dentro: a equipe não tem login.*
+> *Abra o mesmo endereço oficial em todos os aparelhos. Os pedidos são compartilhados online.*
+> *A equipe não tem login: ao registrar a fila, escolha o seu nome na lista.*
 > *Ao registrar a fila, escolha o seu nome na lista “Seu nome (funcionário)”.*
 
 ---
 
 ## Parte 5 — Conferência final
 
-- [ ] `main` com a versão **1.5.6** e sem PR pendente (Parte 0)
+- [ ] `main` com a versão **1.5.7** e sem PR pendente (Parte 0)
 - [ ] SQL rodou com **“Success. No rows returned”** (Parte 1.2)
 - [ ] Projeto do Supabase na região **São Paulo**, senha do banco guardada (Parte 1.1)
-- [ ] Site no ar e **reivindicado (Claim)** na sua conta do Netlify (Parte 2)
+- [ ] Site oficial no ar (Netlify Drop precisa estar **reivindicado/Claim**)
+- [ ] Workflow confirmou a URL + chave pública do Supabase no pacote
 - [ ] **Altoprints instalado** como aplicativo no celular principal (Parte 4.4)
 - [ ] *Configurações → Nuvem* mostra **“Banco na nuvem conectado”**
 - [ ] Seu acesso de **proprietário** criado com **senha forte** + ícone salvo no celular
@@ -326,7 +302,7 @@ Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
       Se treinou com exemplos: *Configurações → Dados → Apagar todos os dados*
 - [ ] Teste de pedido entre computador e celular funcionou (Parte 4.3)
 - [ ] *Configurações → Dados → **Baixar backup*** funcionou (guarde o arquivo)
-- [ ] Versão **1.5.6** aparecendo no rodapé do sistema
+- [ ] Versão **1.5.7** aparecendo no rodapé do sistema
 
 ---
 
@@ -335,7 +311,7 @@ Guia completo para celular e computador: [`app/PWA.md`](app/PWA.md).
 | Quando | O que fazer |
 | --- | --- |
 | **Toda semana** | *Configurações → Dados → Baixar backup* (o plano grátis do Supabase **não** faz backup automático) |
-| **Atualização do sistema** | Caminho A: automático (enviou para a `main`, o Netlify publica). Caminho B: `npm run publicar` + arrastar a pasta de novo |
+| **Atualização do sistema** | GitHub Pages/Netlify publica automaticamente na `main`; Netlify Drop usa o artefato da última execução bem-sucedida (sempre com Supabase central) |
 | **Mudou o banco?** | *Configurações → Nuvem → Copiar o SQL* → SQL Editor → **Run**. Só completa o molde, nunca apaga nada |
 | **Outro proprietário esqueceu a senha** | *Configurações → Funcionários e acessos → Redefinir senha* |
 | **VOCÊ esqueceu a senha** | [`app/DEPLOY.md`](app/DEPLOY.md) → seção **“Esqueci a senha”** (uma linha de SQL resolve) |
@@ -357,11 +333,12 @@ até o mês seguinte (sem cobrança surpresa).
 | “não foi possível falar com o banco na nuvem” | internet caiu **ou** o projeto está dormindo | **Restore project** no painel do Supabase |
 | “a chave do Supabase parece inválida” | chave errada/incompleta/**secreta** | Parte 1.3: use a **pública** (`sb_publishable_` ou `anon`) |
 | “Falha ao enviar o arquivo” | o SQL não rodou por completo (faltou o bucket) | rode o SQL de novo |
-| Tela em branco ao abrir o `index.html` com 2 cliques | normal: esse arquivo é para **hospedar** | use o **`Altoprints.html`** (arquivo único) ou o site no ar |
-| “Sem espaço” / nada é salvo | janela **anônima** ou armazenamento cheio | abra numa janela normal; *Configurações → Dados → Liberar espaço* |
-| O site mostra a versão **antiga** | o deploy não rodou ou o navegador guardou cache | *Actions → Publicar sistema → Re-run* · depois recarregue com `Ctrl + Shift + R` |
-| O deploy do Netlify **falhou** | o guarda de publicação barrou algo | leia o log: ele diz exatamente o que encontrou |
-| Quer trocar de projeto do Supabase | — | *Configurações → Nuvem → Desconectar* e conecte com os dados novos |
+| Publicação bloqueada por configuração Supabase | URL/chave ausente ou inválida | configure `VITE_SUPABASE_URL` e chave `publishable`/`anon` nos Secrets/Variables; rode o workflow de novo |
+| O site mostra o aviso de conexão central ausente | pacote antigo ou build sem variáveis | corrija as variáveis de publicação e publique novamente; o app não salvará no navegador |
+| Falha ao carregar ou salvar | internet indisponível, projeto pausado ou erro no Supabase | confira a conexão e o painel do Supabase; o app não muda para armazenamento local |
+| O site mostra a versão **antiga** | o deploy não rodou ou o navegador guardou cache | *Actions → Publicar sistema → Re-run* · depois reabra online |
+| O deploy do Netlify **falhou** | configuração do Supabase ou guarda bloqueou o build | leia o log: ele informa qual validação falhou |
+| Quer trocar o projeto Supabase | conexão central definida na publicação | atualize os Secrets/Variables do host e publique de novo; não altere aparelho por aparelho |
 
 ---
 
@@ -383,6 +360,6 @@ cd app
 npm install         # dependências (só na primeira vez)
 npm run dev         # desenvolver no computador (http://localhost:8080) — abre já logado
 npm run testar      # todos os testes (regras, login, telas)
-npm run publicar    # gera a pasta publicar/ + Altoprints.html + confere o pacote
+npm run publicar    # gera só o pacote online; exige URL e chave pública do Supabase
 npm run checar      # só a conferência (pode ir para o ar?) — aceita a pasta: npm run checar dist
 ```

@@ -1,19 +1,10 @@
 /**
- * Gera a pasta ../publicar com o site prontinho para jogar no Netlify Drop.
+ * Gera a pasta ../publicar para hospedar o site online (Pages/Netlify Drop).
  *
- * Uso:  npm run publicar
+ * Uso: npm run publicar
  *
- * A pasta sai com:
- *   index.html, assets/...   (o site compilado, para hospedar)
- *   Altoprints.html          (ARQUIVO ÚNICO: abre com dois cliques, sem servidor)
- *   _redirects               (regra do Netlify para o sistema funcionar em qualquer endereço)
- *   LEIA-ME.txt              (passo a passo de como subir)
- *
- * Por que o arquivo único: quando o index.html é aberto direto do computador
- * (endereço começando com "file://"), o navegador bloqueia o carregamento dos
- * arquivos da pasta "assets" (política de segurança) e a tela fica em branco.
- * No Altoprints.html o programa e o visual vão embutidos no próprio arquivo,
- * então ele funciona com dois cliques, sem internet e sem instalar nada.
+ * A publicação oficial exige a URL e a chave pública do Supabase. O app não
+ * produz arquivo para abrir por dois cliques nem uma versão com dados locais.
  */
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
@@ -23,178 +14,90 @@ import { fileURLToPath } from 'node:url'
 const aqui = dirname(fileURLToPath(import.meta.url))
 const app = resolve(aqui, '..')
 const destino = resolve(app, '..', 'publicar')
+const dist = resolve(app, 'dist')
 
-console.log('\n➡️  Compilando o site...\n')
+// Remove qualquer saída anterior primeiro: se a configuração/build falhar,
+// nada antigo fica disponível para ser arrastado ou publicado por engano.
+await rm(destino, { recursive: true, force: true })
+await rm(dist, { recursive: true, force: true })
+
+console.log('\n➡️  Validando a configuração central do Supabase...\n')
+const validacaoConfig = spawnSync(process.execPath, [resolve(aqui, 'validar-config-supabase.mjs')], {
+  cwd: app,
+  stdio: 'inherit',
+})
+if (validacaoConfig.status !== 0) process.exit(validacaoConfig.status ?? 1)
+
+console.log('\n➡️  Compilando o site online...\n')
 const r = spawnSync('npx', ['vite', 'build'], { cwd: app, stdio: 'inherit', shell: process.platform === 'win32' })
 if (r.status !== 0) process.exit(r.status ?? 1)
 
+console.log('\n➡️  Validando a conexão central e o pacote de produção...\n')
+const checagemDist = spawnSync(process.execPath, [resolve(aqui, 'checar-publicacao.mjs'), 'dist'], {
+  cwd: app,
+  stdio: 'inherit',
+})
+if (checagemDist.status !== 0) {
+  await rm(destino, { recursive: true, force: true })
+  console.log('❌ Publicação cancelada. O site exige a conexão central com o Supabase.\n')
+  process.exit(checagemDist.status ?? 1)
+}
+
 console.log('\n➡️  Montando a pasta "publicar"...\n')
-await rm(destino, { recursive: true, force: true })
 await mkdir(destino, { recursive: true })
 await cp(resolve(app, 'dist'), destino, { recursive: true })
-
 await writeFile(
   resolve(destino, '_redirects'),
   '# mantém o endereço funcionando em qualquer caminho (SPA)\n/*  /index.html  200\n',
 )
 
-/* ------------------------- arquivo único (offline) ------------------------ */
-// Junta o HTML + o CSS + o programa num só arquivo, para abrir com dois cliques.
-console.log('➡️  Montando o arquivo único (Abrir no computador)...')
-
-const lerAssets = async (html) => {
-  let saida = html
-
-  // <script type="module" src="./assets/..."></script>  ->  <script type="module">...</script>
-  const scripts = [...saida.matchAll(/<script[^>]*\ssrc="(\.\/assets\/[^"]+)"[^>]*><\/script>/g)]
-  for (const [tag, caminho] of scripts) {
-    const js = await readFile(resolve(destino, caminho), 'utf8')
-    // O bundle da Supabase contém uma tabela de caracteres escrita com espaços,
-    // tab e quebra de linha dentro de um template literal. Escapamos esses
-    // caracteres para que a linha gerada não pareça ter whitespace acidental.
-    const semEspacoFinalDeTemplate = js.replace(/` \t\n\\r=`/g, '`\\x20\\t\\n\\r=`')
-    // "</script" dentro de um texto do programa fecharia a etiqueta antes da hora
-    const seguro = semEspacoFinalDeTemplate.trimEnd().replace(/<\/script/gi, '<\\/script')
-    // substituição por FUNÇÃO: com texto, os "$" do programa viram comandos e embaralham tudo
-    saida = saida.replace(tag, () => `<script type="module">\n${seguro}\n</script>`)
-  }
-
-  // <link rel="stylesheet" href="./assets/...">  ->  <style>...</style>
-  const estilos = [...saida.matchAll(/<link[^>]*href="(\.\/assets\/[^"]+\.css)"[^>]*>/g)]
-  for (const [tag, caminho] of estilos) {
-    const css = await readFile(resolve(destino, caminho), 'utf8')
-    saida = saida.replace(tag, () => `<style>\n${css}\n</style>`)
-  }
-
-  // tira o que sobrou apontando para a pasta assets (preloads, por exemplo)
-  saida = saida
-    .replace(/<link[^>]*rel="modulepreload"[^>]*>\s*/g, '')
-    .replace(/ crossorigin/g, '')
-
-  return saida
-}
-
-const htmlDist = await readFile(resolve(destino, 'index.html'), 'utf8')
-const htmlUnico = await lerAssets(htmlDist)
-
-// conferência: o arquivo único não pode depender da pasta assets nem ter HTML duplicado
-const problemas = []
-if (/(src|href)="\.\/assets\//.test(htmlUnico)) problemas.push('ainda aponta para a pasta assets')
-if ((htmlUnico.match(/<div id="root">/g) ?? []).length !== 1) problemas.push('o HTML saiu duplicado')
-if (htmlUnico.includes('<script type="module" src=')) problemas.push('o programa não foi embutido')
-if (htmlUnico.length < 600_000) problemas.push('o arquivo saiu pequeno demais')
-if (problemas.length) {
-  console.log(`   ❌ O arquivo único saiu com problema: ${problemas.join('; ')}`)
-  process.exit(1)
-}
-await writeFile(resolve(destino, 'Altoprints.html'), htmlUnico)
-
 const pacote = JSON.parse(await readFile(resolve(app, 'package.json'), 'utf8'))
 await writeFile(
   resolve(destino, 'LEIA-ME.txt'),
   [
-    `Altoprints — Sistema de Pedidos DTF  (versão ${pacote.version})`,
+    `Altoprints — Sistema de Pedidos DTF (versão ${pacote.version})`,
     '',
-    'O SISTEMA COMEÇA VAZIO, DO ZERO:',
-    '  - Nenhum pedido, cliente ou impressão vem pronto.',
-    '  - A EQUIPE NÃO TEM LOGIN: JESSICA, RAISSA e ANDREIA já vêm cadastradas como',
-    '    funcionárias e, ao registrar uma fila, cada uma escolhe o próprio nome.',
-    '  - Só o PROPRIETÁRIO tem usuário e senha (o "Login proprietário" no topo).',
-    '    Na primeira vez é ali que você cria o seu acesso (veja abaixo).',
-    '  - Exemplos para treinar a equipe são opcionais e fictícios: entram só se você',
-    '    pedir em Configurações → Dados → "Carregar demonstração" (e a tela fica com',
-    '    um aviso amarelo de "dados de exemplo" até você apagar).',
+    'SITE OFICIAL — SOMENTE ONLINE:',
+    '  - O sistema usa um único banco Supabase configurado durante a publicação.',
+    '  - Todos os aparelhos abrem os mesmos pedidos, clientes e acessos.',
+    '  - O pacote não funciona como arquivo offline e não grava dados operacionais no navegador.',
+    '  - A chave incluída no app é pública (publishable/anon); nunca use sb_secret/service_role.',
     '',
-    'DUAS FORMAS DE USAR:',
-    '',
-    '  A) NO COMPUTADOR, SEM INTERNET (jeito mais rápido de ver o sistema):',
-    '     - Clique DUAS VEZES no arquivo  Altoprints.html  (está nesta pasta)',
-    '     - Ele abre no navegador já funcionando; os dados ficam salvos nesse computador',
-    '     - NÃO abra o "index.html" com dois cliques: ele fica em branco (é só para hospedar)',
-    '',
-    '  B) NO AR, PARA A EQUIPE TODA (Netlify Drop):',
-    '     1. Abra https://app.netlify.com/drop',
-    '     2. Arraste ESTA PASTA inteira (a pasta "publicar") para a área pontilhada',
-    '     3. Espere o "Deploy" terminar e clique em CLAIM SITE (reivindicar) para o site virar seu',
-    '     4. Pronto: o endereço aparece no topo da página',
+    'PUBLICAR NO NETLIFY DROP:',
+    '  1. Abra https://app.netlify.com/drop.',
+    '  2. Arraste esta pasta inteira e aguarde o deploy.',
+    '  3. Clique em Claim site para manter o endereço.',
+    '  4. Todos devem usar o mesmo endereço oficial.',
     '',
     'INSTALAR COMO APLICATIVO (PWA):',
-    '  - Depois que o site estiver publicado em HTTPS, abra o endereço no celular.',
-    '  - Android: toque em "Instalar app" (ou Chrome → ⋮ → Instalar app).',
-    '  - iPhone/iPad: abra no Safari → Compartilhar → Adicionar à Tela de Início.',
-    '  - O arquivo Altoprints.html, aberto pelo computador, não pode ser instalado como PWA.',
-    '  - Guia completo: app/PWA.md',
+    '  - Abra o endereço publicado em HTTPS no celular ou computador.',
+    '  - Android: Chrome → Instalar app. iPhone/iPad: Safari → Compartilhar → Adicionar à Tela de Início.',
+    '  - O aplicativo atualiza sozinho e precisa de internet para ler/gravar dados.',
     '',
-    'COMO ATUALIZAR DEPOIS:',
-    '  - Rode de novo:  npm run publicar',
-    '  - Arraste a pasta "publicar" de novo na página do site (Deploys → Drag and drop)',
-    '  - O arquivo Altoprints.html é gerado de novo junto (é só clicar duas vezes nele)',
+    'PRIMEIRO ACESSO:',
+    '  - O sistema começa sem pedidos de exemplo e sem senha padrão.',
+    '  - O proprietário cria o primeiro acesso em Login proprietário (ou #/administracao).',
+    '  - A equipe registra as filas no mesmo banco online, sem contas individuais.',
     '',
-    'PRIMEIRO ACESSO (criar o SEU acesso de proprietário):',
-    '  1. Abra o sistema: no topo, no cantinho, tem o botão "Login proprietário".',
-    '     Também abre pelo endereço  .../#/administracao, com 5 toques no logo ou',
-    '     Ctrl + Alt + D.',
-    '  2. Como ainda não existe proprietário, a tela oferece "Criar o acesso do',
-    '     proprietário": digite o seu nome, o usuário e uma SENHA FORTE (guarde-a bem).',
-    '  3. No site publicado, toque em "Instalar app"; no iPhone/iPad use Safari → Compartilhar →',
-    '     Adicionar à Tela de Início. O ícone abre o sistema com 1 toque (guia: app/PWA.md).',
-    '  4. Quer um segundo login de dono (sócio, gerente, escritório)?',
-    '     Configurações → Funcionários e acessos → Novo acesso.',
-    '  5. FUNCIONÁRIOS: JESSICA, RAISSA e ANDREIA já vêm prontas (sem conta e sem',
-    '     senha). Para adicionar mais alguém: Configurações → Funcionários e acessos',
-    '     → Novo funcionário (só o proprietário cadastra).',
+    'COMO ATUALIZAR:',
+    '  - Gere novo pacote com npm run publicar ou envie a alteração para a main.',
+    '  - O PWA instalado recebe a atualização automaticamente ao ficar online.',
     '',
-    'ONDE OS DADOS FICAM (importante):',
-    '  - Neste aparelho, os dados ficam guardados no próprio navegador, num espaço',
-    '    grande (IndexedDB) — o registro de impressões, pedidos e clientes não',
-    '    esbarra mais no limite pequeno do navegador.',
-    '  - SEM A NUVEM, CADA APARELHO TEM OS PRÓPRIOS DADOS: o celular não vê os',
-    '    pedidos do computador. Dá para levar os dados com Backup → Restaurar, e para',
-    '    trabalhar junto de verdade conecte a nuvem (Configurações → Nuvem): com ela,',
-    '    toda mudança aparece em todos os aparelhos sozinha.',
-    '',
-    'CONECTAR A EQUIPE (banco na nuvem) — 3 passos, com o sistema aberto:',
-    '  - Configurações → Nuvem → siga o assistente: cria o projeto do Supabase,',
-    '    copia o SQL (1 clique), cola a URL e a chave, conecta.',
-    '  - Depois clique em "Copiar link" e mande o link no grupo: quem abrir uma vez',
-    '    fica conectado naquele aparelho.',
-    '  - Guia completo: app/CONECTAR-NUVEM.md',
-    '',
-    'ANTES DE COMEÇAR A USAR DE VERDADE:',
-    '  - Se carregou os exemplos para treinar: Configurações → Dados →',
-    '    "Apagar todos os dados" (o seu acesso de proprietário é mantido).',
-    '  - Confira as comissões e os preços em Configurações.',
-    '  - Envie o logo da empresa em Configurações → Empresa.',
-    '  - Faça backup de vez em quando (Configurações → Dados → Baixar backup).',
-    '',
-    'SE APARECER UM ERRO DE "SEM ESPAÇO" OU NADA FOR SALVO:',
-    '  - Confira se a janela do navegador não está ANÔNIMA/PRIVADA: nesse modo o',
-    '    navegador não deixa o sistema salvar nada. Abra numa janela normal.',
-    `  - O rodapé mostra a versão do`,
-    `    sistema no rodapé (ex.: "versão ${pacote.version}").`,
-    '  - Em Configurações → Dados existe o bloco "Onde os dados ficam neste aparelho",',
-    '    com o botão "Liberar espaço" quando o armazenamento antigo estiver cheio.',
-    '',
-    'ESQUECI A SENHA DO PROPRIETÁRIO:',
-    '  - O caminho está em app/DEPLOY.md (título "Esqueci a senha").',
+    'Nunca limpe os dados do navegador para atualizar. A conexão oficial é central e não é configurada aparelho por aparelho.',
     '',
   ].join('\n'),
 )
 
-/* --------------------- conferência antes de entregar -------------------- */
-// Nada de credencial de exemplo ou dado de pessoa real pode ir para o ar: o
-// guarda roda sozinho aqui e também pelo "npm run checar".
-console.log('➡️  Conferindo o pacote (credenciais, dados pessoais e estrutura)...')
+console.log('\n➡️  Conferindo o pacote final...')
 const checagem = spawnSync(process.execPath, [resolve(aqui, 'checar-publicacao.mjs')], {
   cwd: app,
   stdio: 'inherit',
 })
 if (checagem.status !== 0) {
+  await rm(destino, { recursive: true, force: true })
   console.log('❌ Publicação cancelada: resolva os problemas acima e rode de novo.\n')
   process.exit(checagem.status ?? 1)
 }
 
-console.log('✅ Pasta pronta:', destino)
-console.log('   Arquivo único (dois cliques):', resolve(destino, 'Altoprints.html'))
+console.log('✅ Pacote online pronto:', destino)
 console.log('   Arraste a pasta em https://app.netlify.com/drop\n')
-

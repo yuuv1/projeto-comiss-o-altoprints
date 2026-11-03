@@ -1,37 +1,22 @@
 # Próximas etapas — logins com relatórios, área do chefe e catálogo de impressões
 ### você pediu: (1) logins com opções de relatórios, (2) melhor experiência do chefe no administrativo, (3) catalogar as impressões
 
-> **Documento de planejamento.** A situação real está logo abaixo; as seções seguintes guardam
-> o histórico de como cada frente foi pensada (não são tarefas pendentes).
+> **Documento de planejamento histórico.** As seções antigas abaixo registram como as
+> funcionalidades foram pensadas; não são instruções atuais de publicação. Para o estado
+> vigente, consulte [`LANCAMENTO.md`](LANCAMENTO.md).
 
-## Situação (conferida no código em 30/10/2026)
+## Situação atual
 
 - **Frente A (logins com opções de relatórios): IMPLEMENTADA** — as caixinhas por acesso estão
   em **Configurações → Equipe**, e as telas liberadas saem filtradas só com os dados do vendedor.
-- **Frente B (experiência do chefe): IMPLEMENTADA nesta versão (1.3.0)**:
-  - **Resumo de hoje** no topo do Painel: criados, pagos, na fila, concluídos, entregues e
-    **parados há 3+ dias**;
-  - **atalhos grandes** do dia a dia (Novo pedido · A receber · Na máquina · Equipe · Relatório);
-  - **checklist de primeiros passos** com barra de progresso (some quando tudo está pronto);
-  - **busca global `Ctrl + K`** (pedido, cliente, telefone, cidade, rastreio e vendedor),
-    respeitando o que cada acesso pode ver;
-  - **equipe em formato de tabela** (pedidos, faturamento, comissão do mês e última venda);
-  - **Configurações** com uma frase de "para que serve" em cada aba e abertura direta
-    por endereço (`?aba=equipe`, `?aba=nuvem`…).
+- **Frente B (experiência do chefe): IMPLEMENTADA** — inclui resumo de hoje, atalhos, checklist,
+  busca global, equipe em tabela e explicações nas Configurações.
 - **Frente C (catalogar as impressões): FORA do sistema, por decisão de simplificação.**
-  Hoje o pedido é uma **fila** com um estágio (`em andamento` / `concluído`) e duas marcações
-  (pago e entregue) — quem muda o status é a tela **Pedidos**, e a **tela de impressões foi
-  retirada** do menu (o teste de tela garante que ela não volte sem querer). O que continua
-  no código: a tabela `impressoes` no banco/backup e o histórico fictício dos dados de exemplo,
-  prontos para uma tela futura se você quiser.
-- **Publicação:** o site já está no ar pelo **GitHub Pages** (versão 1.4.0). Falta **conectar
-  o Supabase** para a equipe toda ver os mesmos dados — plano em
-  [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md).
-
-> **Corrigido nesta rodada:** tabela de comissão oficial (50–100 m = 2% · acima de 100 m = 1,5%),
-> texto da confirmação "Usar tabela oficial" que ainda dizia "acima de 50 m", links mortos
-> (`/por-vendedor` → `/relatorio`) e a possibilidade de abrir Pedidos já filtrado por vendedor
-> (`/pedidos?vendedor=`), usada pelos atalhos do Painel.
+  O fluxo atual é uma fila na tela **Pedidos**; a tela de catálogo foi retirada do menu.
+- **Publicação online-only (versão 1.5.7):** o site oficial requer a configuração central do
+  Supabase no GitHub Actions. Sem URL e chave pública válidas, o build/publicação é bloqueado;
+  não existe modo local nem conexão por aparelho. O guia atualizado está em
+  [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md) e [`LANCAMENTO.md`](LANCAMENTO.md).
 
 ---
 
@@ -124,7 +109,8 @@ quantos metros saíram, quantas vezes reimprimiu nem por quê**.
 
 **Dados novos necessários:** uma tabela `impressoes` (pedido, arquivo, metros, quem, quando, motivo
 de reimpressão, observação) e um campo de tags nos arquivos. No Supabase isso entra no
-`schema.sql` que eu já mantenho; no modo local vai para o próprio banco do navegador.
+`schema.sql` que eu já mantenho; qualquer implementação futura deve continuar no Supabase
+central, sem criar modo local.
 
 ---
 
@@ -135,8 +121,8 @@ de reimpressão, observação) e um campo de tags nos arquivos. No Supabase isso
 3. **Frente B** (experiência do chefe) — rende mais depois que os dados de impressão existem
    (porque o Painel vai mostrar metros impressos, reimpressões etc.).
 
-Cada frente: implemento → rodo os testes → te mando o que testar → commito. A pasta `publicar/` é
-regenerada com `npm run publicar` depois de cada frente.
+Em alterações futuras: implementar → rodar os testes → revisar o pacote online. `npm run publicar`
+é apenas uma validação local; não versione `app/dist/` nem `publicar/` (artefatos gerados).
 
 ---
 
@@ -145,6 +131,6 @@ regenerada com `npm run publicar` depois de cada frente.
 1. **Opções de relatórios:** caixinha por acesso (implementado em Configurações → Equipe).
 2. **Impressões:** o fluxo é o status da fila na tela Pedidos; a tela de catálogo de impressões
    saiu do sistema (os dados continuam no banco para o futuro).
-3. **Publicação:** GitHub Pages publica sozinho a `main`; o **Supabase** entra em seguida para a
-   equipe toda ver os mesmos pedidos — plano em [`PLANO-NUVEM-E-PUBLICACAO.md`](PLANO-NUVEM-E-PUBLICACAO.md)
-   e guia detalhado em [`LANCAMENTO.md`](LANCAMENTO.md) / `app/PASSO-A-PASSO-SUPABASE.md`.
+3. **Publicação:** GitHub Pages publica a `main` somente depois que o workflow valida a
+   configuração central do Supabase. O site oficial é online-only; consulte [`LANCAMENTO.md`](LANCAMENTO.md)
+   e `app/PASSO-A-PASSO-SUPABASE.md`.

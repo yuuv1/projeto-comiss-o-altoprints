@@ -5,9 +5,11 @@ Cada ideia tem uma etiqueta de esforço: **🟢 pequeno** (faço em uma rodada) 
 
 No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 
-> **Já entregue na versão 1.4.0:** só o proprietário tem login (a equipe escolhe o próprio nome no pedido) e o backup ficou importável/sincronizável. Antes, na 1.3.0: a busca global (Ctrl + K), o resumo de hoje e o checklist de
-> primeiros passos no Painel do proprietário, a equipe em tabela e a explicação em cada aba das
-> Configurações. O que falta mesmo é a **nuvem** — plano em `PLANO-NUVEM-E-PUBLICACAO.md`.
+> **Já entregue até a versão 1.5.7:** login do proprietário, backup importável/sincronizável,
+> busca global, resumo de hoje, checklist e equipe em tabela. O site oficial é online-only e
+> usa Supabase central; a publicação exige configuração válida e nunca cai para dados locais.
+> Para conferir os requisitos de implantação, consulte `PLANO-NUVEM-E-PUBLICACAO.md` e
+> `LANCAMENTO.md`.
 
 ---
 
@@ -71,7 +73,6 @@ No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 | Ideia | Por que ajuda | Esforço |
 | --- | --- | --- |
 | **Instalar como app no celular (PWA)** com ícone e tela cheia | Abre igual aplicativo, sem passar pelo navegador | 🟡 |
-| **Funcionar offline** e sincronizar quando voltar a internet | Queda de internet não para o atendimento | 🔴 |
 | **Notificação de "pedido pago" / "pedido pronto"** no celular | Ninguém precisa ficar abrindo o sistema para conferir | 🔴 |
 | ✅ **Busca global (Ctrl+K)** por pedido, cliente, telefone, cidade, rastreio e vendedor | Achar qualquer coisa em 2 segundos | 🟢 |
 | **Importar CSV do sistema antigo** (pedidos e clientes) | Traz o histórico de uma vez, sem digitar | 🟡 |

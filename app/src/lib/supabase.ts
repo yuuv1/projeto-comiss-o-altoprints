@@ -1,19 +1,10 @@
-// Conexão com o Supabase (banco na nuvem) — configurável DENTRO do sistema.
+// Conexão única do site oficial com o Supabase. Em produção, URL e chave pública
+// vêm obrigatoriamente da configuração de publicação; não lemos configuração por
+// aparelho, não aceitamos outro projeto por link e não caímos em armazenamento local.
+// O modo de desenvolvimento/testes pode continuar sem Supabase.
 //
-// O proprietário abre Configurações → Nuvem, cola a URL do projeto e a chave pública,
-// e pronto: a conexão fica guardada neste aparelho. Para os outros aparelhos, o sistema
-// gera um LINK (ou um código) que, aberto uma vez, conecta aquele celular sozinho.
-//
-// A chave aceita é a PÚBLICA do projeto: a nova "publishable" (sb_publishable_...) ou a
-// antiga "anon" (a sequência longa que começa com eyJ). As duas são equivalentes e podem
-// aparecer no site — o que decide o que cada pessoa vê são o login e as permissões.
-//
-// ⚠️ NUNCA use a chave SECRETA (sb_secret_...) nem a "service_role": elas dão acesso
-// total ao banco. Se uma delas for colada por engano, o sistema se recusa a conectar.
-//
-// Também funciona por arquivo .env (opcional, para quem já usa):
-//   VITE_SUPABASE_URL=https://xxxx.supabase.co
-//   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+// A chave aceita é pública: publishable (sb_publishable_...) ou anon (JWT eyJ...).
+// Nunca use sb_secret_ ou service_role: dão acesso total ao banco.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type SituacaoChave = 'ok' | 'faltando' | 'secreta'
@@ -23,6 +14,18 @@ export const conferirChave = (valor?: string | null): SituacaoChave => {
   const c = (valor ?? '').trim()
   if (!c) return 'faltando'
   if (c.startsWith('sb_secret_')) return 'secreta'
+  // A service_role antiga também é JWT (parecida com a anon pública), então
+  // confira o papel antes de permitir que ela entre em qualquer build.
+  const partes = c.split('.')
+  if (partes.length === 3) {
+    try {
+      const payload = partes[1].replace(/-/g, '+').replace(/_/g, '/')
+      const preenchido = payload + '='.repeat((4 - (payload.length % 4)) % 4)
+      if ((JSON.parse(atob(preenchido)) as { role?: string }).role === 'service_role') return 'secreta'
+    } catch {
+      // JWT malformado será recusado pela validação de publicação.
+    }
+  }
   return 'ok'
 }
 
@@ -35,20 +38,27 @@ const CHAVE_LOCAL = 'altoprints:nuvem'
 const PREFIXO_CODIGO = 'ALT1'
 
 /* ------------------------------------------------------------------ */
-/* Ajustes vindos do arquivo .env (opcional)                           */
+/* Configuração central, inserida durante a publicação                 */
 /* ------------------------------------------------------------------ */
 
-const urlEnv = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? ''
-const chaveEnv =
-  ((import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ||
-    (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined))?.trim() ?? ''
+export const nuvemObrigatoria = import.meta.env.PROD
+const urlEnvOriginal = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? ''
+const urlEnv = urlEnvOriginal.replace(/\/+$/, '')
+const chavePublicaEnv = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() ?? ''
+const chaveAnonimaEnv = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ?? ''
+const chaveEnv = chavePublicaEnv || chaveAnonimaEnv
+const urlEnvValida = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(urlEnv)
 const configEnv: ConfigNuvem | null =
-  urlEnv && conferirChave(chaveEnv) === 'ok' ? { url: urlEnv, chave: chaveEnv } : null
+  urlEnvValida && conferirChave(chaveEnv) === 'ok' ? { url: urlEnv, chave: chaveEnv } : null
 
+if (nuvemObrigatoria && !configEnv) {
+  console.error(
+    '[Altoprints] Configuração online ausente ou inválida. A publicação precisa incluir a URL do Supabase e a chave pública.',
+  )
+}
 if (chaveEnv && conferirChave(chaveEnv) === 'secreta') {
   console.error(
-    '[Altoprints] A chave do arquivo .env é SECRETA (sb_secret_). Use a chave publishable ' +
-      '(ou a anon antiga) — a secreta dá acesso total ao banco e não pode ficar no site.',
+    '[Altoprints] A chave do build é SECRETA. Use a chave publishable ou a anon; a secreta nunca pode ficar no site.',
   )
 }
 
@@ -72,7 +82,7 @@ export function validarConexao(url: string, chave: string): string {
   const situacao = conferirChave(chave)
   if (situacao === 'faltando') return 'Cole a chave pública do projeto (publishable ou anon).'
   if (situacao === 'secreta')
-    return 'Esta é a chave SECRETA (sb_secret_). Use a chave publishable (ou a anon antiga) — a secreta dá acesso total ao banco e não pode ficar no site.'
+    return 'Esta é uma chave SECRETA (sb_secret_/service_role). Use a chave publishable (ou a anon pública) — a secreta dá acesso total ao banco e não pode ficar no site.'
   return ''
 }
 
@@ -143,11 +153,22 @@ const aplicar = (c: ConfigNuvem | null) => {
   cliente = c ? criar(c) : null
 }
 
-/** true quando o .env manda (aí a tela não deixa desconectar) */
-export const nuvemTravadaPeloEnv = () => Boolean(configEnv)
+/** A conexão do site oficial é central e não pode ser trocada por aparelho. */
+export const nuvemTravadaPeloEnv = () => Boolean(configEnv) || nuvemObrigatoria
 
 export const emNuvem = () => Boolean(cliente)
 export const clienteNuvem = () => cliente
+
+/** Em produção, toda leitura/gravação exige a conexão única do site. */
+export function clienteNuvemObrigatorio() {
+  if (cliente) return cliente
+  if (nuvemObrigatoria)
+    throw new Error(
+      'O site oficial funciona somente conectado ao banco online. A publicação está sem a configuração central do Supabase; nenhum pedido, cliente, arquivo ou outro dado operacional será salvo neste aparelho.',
+    )
+  return null
+}
+
 export const configNuvem = () => config
 export const conexaoRecebidaAgora = () => recebidaAgora
 
@@ -178,6 +199,8 @@ const gravarLocalStorage = (c: ConfigNuvem | null) => {
 
 /** Conecta (guarda neste aparelho) — as informações já precisam ter passado por validarConexao */
 export function conectar(configNova: ConfigNuvem) {
+  if (nuvemObrigatoria || configEnv)
+    throw new Error('A conexão deste build é definida na publicação e não pode ser trocada por aparelho.')
   const erro = validarConexao(configNova.url, configNova.chave)
   if (erro) throw new Error(erro)
   const limpa: ConfigNuvem = { url: normalizarUrl(configNova.url), chave: configNova.chave.trim() }
@@ -187,7 +210,8 @@ export function conectar(configNova: ConfigNuvem) {
 }
 
 export function desconectar() {
-  if (configEnv) throw new Error('Esta versão do site já vem com a nuvem configurada e não pode ser desconectada por aqui.')
+  if (nuvemObrigatoria || configEnv)
+    throw new Error('Este build exige a conexão central com a nuvem e não pode ser desconectado.')
   aplicar(null)
   gravarLocalStorage(null)
 }
@@ -203,40 +227,63 @@ export const linkDeConexao = () => {
 }
 
 /* ------------------------------------------------------------------ */
-/* Início: .env, código guardado ou link recebido                      */
+/* Início: produção usa só a configuração central; dev aceita links    */
 /* ------------------------------------------------------------------ */
 
 ;(() => {
-  // 1) link recebido (?nuvem=CODIGO) tem prioridade e é guardado no aparelho
-  try {
-    const parametros = new URLSearchParams(window.location.search)
-    const doLink = parametros.get('nuvem')
-    if (doLink) {
-      const recebida = lerCodigoConexao(doLink)
-      aplicar(recebida)
-      if (!configEnv) gravarLocalStorage(recebida)
-      recebidaAgora = true
-      // limpa o endereço para o código não ficar aparecendo na barra
-      parametros.delete('nuvem')
-      const resto = parametros.toString()
-      history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${resto ? `?${resto}` : ''}${window.location.hash}`,
-      )
-      return
+  if (nuvemObrigatoria) {
+    // O site oficial nunca usa a conexão de outro projeto guardada no aparelho
+    // nem aceita links ALT1 diferentes: todos ficam presos ao mesmo Supabase.
+    aplicar(configEnv)
+    if (typeof window !== 'undefined') {
+      try {
+        const parametros = new URLSearchParams(window.location.search)
+        if (parametros.has('nuvem')) {
+          parametros.delete('nuvem')
+          const resto = parametros.toString()
+          history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}${resto ? `?${resto}` : ''}${window.location.hash}`,
+          )
+        }
+      } catch {
+        /* a URL não interfere na conexão central do site */
+      }
     }
-  } catch (erro) {
-    console.warn('[Altoprints] Link de conexão inválido:', (erro as Error).message)
+    return
   }
 
-  // 2) arquivo .env (versões mais antigas/quem preferir por lá)
+  // Em desenvolvimento, link/código e configuração do aparelho continuam úteis
+  // para testar a interface sem alterar a conexão da publicação oficial.
+  if (typeof window !== 'undefined') {
+    try {
+      const parametros = new URLSearchParams(window.location.search)
+      const doLink = parametros.get('nuvem')
+      if (doLink) {
+        const recebida = lerCodigoConexao(doLink)
+        aplicar(recebida)
+        gravarLocalStorage(recebida)
+        recebidaAgora = true
+        parametros.delete('nuvem')
+        const resto = parametros.toString()
+        history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${resto ? `?${resto}` : ''}${window.location.hash}`,
+        )
+        return
+      }
+    } catch (erro) {
+      console.warn('[Altoprints] Link de conexão inválido:', (erro as Error).message)
+    }
+  }
+
   if (configEnv) {
     aplicar(configEnv)
     return
   }
 
-  // 3) conexão já guardada neste aparelho
   const local = lerLocalStorage()
   if (local) aplicar(local)
 })()

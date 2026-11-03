@@ -1,6 +1,6 @@
-// Guarda os arquivos de arte: na nuvem (Supabase Storage) ou localmente (IndexedDB)
+// Arquivos de arte vão ao Supabase Storage no site; IndexedDB é reservado para dev/testes.
 import type { Arquivo, ID } from './types'
-import { clienteNuvem } from './supabase'
+import { clienteNuvemObrigatorio, nuvemObrigatoria } from './supabase'
 
 const BUCKET = 'artes'
 
@@ -30,14 +30,12 @@ const abrirIDB = (): Promise<IDBDatabase> =>
   })
 
 /**
- * Aviso usado quando o navegador não deixa guardar anexos: acontece quando o
- * sistema é aberto como arquivo (Altoprints.html, endereço começando com
- * "file://"), porque o navegador trata esse modo como mais restrito.
+ * Aviso usado quando o navegador de desenvolvimento não deixa guardar um
+ * anexo local. O site oficial nunca usa IndexedDB como armazenamento de arquivos.
  */
 const erroDeArmazenamento = () =>
   new Error(
-    'Este navegador não guarda arquivos de arte quando o sistema é aberto direto do computador (arquivo Altoprints.html). ' +
-      'Use o sistema pelo link publicado ou conecte a nuvem para anexar artes — os pedidos, clientes e impressões continuam funcionando normalmente.',
+    'Não foi possível acessar o armazenamento de arquivos. O site oficial exige uma conexão válida com o Supabase Storage; tente novamente quando a conexão online voltar.',
   )
 
 const idbPut = async (id: ID, blob: Blob) => {
@@ -103,7 +101,7 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
     created_at: new Date().toISOString(),
   }
 
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (sb) {
     const caminho = `${pedidoId}/${id}--${file.name.replace(/[^\w.\-]+/g, '_')}`
     const { error } = await sb.storage.from(BUCKET).upload(caminho, file, {
@@ -127,19 +125,22 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
 
 /** URL para visualizar/baixar o arquivo (local: cria um object URL) */
 export async function urlDoArquivo(arquivo: Arquivo): Promise<string | null> {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (arquivo.url) {
     if (!sb || /^https?:\/\//.test(arquivo.url)) return arquivo.url
     const { data } = await sb.storage.from(BUCKET).createSignedUrl(arquivo.url, 3600)
     if (data?.signedUrl) return data.signedUrl
     return null
   }
+  // Nunca recuperar a arte antiga do IndexedDB como fallback no site oficial.
+  // Registros sem URL no Supabase não têm um arquivo online disponível.
+  if (nuvemObrigatoria) return null
   const blob = await idbGet(arquivo.id)
   return blob ? URL.createObjectURL(blob) : null
 }
 
 export async function apagarArquivo(arquivo: Arquivo) {
-  const sb = clienteNuvem()
+  const sb = clienteNuvemObrigatorio()
   if (sb) {
     const caminho = arquivo.url ? extrairCaminho(arquivo.url) : null
     if (caminho) await sb.storage.from(BUCKET).remove([caminho])
