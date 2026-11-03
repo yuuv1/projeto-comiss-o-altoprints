@@ -59,14 +59,19 @@ Você pode fazer em duas etapas:
 
 1. No GitHub, abra o repositório e vá em **Settings → Pages**.
 2. Em **Source**, escolha **GitHub Actions**.
-3. Vá em **Actions → "Publicar sistema (GitHub Pages)" → Run workflow**
+3. Antes de publicar, em **Settings → Secrets and variables → Actions**, configure
+   `VITE_SUPABASE_URL` e a chave pública `VITE_SUPABASE_PUBLISHABLE_KEY` (ou
+   `VITE_SUPABASE_ANON_KEY` em projeto antigo). O workflow também aceita esses valores
+   como *Actions variables*. **Eles são obrigatórios para o site oficial**: sem a nuvem,
+   a publicação para com erro em vez de sair em modo local.
+4. Vá em **Actions → "Publicar sistema (GitHub Pages)" → Run workflow**
    (ou faça qualquer alteração na branch `main`).
-4. Em 1 a 2 minutos o link aparece no próprio GitHub
+5. Em 1 a 2 minutos o link aparece no próprio GitHub
    (algo como `https://seu-usuario.github.io/projeto-comiss-o-altoprints/`).
 
-O arquivo `.github/workflows/publicar.yml` cuida de instalar, testar e publicar. Se o
-Pages não estiver ligado, ele mostra no resumo da execução (e num aviso amarelo) o que
-fazer — publicar a pasta `publicar/` no Netlify Drop.
+O arquivo `.github/workflows/publicar.yml` instala, testa, valida a conexão obrigatória
+com a nuvem e publica. Se o Pages não estiver ligado, ele mostra no resumo da execução
+(e num aviso amarelo) o que fazer — publicar a pasta `publicar/` no Netlify Drop.
 
 ### Opção B: Netlify
 
@@ -122,20 +127,23 @@ Uma vez conectado, toda alteração enviada ao repositório publica o sistema au
    - É aqui que os arquivos de arte dos pedidos são guardados.
 4. Abra **Project Settings → API** e copie:
    - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public** (Project API keys) → `VITE_SUPABASE_ANON_KEY`
+   - **Chave pública**: `publishable` (projetos novos) ou `anon` (projetos antigos) →
+     `VITE_SUPABASE_PUBLISHABLE_KEY` ou `VITE_SUPABASE_ANON_KEY`
 5. Coloque essas duas variáveis onde você publicou:
 
    - **No seu computador**: crie o arquivo `app/.env` (copie de `app/.env.example`) com:
      ```
      VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
-     VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
+     VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
      ```
-     Depois rode `npm run dev` novamente.
+     (Ou use `VITE_SUPABASE_ANON_KEY` com a chave antiga.) Depois rode `npm run dev` novamente.
 
    - **No GitHub Pages**: no repositório, vá em
-     **Settings → Secrets and variables → Actions → New repository secret** e crie os
-     dois segredos com os mesmos nomes (`VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`).
-     Depois rode o workflow de publicação novamente.
+     **Settings → Secrets and variables → Actions → New repository secret** e crie
+     `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (ou `VITE_SUPABASE_ANON_KEY`
+     para a chave antiga). O workflow também aceita *Actions variables* com esses nomes.
+     Depois rode o workflow de publicação novamente. Sem esses valores, ele para antes
+     de publicar para evitar que o site oficial abra em modo local.
 
    - **No Netlify/Vercel**: em *Environment Variables* do projeto, adicione as duas
      variáveis e faça um novo deploy.

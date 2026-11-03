@@ -213,12 +213,15 @@ conta as filas **concluídas** do período; o "pago" é orientação da equipe.
 
 O sistema funciona de duas formas, sem mudar nenhuma tela:
 
-1. **Modo local (padrão)** — os dados ficam salvos no próprio navegador. Bom para
-   conhecer o sistema e testar. Os arquivos de arte ficam no navegador também.
-   ⚠️ Cada aparelho guarda os **próprios** dados: sem a nuvem, o celular não vê os pedidos
-   do computador (dá para levar os dados de um para o outro com **Backup → Restaurar**).
-2. **Modo nuvem (Supabase, grátis)** — os dados ficam num banco na nuvem e aparecem
-   iguais em todos os computadores e celulares. Para ativar, veja **[app/DEPLOY.md](app/DEPLOY.md)**.
+1. **Modo nuvem (Supabase)** — é o modo obrigatório do **site oficial no GitHub Pages**:
+   o build recebe a URL e a chave pública do projeto, então o site e o PWA já iniciam no
+   banco compartilhado e todos os aparelhos veem os mesmos dados.
+2. **Modo local** — continua disponível para desenvolvimento, demonstrações e builds
+   manuais sem configuração. Os dados ficam só naquele navegador; não compartilham com
+   outros aparelhos. O workflow oficial agora interrompe a publicação se a configuração
+   da nuvem estiver ausente, em vez de lançar silenciosamente uma versão local.
+
+Para configurar hospedagem e nuvem, veja **[app/DEPLOY.md](app/DEPLOY.md)**.
 
 ---
 

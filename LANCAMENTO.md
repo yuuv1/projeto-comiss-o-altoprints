@@ -159,22 +159,26 @@ código fechado, use o Caminho A ou B.)
 1. **Deixar o repositório público:** no GitHub → repositório
    **`yuuv1/projeto-comiss-o-altoprints`** → **Settings** → **General** → role até o fim
    (*Danger Zone*) → **Change visibility** → **Public**.
-2. **Publicar:** aba **Actions** → **Publicar sistema (GitHub Pages)** →
+2. **Configurar a nuvem antes da primeira publicação:** em **Settings → Secrets and
+   variables → Actions**, crie os segredos `VITE_SUPABASE_URL` (Project URL) e
+   `VITE_SUPABASE_PUBLISHABLE_KEY` (chave pública). Em projeto antigo, use
+   `VITE_SUPABASE_ANON_KEY`. O workflow também aceita esses nomes como *Actions variables*.
+   **Sem eles a publicação para com erro, em vez de deixar o site oficial em modo local.**
+3. **Publicar:** aba **Actions** → **Publicar sistema (GitHub Pages)** →
    **Run workflow** → **main** → **Run workflow**. (Daqui para frente, qualquer envio para
    a `main` já publica sozinho — não precisa repetir.)
    - Na primeira vez o próprio robô liga o Pages (Settings → Pages → Source:
      *GitHub Actions*). Se quiser adiantar: ligue lá antes.
-3. Espere o **✓ verde** (uns 2 minutos na primeira vez) e abra
+4. Espere o **✓ verde** (uns 2 minutos na primeira vez) e abra
    **<https://yuuv1.github.io/projeto-comiss-o-altoprints/>**.
-4. **Como conferir:** abre a tela de login do sistema com a versão no rodapé.
-   Se aparecer a página **404** do GitHub, espere 1–2 minutos e atualize — o primeiro
-   deploy demora um pouquinho para propagar.
+5. **Como conferir:** abra **Login proprietário** ou *Configurações → Nuvem* e confirme
+   **“Banco na nuvem (Supabase) conectado”**. Se aparecer a página **404** do GitHub,
+   espere 1–2 minutos e atualize — o primeiro deploy demora um pouquinho para propagar.
 
-**Onde ficam os dados neste caminho:** o GitHub Pages guarda **o site**. Os pedidos ficam
-no **Supabase** (Parte 1) — que é o que mantém o conteúdo salvo e igual em todos os
-aparelhos. Neste caminho o site sobe sem as chaves do banco: conecte a nuvem por dentro
-do sistema na **Parte 3, passo 3B** (1 minuto) e mande o **link de conexão** da Parte 4
-para os celulares da equipe.
+**Onde ficam os dados neste caminho:** o GitHub Pages guarda **o site**. Os pedidos e
+logins ficam no **Supabase** (Parte 1), no mesmo projeto para todos os aparelhos. Como a
+configuração vai no build oficial, o site e o PWA instalado já iniciam conectados; não é
+necessário conectar aparelho por aparelho nem enviar link de conexão.
 
 ---
 
@@ -214,10 +218,10 @@ relativos, então qualquer endereço serve.
 
 Faça isso **antes** de mandar o link para a equipe.
 
-### 3A. Se você usou o Caminho A (site já conectado ao banco)
+### 3A. Se você usou o Caminho A ou C (site já conectado ao banco)
 
-1. Abra o endereço do sistema e acrescente **`/#/administracao`** no fim:
-   `https://SEU-ENDERECO.netlify.app/#/administracao`
+1. Abra o endereço publicado e acrescente **`/#/administracao`** no fim — por exemplo:
+   `https://yuuv1.github.io/projeto-comiss-o-altoprints/#/administracao`.
    - Outras formas de abrir a mesma porta: **5 toques seguidos no logo** ou
      **Ctrl + Alt + D** no computador.
 2. Como ainda não existe nenhum dono, a tela mostra **“Criar o acesso do proprietário”**:
@@ -276,8 +280,9 @@ Pode ter quantos quiser — o sistema só não permite ficar **sem nenhum** dono
    aparelho, abra `/#/administracao` → **“Conectar este aparelho ao banco da empresa”** e
    cole ali (é uma configuração do dono, feita uma vez por aparelho).
 
-> No **Caminho A** (chaves no Netlify) isso nem é necessário: todo aparelho que abrir o
-> site já nasce conectado. O link serve para o **Caminho B**.
+> Nos **Caminhos A e C** (chaves configuradas no Netlify ou no GitHub Actions), isso nem
+> é necessário: todo aparelho que abrir o site ou o PWA já nasce conectado. O link serve
+> para o **Caminho B**.
 
 ### 4.3 Testar antes de divulgar
 

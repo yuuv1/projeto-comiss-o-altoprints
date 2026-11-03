@@ -43,16 +43,25 @@ jobs:
         working-directory: app
         run: npm run testar
 
+      # O site oficial precisa abrir conectado ao banco compartilhado. Se os
+      # valores estiverem ausentes, pare aqui em vez de publicar em modo local.
+      - name: Validar configuração obrigatória da nuvem
+        working-directory: app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+        run: node scripts/validar-config-nuvem.mjs
+
       # Gera o app/dist (site) + a pasta publicar/ (Netlify Drop) + o arquivo
-      # único Altoprints.html. As chaves do Supabase são opcionais: sem elas o
-      # site sobe em modo local e a conexão é feita depois pela tela Nuvem.
+      # único Altoprints.html, já com a conexão pública ao projeto da empresa.
       - name: Gerar a versão de produção
         working-directory: app
         env:
-          # Configure em Settings > Secrets and variables > Actions (opcional)
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # A chave pública é incorporada ao bundle pelo Vite; nunca use secret/service_role.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
         run: npm run publicar
 
       # Trava de segurança: nenhuma credencial de exemplo, dado de pessoa real ou
