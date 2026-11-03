@@ -664,8 +664,8 @@ async function main() {
     { rota: '/clientes', esperado: 'liberada' },
     { rota: '/pedido/novo', esperado: 'liberada' },
     { rota: '/para-imprimir', esperado: 'liberada' },
-    { rota: '/relatorio', esperado: 'proprietario' },
-    { rota: '/por-vendedor', esperado: 'proprietario' },
+    { rota: '/relatorio', esperado: 'liberada' },
+    { rota: '/por-vendedor', esperado: 'liberada' },
     { rota: '/equipe', esperado: 'proprietario' },
     { rota: '/configuracoes', esperado: 'proprietario' },
   ]

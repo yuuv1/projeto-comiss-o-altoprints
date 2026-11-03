@@ -25,9 +25,9 @@ export function BuscaGlobal({ aberto, onFechar }: { aberto: boolean; onFechar: (
     () =>
       buscarTudo(db, termo, {
         vendedorId: '',
-        verVendedores: ehProprietario,
+        verVendedores: true,
       }),
-    [db, ehProprietario, termo],
+    [db, termo],
   )
 
   // abre limpo e com o cursor no campo

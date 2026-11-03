@@ -81,8 +81,9 @@ export function Layout() {
   const emAndamento = useMemo(() => db.pedidos.filter(naFilaDeImpressao).length, [db.pedidos])
 
   /*
-   * A barra de cima tem só o dia a dia. A engrenagem (Configurações, com
-   * Funcionários e acessos dentro) aparece apenas para o proprietário.
+   * A barra de cima tem o dia a dia e os relatórios (liberados também para a equipe
+   * ver e exportar). A engrenagem (Configurações, com o sistema de comissões e
+   * acessos) aparece apenas para o proprietário.
    */
   const menu: ItemMenu[] = ehProprietario
     ? [
@@ -94,10 +95,11 @@ export function Layout() {
     : [
         { to: '/pedidos', label: 'Pedidos', icone: ClipboardList, badge: emAndamento },
         { to: '/clientes', label: 'Clientes', icone: Users },
+        { to: '/relatorio', label: 'Relatório', icone: BarChart3 },
       ]
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-20 transition-colors xl:pb-10 print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-28 transition-colors xl:pb-10 print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-100 transition-opacity print:hidden dark:opacity-25">
         <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-pink-300/40 to-purple-300/30 blur-3xl" />
         <div className="absolute -right-24 top-32 h-80 w-80 rounded-full bg-gradient-to-br from-sky-300/40 to-emerald-200/30 blur-3xl" />
@@ -152,9 +154,9 @@ export function Layout() {
             <button
               onClick={() => setBuscaAberta(true)}
               title="Buscar pedido, cliente ou telefone (Ctrl + K)"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2 text-slate-500 shadow-sm transition hover:text-purple-700 sm:pr-3 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+              className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-slate-600 shadow-sm transition hover:text-purple-700 sm:min-h-0 sm:min-w-0 sm:py-1.5 sm:pl-2.5 sm:pr-3 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
             >
-              <Search className="h-4 w-4" />
+              <Search className="h-5 w-5 sm:h-4 sm:w-4" />
               <span className="hidden text-[12px] font-bold sm:inline">Buscar</span>
               <span className="hidden rounded-md border border-slate-200 px-1 text-[10px] font-bold text-slate-400 md:inline dark:border-slate-600 dark:text-slate-400">
                 Ctrl K
@@ -163,10 +165,10 @@ export function Layout() {
 
             <button
               onClick={alternar}
-              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-purple-300"
+              className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:text-purple-700 sm:min-h-0 sm:min-w-0 sm:p-1.5 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
               title={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
             >
-              {escuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {escuro ? <Sun className="h-5 w-5 sm:h-4 sm:w-4" /> : <Moon className="h-5 w-5 sm:h-4 sm:w-4" />}
             </button>
 
             <button
@@ -199,10 +201,10 @@ export function Layout() {
 
                 <button
                   onClick={() => setPerfilAberto(true)}
-                  className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-2.5 text-left shadow-sm transition hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
+                  className="flex min-h-[42px] items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1.5 pr-3 text-left shadow-sm transition hover:text-purple-700 sm:min-h-0 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-purple-300"
                   title="Meu perfil (proprietário)"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-[11px] font-black text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-xs font-black text-white sm:h-7 sm:w-7 sm:text-[11px]">
                     {(usuario?.nome ?? '?').slice(0, 2).toUpperCase()}
                   </span>
                   <span className="hidden leading-tight sm:block">
@@ -236,17 +238,17 @@ export function Layout() {
 
             <button
               onClick={() => setMenuAberto((v) => !v)}
-              className="rounded-full border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:text-purple-700 xl:hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-full border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:text-purple-700 xl:hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
               title="Menu"
             >
-              {menuAberto ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {menuAberto ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
         {menuAberto ? (
-          <div className="animate-fade-in-up border-t border-slate-100 bg-white/95 px-2 pb-2 pt-1.5 xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
-            <div className="grid grid-cols-2 gap-1">
+          <div className="animate-fade-in-up border-t border-slate-100 bg-white/95 px-2.5 pb-3 pt-2 xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
+            <div className="grid grid-cols-2 gap-2">
               {menu.map(({ to, label, icone: Icone, badge }) => (
                 <NavLink
                   key={to}
@@ -255,17 +257,17 @@ export function Layout() {
                   onClick={() => setMenuAberto(false)}
                   className={({ isActive }) =>
                     cn(
-                      'inline-flex items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold transition',
+                      'inline-flex min-h-[48px] items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-sm font-extrabold transition',
                       isActive
                         ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                        : 'bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
                     )
                   }
                 >
-                  <Icone className="h-4 w-4" />
+                  <Icone className="h-5 w-5 shrink-0" />
                   <span className="truncate">{label}</span>
                   {badge ? (
-                    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-amber-900">
+                    <span className="ml-auto inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-400 px-1.5 text-xs font-black text-amber-950">
                       {badge}
                     </span>
                   ) : null}
@@ -277,17 +279,17 @@ export function Layout() {
               <NavLink
                 to="/configuracoes"
                 onClick={() => setMenuAberto(false)}
-                className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-50 px-2.5 py-2 text-[13px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                className="mt-2 flex min-h-[48px] w-full items-center justify-center gap-2.5 rounded-2xl bg-slate-100 px-3.5 py-2.5 text-sm font-extrabold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
               >
-                <Settings className="h-4 w-4" /> Configurações, Funcionários e acessos
+                <Settings className="h-5 w-5" /> Configurações, Funcionários e acessos
               </NavLink>
             ) : (
               <NavLink
                 to={ROTA_ADMIN}
                 onClick={() => setMenuAberto(false)}
-                className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-50 px-2.5 py-2 text-[13px] font-bold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+                className="mt-2 flex min-h-[48px] w-full items-center justify-center gap-2.5 rounded-2xl bg-violet-50 px-3.5 py-2.5 text-sm font-extrabold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
               >
-                <LockKeyhole className="h-4 w-4" /> Login proprietário
+                <LockKeyhole className="h-5 w-5" /> Login proprietário
               </NavLink>
             )}
 
@@ -297,9 +299,9 @@ export function Layout() {
                   setMenuAberto(false)
                   await sair()
                 }}
-                className="mt-1.5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[13px] font-bold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center gap-2.5 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-sm font-extrabold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
               >
-                <LogOut className="h-4 w-4" /> Sair do login do proprietário
+                <LogOut className="h-5 w-5" /> Sair do login do proprietário
               </button>
             ) : null}
           </div>
@@ -334,15 +336,15 @@ export function Layout() {
         · v{VERSAO}
       </footer>
 
-      {/* Barra inferior fixa para celular/tablet (navegação rápida com uma mão) */}
+      {/* Barra inferior fixa para celular/tablet (botões bem grandes e legíveis para o proprietário) */}
       <nav
         aria-label="Navegação rápida mobile"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-1.5 py-1 backdrop-blur-xl xl:hidden print:hidden dark:border-slate-800 dark:bg-slate-950/95"
+        className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-slate-200/90 bg-white/98 px-2 py-2 shadow-2xl backdrop-blur-xl xl:hidden print:hidden dark:border-slate-800 dark:bg-slate-950/98"
       >
         <div
           className={cn(
-            'mx-auto grid max-w-lg gap-1',
-            ehProprietario ? 'grid-cols-5' : 'grid-cols-3',
+            'mx-auto grid max-w-xl gap-1.5',
+            ehProprietario ? 'grid-cols-5' : 'grid-cols-4',
           )}
         >
           {menu.map(({ to, label, icone: Icone, badge }) => (
@@ -352,17 +354,17 @@ export function Layout() {
               end={to === '/'}
               className={({ isActive }) =>
                 cn(
-                  'relative flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  'relative flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-xs font-extrabold transition active:scale-95 sm:text-sm',
                   isActive
                     ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                    : 'bg-slate-50/80 text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
                 )
               }
             >
-              <Icone className="h-4 w-4 shrink-0" />
+              <Icone className="h-6 w-6 shrink-0" />
               <span className="max-w-full truncate leading-tight">{label}</span>
               {badge ? (
-                <span className="absolute right-1.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-amber-950">
+                <span className="absolute right-1.5 top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 text-[11px] font-black text-amber-950 shadow-sm">
                   {badge}
                 </span>
               ) : null}
@@ -373,14 +375,14 @@ export function Layout() {
               to="/configuracoes"
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  'flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-xs font-extrabold transition active:scale-95 sm:text-sm',
                   isActive
                     ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                    : 'bg-slate-50/80 text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800',
                 )
               }
             >
-              <Settings className="h-4 w-4 shrink-0" />
+              <Settings className="h-6 w-6 shrink-0" />
               <span className="max-w-full truncate leading-tight">Ajustes</span>
             </NavLink>
           ) : (
@@ -388,14 +390,14 @@ export function Layout() {
               to={ROTA_ADMIN}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-bold transition',
+                  'flex min-h-[60px] flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-xs font-extrabold transition active:scale-95 sm:text-sm',
                   isActive
                     ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                    : 'text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800',
+                    : 'bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/60 dark:text-violet-200 dark:hover:bg-slate-800',
                 )
               }
             >
-              <LockKeyhole className="h-4 w-4 shrink-0" />
+              <LockKeyhole className="h-6 w-6 shrink-0" />
               <span className="max-w-full truncate leading-tight">Dono</span>
             </NavLink>
           )}

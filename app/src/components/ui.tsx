@@ -42,13 +42,13 @@ const variantes: Record<Variante, string> = {
   aviso: 'text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 shadow-soft dark:shadow-dark-soft',
 }
 
-/* As alturas ficam um degrau acima do que parecem porque o espaçamento
-   compacto (--espaco) encolhe tudo: assim o botão continua confortável. */
+/* As alturas ficam generosas no celular para facilitar leitura e toque
+   (especialmente para o proprietário no mobile). */
 const tamanhos: Record<Tamanho, string> = {
-  sm: 'h-9 px-3 text-xs gap-1.5',
-  md: 'h-10 px-3.5 text-sm gap-1.5',
-  lg: 'h-12 px-5 text-base gap-2',
-  icone: 'h-9 w-9 text-sm',
+  sm: 'min-h-[42px] px-3.5 py-2 text-sm gap-1.5 sm:min-h-0 sm:h-9 sm:px-3 sm:py-1.5 sm:text-xs',
+  md: 'min-h-[48px] px-4 py-2.5 text-base gap-2 sm:min-h-0 sm:h-10 sm:px-3.5 sm:py-2 sm:text-sm sm:gap-1.5',
+  lg: 'min-h-[54px] px-5 py-3 text-base gap-2 sm:h-12',
+  icone: 'h-11 w-11 text-base sm:h-9 sm:w-9 sm:text-sm',
 }
 
 interface BotaoProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -73,13 +73,13 @@ export function Botao({
       {...props}
       disabled={disabled || carregando}
       className={cn(
-        'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-50',
         variantes[variante],
         tamanhos[tamanho],
         className,
       )}
     >
-      {carregando ? <Loader2 className="h-4 w-4 animate-spin" /> : Icone ? <Icone className="h-4 w-4" /> : null}
+      {carregando ? <Loader2 className="h-5 w-5 animate-spin sm:h-4 sm:w-4" /> : Icone ? <Icone className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" /> : null}
       {children}
     </button>
   )
@@ -203,7 +203,7 @@ export function Campo({
 }
 
 const baseCampo =
-  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
+  'w-full min-h-[46px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 sm:min-h-0 sm:px-3 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
 
 export const Entrada = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => (
   <input {...props} className={cn(baseCampo, className)} />
@@ -478,7 +478,7 @@ export function Abas<T extends string>({
 }) {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
-      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-100 bg-white p-1 shadow-soft dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft">
+      <div className="grid w-full grid-cols-2 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-soft sm:inline-flex sm:w-auto sm:flex-wrap sm:gap-1 sm:p-1 dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft">
       {abas.map((aba) => {
         const Icone = aba.icone
         const selecionada = aba.id === ativa
@@ -487,19 +487,19 @@ export function Abas<T extends string>({
             key={aba.id}
             onClick={() => onChange(aba.id)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-4 sm:py-2 sm:text-sm',
+              'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm sm:font-bold',
               selecionada
                 ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 sm:bg-transparent dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-800',
             )}
           >
-            {Icone ? <Icone className="h-4 w-4" /> : null}
-            {aba.label}
+            {Icone ? <Icone className="h-5 w-5 shrink-0 sm:h-4 sm:w-4" /> : null}
+            <span className="truncate">{aba.label}</span>
             {aba.contador !== undefined ? (
               <span
                 className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                  selecionada ? 'bg-white/25' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+                  'rounded-full px-2 py-0.5 text-xs font-extrabold sm:px-1.5 sm:text-[10px]',
+                  selecionada ? 'bg-white/25' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
                 )}
               >
                 {aba.contador}
@@ -530,7 +530,7 @@ export function Pilulas<T extends string>({
   className?: string
 }) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
       {itens.map((item) => {
         const selecionado = item.id === ativo
         return (
@@ -539,18 +539,18 @@ export function Pilulas<T extends string>({
             type="button"
             onClick={() => onChange(item.id)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+              'inline-flex min-h-[44px] items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-0 sm:rounded-full sm:px-3.5 sm:py-1.5 sm:text-xs',
               selecionado
                 ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-purple-300',
+                : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:text-purple-300',
             )}
           >
             {item.label}
             {item.contador !== undefined ? (
               <span
                 className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px] font-black',
-                  selecionado ? 'bg-white/25' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                  'rounded-full px-2 py-0.5 text-xs font-black sm:px-1.5 sm:text-[10px]',
+                  selecionado ? 'bg-white/25' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
                 )}
               >
                 {item.contador}

@@ -275,19 +275,19 @@ export default function Painel() {
       </Cartao>
 
       {/* --------------------------- atalhos grandes do dia --------------------------- */}
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
         {acoesGrandes.map(({ label, sub, icone: Icone, cor, to }) => (
           <button
             key={label}
             onClick={() => navegar(to)}
-            className="group flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 text-left shadow-soft transition hover:-translate-y-0.5 hover:shadow-hover dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft"
+            className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 text-left shadow-soft transition active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-hover dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft"
           >
-            <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white', cor)}>
-              <Icone className="h-5 w-5" />
+            <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm sm:h-10 sm:w-10', cor)}>
+              <Icone className="h-6 w-6 sm:h-5 sm:w-5" />
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-extrabold text-slate-800 dark:text-slate-100">{label}</span>
-              <span className="block truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">{sub}</span>
+              <span className="block truncate text-base font-extrabold text-slate-800 sm:text-sm dark:text-slate-100">{label}</span>
+              <span className="block truncate text-xs font-semibold text-slate-500 sm:text-[11px] dark:text-slate-400">{sub}</span>
             </span>
           </button>
         ))}
@@ -310,34 +310,38 @@ export default function Painel() {
       />
 
       {mesesDisponiveis.length > 1 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-bold text-slate-500 dark:text-slate-400">Mês:</span>
-          {mesesDisponiveis.map((m) => {
-            const ativo = inicio === m.de && fim === m.ate
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  if (m.id === mesAtual) {
-                    setPeriodo('mes')
-                  } else {
-                    setInicioPersonalizado(m.de)
-                    setFimPersonalizado(m.ate)
-                    setPeriodo('personalizado')
-                  }
-                }}
-                className={cn(
-                  'rounded-lg border px-2.5 py-1 text-xs font-bold transition',
-                  ativo
-                    ? 'border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-950/60 dark:text-purple-200'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                )}
-              >
-                {m.label}
-              </button>
-            )
-          })}
+        <div className="mb-3">
+          <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Escolher mês direto:
+          </span>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            {mesesDisponiveis.map((m) => {
+              const ativo = inicio === m.de && fim === m.ate
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    if (m.id === mesAtual) {
+                      setPeriodo('mes')
+                    } else {
+                      setInicioPersonalizado(m.de)
+                      setFimPersonalizado(m.ate)
+                      setPeriodo('personalizado')
+                    }
+                  }}
+                  className={cn(
+                    'inline-flex min-h-[46px] items-center justify-center rounded-2xl border px-3.5 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[38px] sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs',
+                    ativo
+                      ? 'border-purple-500 bg-purple-100 text-purple-800 shadow-sm dark:border-purple-500 dark:bg-purple-950/70 dark:text-purple-100'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                  )}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       ) : null}
 
@@ -536,29 +540,31 @@ export default function Painel() {
           </Botao>
         </div>
 
-        {/* Cartões mobile para funcionários */}
-        <div className="grid gap-2 md:hidden">
+        {/* Cartões mobile grandes para funcionários do respectivo mês */}
+        <div className="grid gap-2.5 md:hidden">
           {equipe.map(({ conta, pedidos, faturamento, comissao, ultima }) => (
-            <div
+            <button
               key={conta.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 p-3 dark:border-slate-800"
+              type="button"
+              onClick={() => navegar(`/pedidos?vendedor=${conta.id}`)}
+              className="flex min-h-[64px] w-full flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-left transition active:scale-[0.98] hover:bg-white dark:border-slate-800 dark:bg-slate-800/60"
             >
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-xs font-black text-white">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-sm font-black text-white shadow-sm">
                   {conta.nome.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate font-bold text-slate-800 dark:text-slate-100">{conta.nome}</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="truncate text-base font-extrabold text-slate-800 dark:text-slate-100">{conta.nome}</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     {pedidos} pedido(s) • última: {ultima ? dataBR(ultima) : 'sem pedidos'}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">{moeda(faturamento)}</p>
-                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">comissão {moeda(comissao)}</p>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400">{moeda(faturamento)}</p>
+                <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400">comissão {moeda(comissao)}</p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
