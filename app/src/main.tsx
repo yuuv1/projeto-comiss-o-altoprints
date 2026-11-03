@@ -10,10 +10,27 @@ import { prepararAparicao } from './lib/tema'
 
 // O arquivo Altoprints.html (file://) é uma demonstração local, não um PWA.
 // O service worker só é ativado no site hospedado em HTTPS ou localhost.
+// O modo autoUpdate aplica a versão nova quando ela chega; a verificação abaixo
+// também roda ao abrir/voltar ao app e a cada 5 minutos enquanto estiver aberto.
+// Um PWA fechado ou sem internet só consegue atualizar na próxima abertura online.
 const origemSegura = window.location.protocol === 'https:' || window.location.hostname === 'localhost'
 if (import.meta.env.PROD && origemSegura && 'serviceWorker' in navigator) {
   registerSW({
     immediate: true,
+    onRegisteredSW(_url, registration) {
+      if (!registration) return
+      const verificarAtualizacao = () => {
+        if (!navigator.onLine || document.visibilityState === 'hidden') return
+        void registration.update().catch(() => {
+          // Falha temporária de rede: a próxima verificação tenta novamente.
+        })
+      }
+      verificarAtualizacao()
+      window.setInterval(verificarAtualizacao, 5 * 60 * 1000)
+      window.addEventListener('online', verificarAtualizacao)
+      window.addEventListener('focus', verificarAtualizacao)
+      document.addEventListener('visibilitychange', verificarAtualizacao)
+    },
     onRegisterError(error) {
       console.warn('[Altoprints] Não foi possível ativar o modo instalável:', error)
     },

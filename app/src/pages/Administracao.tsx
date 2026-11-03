@@ -96,11 +96,16 @@ export default function Administracao() {
             </Campo>
           ) : null}
 
-          <Campo label="Usuário" obrigatorio className="mb-3" dica={criando ? 'Só letras, números, ponto, traço e underline.' : undefined}>
+          <Campo
+            label="E-mail ou usuário"
+            obrigatorio
+            className="mb-3"
+            dica={criando ? 'Informe um e-mail completo ou um usuário curto.' : undefined}
+          >
             <Entrada
               value={login}
               onChange={(e) => setLogin(e.target.value)}
-              placeholder="Digite seu usuário"
+              placeholder="Digite seu e-mail ou usuário"
               autoCapitalize="none"
               autoCorrect="off"
               required

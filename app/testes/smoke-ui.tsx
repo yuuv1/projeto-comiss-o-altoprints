@@ -576,7 +576,7 @@ async function main() {
   const novoDonoOk =
     abriuNovoAcesso &&
     textoNovoAcesso.includes('Novo acesso de proprietário') &&
-    textoNovoAcesso.includes('Usuário (login)') &&
+    (textoNovoAcesso.includes('E-mail ou usuário (login)') || textoNovoAcesso.includes('Usuário (login)')) &&
     textoNovoAcesso.includes('Repita a senha')
   if (!novoDonoOk) falhas++
   console.log(`  ${novoDonoOk ? '✅' : '❌'} a janela “Novo acesso” cria outro proprietário com usuário e senha`)

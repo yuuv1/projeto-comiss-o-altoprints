@@ -266,7 +266,7 @@ export const podeVerTela = (u: Usuario | null | undefined, tela: keyof TelasAces
 export interface Usuario {
   id: ID
   nome: string
-  /** nome de usuário do login (sem espaços, minúsculo) */
+  /** identificador do login (e-mail completo ou nome de usuário) */
   usuario: string
   /** senha criptografada (SHA-256 + sal) — nunca guardamos a senha em texto puro */
   senha_hash: string

@@ -65,6 +65,9 @@ interface Ctx {
   carregando: boolean
   erro: string | null
   nuvem: boolean
+  ultimaSincronizacao: string | null
+  erroSincronizacao: string | null
+  realtimeAtivo: boolean
   limparErro: () => void
   /** relê o banco; `silencioso` evita a tela de "Carregando" nas sincronizações automáticas */
   recarregar: (silencioso?: boolean) => Promise<DB>
@@ -142,6 +145,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<DB>(dbVazio())
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState<string | null>(null)
+  const [erroSincronizacao, setErroSincronizacao] = useState<string | null>(null)
+  const [realtimeAtivo, setRealtimeAtivo] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [nuvem, setNuvem] = useState(emNuvem())
   const contadorToast = useRef(0)
@@ -161,9 +167,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const dados = await carregarTudo()
       setDb(dados)
       setErro(null)
+      if (emNuvem()) {
+        setUltimaSincronizacao(new Date().toISOString())
+        setErroSincronizacao(null)
+      }
       return dados
     } catch (e) {
-      setErro((e as Error).message)
+      const mensagem = (e as Error).message
+      setErro(mensagem)
+      if (emNuvem()) setErroSincronizacao(mensagem)
       throw e
     } finally {
       if (!silencioso) setCarregando(false)
@@ -205,21 +217,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   /*
-   * SINCRONIA DA NUVEM — com o Supabase conectado, os aparelhos releem o banco
-   * sozinhos: a cada 15 s, quando a pessoa volta para a aba e quando a janela
-   * ganha foco. Assim o pedido lançado no computador aparece no celular, e um
-   * backup restaurado num aparelho chega nos outros sem ninguém recarregar.
+   * SINCRONIA DA NUVEM — Realtime atualiza assim que outra máquina grava.
+   * A checagem a cada 15 s continua como reserva; ao voltar para o app também
+   * buscamos de novo. O estado de cada etapa fica visível em Configurações → Nuvem.
    */
   useEffect(() => {
-    if (!emNuvem()) return
+    if (!nuvem || !emNuvem()) return
     let ativo = true
     const atualizar = async () => {
-      if (!ativo) return
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (!ativo || document.visibilityState === 'hidden') return
       try {
         await recarregar(true)
       } catch {
-        // sem internet: segue com o que está na tela e tenta de novo no próximo ciclo
+        // A tela mantém os dados locais e mostra o erro; tenta novamente no ciclo seguinte.
       }
     }
     const relogio = window.setInterval(atualizar, 15000)
@@ -233,6 +243,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', aoVoltar)
     }
   }, [recarregar, nuvem])
+
+  // Eventos em tempo real entre aparelhos; se o Supabase não os disponibilizar,
+  // a leitura periódica acima continua garantindo a atualização eventual.
+  useEffect(() => {
+    const sb = nuvem ? clienteNuvem() : null
+    if (!sb) {
+      setRealtimeAtivo(false)
+      return
+    }
+
+    let ativo = true
+    let agendado: number | undefined
+    setRealtimeAtivo(false)
+    const recarregarDebounced = () => {
+      if (agendado) window.clearTimeout(agendado)
+      agendado = window.setTimeout(() => {
+        agendado = undefined
+        if (ativo && document.visibilityState !== 'hidden') void recarregar(true).catch(() => {})
+      }, 300)
+    }
+    const channel = sb.channel('altoprints-sincronizacao')
+    const tabelas = ['pedidos', 'clientes', 'vendedores', 'arquivos', 'impressoes', 'usuarios', 'configuracoes'] as const
+    for (const tabela of tabelas) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: tabela }, recarregarDebounced)
+    }
+    channel.subscribe((status) => {
+      if (!ativo) return
+      const conectado = status === 'SUBSCRIBED'
+      setRealtimeAtivo(conectado)
+      if (conectado) recarregarDebounced()
+    })
+
+    return () => {
+      ativo = false
+      if (agendado) window.clearTimeout(agendado)
+      void sb.removeChannel(channel)
+    }
+  }, [nuvem, recarregar])
 
   const fecharToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), [])
 
@@ -251,6 +299,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const desconectarNuvem = useCallback(() => {
     desconectarSupabase()
     setNuvem(false)
+    setUltimaSincronizacao(null)
+    setErroSincronizacao(null)
+    setRealtimeAtivo(false)
     avisar('Este aparelho voltou ao modo local (os dados da nuvem continuam salvos).', 'info')
   }, [avisar])
 
@@ -279,6 +330,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // em Configurações → Dados. Só os acessos da equipe são criados (acima).
         lsRemover(CHAVE_DEMO_ANTIGA)
         setDb(await criarEquipeInicial(dados))
+        if (emNuvem()) {
+          setUltimaSincronizacao(new Date().toISOString())
+          setErroSincronizacao(null)
+        }
         // bancos antigos ficavam no localStorage (espaço pequeno): passa para o
         // armazenamento novo e devolve o espaço. Falhar aqui não impede o uso.
         try {
@@ -289,7 +344,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         setErro(null)
       } catch (e) {
-        setErro((e as Error).message)
+        const mensagem = (e as Error).message
+        setErro(mensagem)
+        if (emNuvem()) setErroSincronizacao(mensagem)
       } finally {
         setCarregando(false)
       }
@@ -665,6 +722,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       carregando,
       erro,
       nuvem,
+      ultimaSincronizacao,
+      erroSincronizacao,
+      realtimeAtivo,
       limparErro: () => setErro(null),
       recarregar,
       toasts,
@@ -700,6 +760,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       db,
       carregando,
       erro,
+      nuvem,
+      ultimaSincronizacao,
+      erroSincronizacao,
+      realtimeAtivo,
       recarregar,
       toasts,
       avisar,

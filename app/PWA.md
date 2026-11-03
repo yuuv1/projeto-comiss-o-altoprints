@@ -14,11 +14,11 @@ em alta resolução está em `app/public/brand/altoprints-logo-completo.png` (PN
 
 ## Acesso do proprietário e relatório no celular
 
-1. No aparelho do proprietário atual, abra **Configurações → Funcionários e acessos → Novo acesso de proprietário** e crie um usuário e senha separados para o chefe. Não reutilize o acesso da equipe.
+1. No aparelho do proprietário atual, abra **Configurações → Funcionários e acessos → Novo acesso de proprietário** e crie um e-mail (ou usuário) e senha separados para o chefe. Não reutilize o acesso da equipe.
 2. No celular do chefe, abra o mesmo endereço, conecte à mesma **Nuvem** da empresa e toque em **Login proprietário** para entrar com esse acesso.
 3. No **Painel**, toque em **Relatório**. Escolha o período (por exemplo, do início até hoje) e deixe **Todos os funcionários**; use **Imprimir / PDF** para visualizar/salvar ou **Exportar CSV** para baixar.
 
-O relatório é protegido para proprietários. Com a Nuvem conectada ao mesmo banco, o chefe vê os pedidos atualizados em qualquer aparelho.
+O relatório é protegido para proprietários. Com a Nuvem conectada ao mesmo banco, o chefe vê os pedidos atualizados em qualquer aparelho. Em **Configurações → Nuvem → Diagnóstico da sincronização**, compare o endereço do projeto e confira a hora da última leitura em cada aparelho.
 
 ## Antes de instalar
 
@@ -52,15 +52,12 @@ Também é possível abrir o menu do navegador e escolher **Instalar Altoprints*
 
 ## Atualizações e funcionamento sem internet
 
-- O aplicativo verifica atualizações automaticamente. Quando uma nova versão do site é
-  publicada, o PWA baixa os arquivos novos e atualiza a aplicação.
-- A instalação guarda o **programa** para abrir mais rápido e oferecer a estrutura básica
-  sem rede. Pedidos, clientes, login e alterações no Supabase precisam de internet para
-  carregar e sincronizar; o service worker não guarda respostas do banco no cache offline.
-- A instalação é por aparelho. Depois de instalar, confira em **Configurações → Nuvem**
-  se aquele aparelho está conectado ao banco da empresa. Se o site for publicado com as
-  variáveis do Supabase no workflow do GitHub, cada instalação já abre com a conexão
-  configurada.
+- O PWA confere a versão ao abrir ou voltar ao app e, enquanto fica aberto com internet, a cada 5 minutos. Se uma versão nova foi publicada, ele troca para ela e recarrega a tela.
+- Um aparelho desligado, fechado ou sem internet não pode receber a atualização naquele momento; ao abrir o PWA novamente com internet, ele verifica e atualiza. Se continuar mostrando uma versão antiga, feche o app por completo, abra de novo e confira o número no rodapé.
+- A atualização do **programa** é diferente da sincronização dos **pedidos**. Para compartilhar dados, todos os aparelhos precisam estar ligados ao mesmo projeto Supabase; o app confere mudanças a cada 15 segundos e também ao voltar para a tela. O SQL mais recente habilita atualização em tempo real.
+- A instalação guarda o **programa** para abrir mais rápido e oferecer a estrutura básica sem rede. Pedidos, clientes, login e alterações no Supabase precisam de internet para carregar e sincronizar; o service worker não guarda respostas do banco no cache offline.
+- A instalação é por aparelho e por endereço do site. Instale todos pelo mesmo endereço (mesmo domínio e caminho); um PWA instalado pelo GitHub Pages não recebe a versão publicada em outro domínio, como um Netlify diferente.
+- Depois de instalar, confira em **Configurações → Nuvem → Diagnóstico da sincronização** se o endereço do projeto é igual e se a última leitura está recente em cada aparelho. Se o site for publicado com as variáveis do Supabase no workflow do GitHub, cada instalação já abre com a conexão configurada.
 
 Para remover, desinstale o Altoprints pela tela inicial/lista de aplicativos do aparelho,
 como qualquer outro app. O PWA não passa pela Play Store ou App Store.

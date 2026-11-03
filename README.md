@@ -63,7 +63,7 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.3** — permite mesclar pedidos ausentes do relatório CSV sem apagar pedidos atuais; inclui símbolo da marca no app e restauração de backups antigos.
+> **Versão atual: 1.5.4** — reforça a atualização automática do PWA, exibe o estado da sincronização e aceita e-mail como login do proprietário.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |

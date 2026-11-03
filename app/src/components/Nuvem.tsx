@@ -18,6 +18,7 @@ import sqlSchema from '../../supabase/schema.sql?raw'
 import { useAuth } from '../lib/auth'
 import {
   codigoConexao,
+  configNuvem,
   extrairConexaoDoTexto,
   linkDeConexao,
   nuvemTravadaPeloEnv,
@@ -124,7 +125,18 @@ export function JanelaConexao({ aberto, onFechar }: { aberto: boolean; onFechar:
 /* ------------------------------------------------------------------ */
 
 export function AbaNuvem() {
-  const { db, nuvem, conectarNuvem, desconectarNuvem, enviarDadosParaNuvem, avisar } = useStore()
+  const {
+    db,
+    nuvem,
+    recarregar,
+    ultimaSincronizacao,
+    erroSincronizacao,
+    realtimeAtivo,
+    conectarNuvem,
+    desconectarNuvem,
+    enviarDadosParaNuvem,
+    avisar,
+  } = useStore()
   const { usuario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
 
@@ -196,6 +208,8 @@ export function AbaNuvem() {
   if (nuvem) {
     const link = linkDeConexao()
     const codigoAtual = codigoConexao()
+    const projeto = configNuvem()?.url.replace(/^https?:\/\//, '') ?? 'não identificado'
+    const sincronizadoEm = ultimaSincronizacao ? new Date(ultimaSincronizacao).toLocaleString('pt-BR') : 'ainda não confirmado'
     return (
       <div className="space-y-4">
         <Cartao hover={false}>
@@ -210,13 +224,11 @@ export function AbaNuvem() {
                   className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
                   icone={ShieldCheck}
                 >
-                  Tudo igual em todos os aparelhos
+                  Conectado
                 </Etiqueta>
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {travada
-                  ? 'Configurado pelo arquivo .env deste site.'
-                  : 'Este aparelho está ligado ao banco da empresa.'}{' '}
+                {travada ? 'Configurado pelo arquivo .env deste site.' : 'Este aparelho está ligado ao banco da empresa.'}{' '}
                 {db.pedidos.length} pedido(s) carregado(s).
               </p>
             </div>
@@ -227,8 +239,8 @@ export function AbaNuvem() {
               onClick={async () => {
                 setTestando(true)
                 try {
-                  await (await import('../lib/backend')).carregarTudo()
-                  avisar('Conexão testada: o banco respondeu certinho!')
+                  await recarregar(true)
+                  avisar('Sincronização concluída: este aparelho leu os dados mais recentes da nuvem.')
                 } catch (e) {
                   avisar((e as Error).message, 'erro')
                 } finally {
@@ -236,9 +248,32 @@ export function AbaNuvem() {
                 }
               }}
             >
-              Testar conexão
+              Sincronizar agora
             </Botao>
           </div>
+        </Cartao>
+
+        <Cartao hover={false}>
+          <p className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+            <RefreshCw className="h-4 w-4 text-sky-600 dark:text-sky-400" /> Diagnóstico da sincronização
+          </p>
+          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+            <p>Projeto Supabase deste aparelho: <b className="break-all">{projeto}</b></p>
+            <p>Última leitura confirmada: <b>{sincronizadoEm}</b></p>
+            <p>
+              Atualização dos dados: <b>{realtimeAtivo ? 'ao vivo' : 'checagem automática a cada 15 segundos'}</b>
+              {!realtimeAtivo ? ' e quando o app volta para a tela.' : '.'}
+            </p>
+          </div>
+          <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-[11px] text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+            Compare o endereço do projeto em todos os aparelhos: precisa ser exatamente o mesmo. Para habilitar a atualização ao vivo
+            no banco já criado, copie o SQL nesta tela e execute-o no SQL Editor do projeto Supabase; a checagem automática continua como reserva.
+          </p>
+          {erroSincronizacao ? (
+            <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+              A última sincronização falhou: {erroSincronizacao}
+            </p>
+          ) : null}
         </Cartao>
 
         <Cartao hover={false}>
