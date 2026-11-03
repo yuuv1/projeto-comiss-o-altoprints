@@ -158,30 +158,9 @@ export default function App() {
           <Route path="/vendedores" element={<Navigate to="/equipe" replace />} />
           <Route path="/por-vendedor" element={<Navigate to="/relatorio" replace />} />
 
-          <Route
-            path="/relatorio"
-            element={
-              <SoDono>
-                <Relatorio />
-              </SoDono>
-            }
-          />
-          <Route
-            path="/relatorio-resumo"
-            element={
-              <SoDono>
-                <RelatorioResumo />
-              </SoDono>
-            }
-          />
-          <Route
-            path="/relatorio-cliente-especial"
-            element={
-              <SoDono>
-                <RelatorioClienteEspecial />
-              </SoDono>
-            }
-          />
+          <Route path="/relatorio" element={<Relatorio />} />
+          <Route path="/relatorio-resumo" element={<RelatorioResumo />} />
+          <Route path="/relatorio-cliente-especial" element={<RelatorioClienteEspecial />} />
           <Route
             path="/equipe"
             element={
