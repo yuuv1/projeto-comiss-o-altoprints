@@ -21,7 +21,7 @@ import {
   normalizarUrl,
   validarConexao,
 } from '../src/lib/supabase'
-import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../src/lib/format'
+import { dataBR, dataHoraBR, hojeISO, moeda, metros, percentualBR } from '../src/lib/format'
 import {
   doDia,
   filtrarImpressoes,
@@ -425,6 +425,11 @@ igual('pedido sem metragem não gera comissão por padrão', comissaoDoPedido(pe
 igual('comissão de 2 m (R$ 119,80) a 4%', Number(comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO).toFixed(3)), 4.792)
 igual('comissão de 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 16.47)
 igual('comissão de 80,25 m (R$ 3.602,77) a 2%', Number(comissaoDoPedido(pedidoCom(80.25, 3602.77), FAIXAS_PADRAO).toFixed(2)), 72.06)
+igual('percentualBR formata 4 -> 4%', percentualBR(4), '4%')
+igual('percentualBR formata 3.5 -> 3,5%', percentualBR(3.5), '3,5%')
+igual('percentualBR preserva duas casas decimais exatas (2.75 -> 2,75%)', percentualBR(2.75), '2,75%')
+const faixasCom275 = FAIXAS_PADRAO.map((f, i) => (i === 0 ? { ...f, percentual: 2.75 } : f))
+igual('comissão com faixa exata de 2,75% (R$ 100,00 -> R$ 2,75)', comissaoDoPedido(pedidoCom(2, 100), faixasCom275), 2.75)
 
 const resultado = calcularComissao(
   [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],

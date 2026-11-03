@@ -36,7 +36,7 @@ import {
 } from '../components/ui'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
-import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime } from '../lib/format'
+import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime, percentualBR } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
@@ -679,7 +679,7 @@ export default function PedidoForm() {
                 <span className="text-xl font-black text-emerald-600">{moeda(valorFinal)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Comissão ({numeroBR(percentualComissao, 1)}%)</span>
+                <span className="text-slate-500 dark:text-slate-400">Comissão ({percentualBR(percentualComissao)})</span>
                 <span className="font-semibold text-amber-600">
                   {moeda(valorFinal * (percentualComissao / 100))}
                 </span>

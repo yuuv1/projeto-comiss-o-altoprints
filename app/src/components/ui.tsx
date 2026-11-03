@@ -134,9 +134,9 @@ export function CartaoResumo({
       >
         <Icone className="h-4 w-4" />
       </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
-        <p className="truncate text-lg font-extrabold text-slate-800 dark:text-slate-100">{valor}</p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
+        <p className="break-words text-base font-extrabold leading-tight text-slate-800 sm:text-lg dark:text-slate-100">{valor}</p>
         {sub ? <p className="truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p> : null}
       </div>
     </Cartao>
@@ -325,7 +325,7 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto p-4">{children}</div>
+        <div className="max-h-[75vh] overflow-x-hidden overflow-y-auto break-words p-4">{children}</div>
         {rodape ? (
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
             {rodape}
@@ -380,7 +380,7 @@ export function useConfirmacao() {
         </>
       }
     >
-      <div className="text-sm text-slate-600 dark:text-slate-300">{estado.mensagem}</div>
+      <div className="whitespace-pre-line break-words text-sm text-slate-600 dark:text-slate-300">{estado.mensagem}</div>
     </Modal>
   ) : null
 
@@ -437,21 +437,21 @@ export function TituloPagina({
   icone?: LucideIcon
 }) {
   return (
-    <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3">
-      <div className="flex items-center gap-2">
+    <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2.5">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {Icone ? (
-          <div className="hidden h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
+          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft sm:flex">
             <Icone className="h-5 w-5" />
           </div>
         ) : null}
-        <div>
-          <h1 className="text-lg font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-xl">
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-lg font-extrabold tracking-tight text-slate-800 dark:text-slate-100 sm:text-xl">
             {titulo}
           </h1>
-          {subtitulo ? <p className="text-[13px] text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
+          {subtitulo ? <p className="break-words text-[13px] text-slate-500 dark:text-slate-400">{subtitulo}</p> : null}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">{acoes}</div>
+      {acoes ? <div className="flex flex-wrap items-center gap-2">{acoes}</div> : null}
     </div>
   )
 }
@@ -487,7 +487,7 @@ export function Abas<T extends string>({
             key={aba.id}
             onClick={() => onChange(aba.id)}
             className={cn(
-              'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition',
+              'inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition sm:gap-2 sm:px-4 sm:py-2 sm:text-sm',
               selecionada
                 ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
                 : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
@@ -567,7 +567,7 @@ export function Toaster() {
   const { toasts, fecharToast } = useStore()
   if (!toasts.length) return null
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-[min(92vw,360px)] flex-col gap-2 print:hidden">
+    <div className="pointer-events-none fixed bottom-20 left-3 right-3 z-[60] flex max-w-full flex-col gap-2 sm:bottom-4 sm:left-auto sm:right-4 sm:w-[360px] print:hidden">
       {toasts.map((t) => {
         const Icone = t.tipo === 'erro' ? XCircle : t.tipo === 'info' ? Info : CheckCircle2
         const cor =
@@ -580,7 +580,7 @@ export function Toaster() {
           <button
             key={t.id}
             onClick={() => fecharToast(t.id)}
-            className="pointer-events-auto flex animate-fade-in-up items-start gap-3 rounded-xl border border-slate-100 bg-white p-3 text-left shadow-hover dark:border-slate-800 dark:bg-slate-900"
+            className="pointer-events-auto flex w-full animate-fade-in-up items-start gap-3 overflow-hidden rounded-xl border border-slate-100 bg-white p-3 text-left shadow-hover dark:border-slate-800 dark:bg-slate-900"
           >
             <span
               className={cn(
@@ -590,7 +590,9 @@ export function Toaster() {
             >
               <Icone className="h-4 w-4" />
             </span>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.texto}</span>
+            <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-slate-700 dark:text-slate-200">
+              {t.texto}
+            </span>
           </button>
         )
       })}

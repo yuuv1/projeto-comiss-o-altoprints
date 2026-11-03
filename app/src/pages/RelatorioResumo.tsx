@@ -1,7 +1,8 @@
 import {
   BarChart3,
   CalendarClock,
-  Download,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   FileSpreadsheet,
   Percent,
@@ -9,27 +10,42 @@ import {
   Receipt,
   RotateCcw,
   Ruler,
+  Search,
   Undo2,
+  Users,
   X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { LogoImpressao } from '../components/Logo'
-import { BarraAcoes, Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, Vazio, cn } from '../components/ui'
+import {
+  BarraAcoes,
+  Botao,
+  Campo,
+  Cartao,
+  CartaoResumo,
+  Entrada,
+  Selecao,
+  TituloPagina,
+  Vazio,
+  cn,
+} from '../components/ui'
 import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
-import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
+import { dataBR, hojeISO, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { FAIXAS_PADRAO, filasDaComissao, type Pedido, type Vendedor } from '../lib/types'
 
-type Campo = 'pagamento' | 'pedido' | 'envio'
+type CampoData = 'pagamento' | 'pedido' | 'envio'
 
-const LABEL_CAMPO: Record<Campo, string> = {
+const LABEL_CAMPO: Record<CampoData, string> = {
   pagamento: 'Data do pagamento',
   pedido: 'Data do pedido',
   envio: 'Data do envio',
 }
 
-const dataRef = (p: Pedido, campo: Campo) => {
+const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+const dataRef = (p: Pedido, campo: CampoData) => {
   if (campo === 'pedido') return (p.data_pedido || '').slice(0, 10)
   if (campo === 'envio') return p.data_envio || (p.data_pedido || '').slice(0, 10)
   return p.data_pagamento || (p.data_pedido || '').slice(0, 10)
@@ -40,30 +56,58 @@ const primeiroDiaDoMes = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
+const formatarDataISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+const somarDiasISO = (iso: string, dias: number) => {
+  const base = parseData(iso) ?? new Date()
+  base.setDate(base.getDate() + dias)
+  return formatarDataISO(base)
+}
+
 /**
- * Resumo de vendas e comissões do período (a segunda aba da tela Relatório).
- * Também pode ser aberto sozinho pela rota /relatorio-resumo.
+ * Resumo de vendas e comissões do período (tela Relatório).
+ * Otimizado para visualização direta no celular e no computador, sem precisar baixar PDF.
  */
 export default function RelatorioResumo({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, nomeVendedor, avisar } = useStore()
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
-  const [campo, setCampo] = useState<Campo>('pedido')
+  const [campo, setCampo] = useState<CampoData>('pedido')
   const [inicio, setInicio] = useState(primeiroDiaDoMes)
   const [fim, setFim] = useState(hojeISO)
   const [vendedorId, setVendedorId] = useState('todos')
   const [excluidos, setExcluidos] = useState<string[]>([])
+  const [buscaPedido, setBuscaPedido] = useState('')
+  const [limiteLista, setLimiteLista] = useState(100)
+
+  /**
+   * Filas que entram na conta: SÓ as concluídas (as que já saíram da máquina).
+   */
+  const base = useMemo(() => filasDaComissao(db.pedidos), [db.pedidos])
+
+  const primeiraDataHistorico = useMemo(() => {
+    let menor = '2026-01-01'
+    for (const p of base) {
+      const d = dataRef(p, campo)
+      if (d && d < menor) menor = d
+    }
+    return menor
+  }, [base, campo])
 
   const atalhos = useMemo(() => {
     const hoje = new Date()
     const ano = hoje.getFullYear()
     const mes = hoje.getMonth()
+    const ontemISO = somarDiasISO(hojeISO(), -1)
     return [
       { id: 'hoje', label: 'Hoje', de: hojeISO(), ate: hojeISO() },
+      { id: 'ontem', label: 'Ontem', de: ontemISO, ate: ontemISO },
+      { id: '7dias', label: 'Últimos 7 dias', de: somarDiasISO(hojeISO(), -6), ate: hojeISO() },
       {
         id: 'semana',
         label: 'Esta semana',
-        de: new Date(hoje.getTime() - ((hoje.getDay() + 6) % 7) * 86400000).toISOString().slice(0, 10),
+        de: somarDiasISO(hojeISO(), -((hoje.getDay() + 6) % 7)),
         ate: hojeISO(),
       },
       {
@@ -75,21 +119,37 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
       {
         id: 'mes-passado',
         label: 'Mês passado',
-        de: new Date(ano, mes - 1, 1).toISOString().slice(0, 10),
-        ate: new Date(ano, mes, 0).toISOString().slice(0, 10),
+        de: formatarDataISO(new Date(ano, mes - 1, 1)),
+        ate: formatarDataISO(new Date(ano, mes, 0)),
       },
+      { id: '30dias', label: 'Últimos 30 dias', de: somarDiasISO(hojeISO(), -29), ate: hojeISO() },
+      { id: 'tudo', label: 'Todo o período', de: primeiraDataHistorico, ate: hojeISO() },
     ]
-  }, [])
+  }, [primeiraDataHistorico])
 
-  /**
-   * Filas que entram na conta: SÓ as concluídas (as que já saíram da máquina).
-   * O que ainda está em andamento não é venda e não aparece aqui. A marcação
-   * de "pago" é só orientação da equipe — não tira nem põe fila no relatório.
-   */
-  const base = useMemo(
-    () => filasDaComissao(db.pedidos),
-    [db.pedidos],
-  )
+  /** Meses que possuem pedidos concluídos para seleção em 1 toque no celular */
+  const mesesDisponiveis = useMemo(() => {
+    const conjunto = new Set<string>()
+    conjunto.add(hojeISO().slice(0, 7))
+    for (const p of base) {
+      const d = dataRef(p, campo)
+      if (/^\d{4}-\d{2}/.test(d)) conjunto.add(d.slice(0, 7))
+    }
+    return [...conjunto]
+      .sort((a, b) => b.localeCompare(a))
+      .slice(0, 12)
+      .map((anoMes) => {
+        const [a, m] = anoMes.split('-').map(Number)
+        const de = `${anoMes}-01`
+        const ultimoDia = formatarDataISO(new Date(a, m, 0))
+        return {
+          id: anoMes,
+          label: `${NOMES_MESES[(m || 1) - 1]}/${String(a).slice(-2)}`,
+          de,
+          ate: ultimoDia,
+        }
+      })
+  }, [base, campo])
 
   const filtrados = useMemo(() => {
     return base
@@ -103,10 +163,23 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         if (!d) return false
         return d >= inicio && d <= fim
       })
-      .sort((a, b) => dataRef(a, campo).localeCompare(dataRef(b, campo)) || a.numero - b.numero)
+      .sort((a, b) => dataRef(b, campo).localeCompare(dataRef(a, campo)) || b.numero - a.numero)
   }, [base, campo, fim, inicio, vendedorId])
 
   const visiveis = useMemo(() => filtrados.filter((p) => !excluidos.includes(p.id)), [excluidos, filtrados])
+
+  const visiveisBusca = useMemo(() => {
+    const termo = buscaPedido.trim().toLocaleLowerCase('pt-BR')
+    if (!termo) return visiveis
+    return visiveis.filter((p) =>
+      [p.cliente_nome, `#${p.numero}`, String(p.numero), p.descricao, nomeVendedor(p.vendedor_id)]
+        .join(' ')
+        .toLocaleLowerCase('pt-BR')
+        .includes(termo),
+    )
+  }, [buscaPedido, nomeVendedor, visiveis])
+
+  const visiveisTela = useMemo(() => visiveisBusca.slice(0, limiteLista), [limiteLista, visiveisBusca])
 
   const resumoVendedores = useMemo(() => {
     return comissaoPorVendedor(visiveis, faixas, semMetragem)
@@ -156,7 +229,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         numeroBR(p.valor),
         numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
         p.data_pagamento ? dataBR(p.data_pagamento) : '',
-        `${numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 2)}%`,
+        percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual),
         dataBR(p.data_pedido),
         p.descricao,
         p.forma_pagamento,
@@ -166,13 +239,14 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
       [],
       ...resultado.porFaixa
         .filter((l) => l.pedidos > 0)
-        .map((l) => [`COMISSÃO ${l.rotulo} (${numeroBR(l.percentual, 2)}%)`, '', '', '', '', numeroBR(l.comissao), '', '']),
+        .map((l) => [`COMISSÃO ${l.rotulo} (${percentualBR(l.percentual)})`, '', '', '', '', numeroBR(l.comissao), '', '']),
     ]
     baixarCSV(`relatorio-altoprints-${inicio}-a-${fim}`, linhas)
     avisar('CSV gerado! O arquivo abre no Excel com os acentos corretos.')
   }
 
-  const periodoTexto = `${dataBR(inicio)} — ${dataBR(fim)}`
+  const ehDiaUnico = inicio === fim
+  const periodoTexto = ehDiaUnico ? dataBR(inicio) : `${dataBR(inicio)} — ${dataBR(fim)}`
 
   return (
     <>
@@ -180,10 +254,10 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
       <div className="print:hidden">
         {embutido ? (
           <BarraAcoes>
-            <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
+            <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => window.print()}>
               Imprimir / PDF
             </Botao>
-            <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
+            <Botao tamanho="sm" variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
               Exportar CSV
             </Botao>
           </BarraAcoes>
@@ -191,13 +265,13 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <TituloPagina
             icone={BarChart3}
             titulo="Relatório de vendas"
-            subtitulo="Filas concluídas no período, com a comissão de cada vendedor — pronto para a contabilidade."
+            subtitulo="Veja comissões, vendas e filas concluídas direto na tela do celular ou computador."
             acoes={
               <>
-                <Botao variante="secundario" icone={Printer} onClick={() => window.print()}>
+                <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => window.print()}>
                   Imprimir / PDF
                 </Botao>
-                <Botao variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
+                <Botao tamanho="sm" variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
                   Exportar CSV
                 </Botao>
               </>
@@ -206,19 +280,138 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         )}
 
         <Cartao className="mb-3" hover={false}>
-          <div className="grid gap-3 lg:grid-cols-4">
+          {/* Atalhos rápidos de período para toque no celular */}
+          <div className="mb-3">
+            <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Período rápido
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {atalhos.map((a) => {
+                const ativo = inicio === a.de && fim === a.ate
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      setInicio(a.de)
+                      setFim(a.ate)
+                      setLimiteLista(100)
+                    }}
+                    className={cn(
+                      'rounded-xl border px-2.5 py-1.5 text-xs font-bold transition',
+                      ativo
+                        ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                    )}
+                  >
+                    {a.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Atalhos de meses */}
+          {mesesDisponiveis.length > 1 ? (
+            <div className="mb-3">
+              <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Ir direto para o mês
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {mesesDisponiveis.map((m) => {
+                  const ativo = inicio === m.de && (fim === m.ate || (m.id === hojeISO().slice(0, 7) && fim === hojeISO()))
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setInicio(m.de)
+                        setFim(m.ate > hojeISO() ? hojeISO() : m.ate)
+                        setLimiteLista(100)
+                      }}
+                      className={cn(
+                        'rounded-lg border px-2.5 py-1 text-xs font-bold transition',
+                        ativo
+                          ? 'border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-950/60 dark:text-purple-200'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300',
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Seletores de dia único ou intervalo personalizado */}
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
+            <Campo label="Dia único" className="col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  title="Dia anterior"
+                  onClick={() => {
+                    const d = somarDiasISO(inicio, -1)
+                    setInicio(d)
+                    setFim(d)
+                  }}
+                  className="flex h-10 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <Entrada
+                  type="date"
+                  value={ehDiaUnico ? inicio : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setInicio(e.target.value)
+                      setFim(e.target.value)
+                      setLimiteLista(100)
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  title="Próximo dia"
+                  onClick={() => {
+                    const d = somarDiasISO(fim, 1)
+                    setInicio(d)
+                    setFim(d)
+                  }}
+                  className="flex h-10 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </Campo>
+
+            <Campo label="Início (De)">
+              <Entrada
+                type="date"
+                value={inicio}
+                onChange={(e) => {
+                  setInicio(e.target.value)
+                  setLimiteLista(100)
+                }}
+              />
+            </Campo>
+            <Campo label="Fim (Até)">
+              <Entrada
+                type="date"
+                value={fim}
+                onChange={(e) => {
+                  setFim(e.target.value)
+                  setLimiteLista(100)
+                }}
+              />
+            </Campo>
             <Campo label="Filtrar por">
-              <Selecao value={campo} onChange={(e) => setCampo(e.target.value as Campo)}>
+              <Selecao value={campo} onChange={(e) => setCampo(e.target.value as CampoData)}>
                 <option value="pagamento">Data do pagamento</option>
                 <option value="pedido">Data do pedido</option>
                 <option value="envio">Data do envio</option>
               </Selecao>
-            </Campo>
-            <Campo label="Início">
-              <Entrada type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} />
-            </Campo>
-            <Campo label="Fim">
-              <Entrada type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
             </Campo>
             <Campo label="Funcionário">
               <Selecao value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
@@ -233,34 +426,46 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </Campo>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {atalhos.map((a) => (
-              <Botao
-                key={a.id}
-                tamanho="sm"
-                variante="secundario"
-                onClick={() => {
-                  setInicio(a.de)
-                  setFim(a.ate)
-                }}
-                className={cn(inicio === a.de && fim === a.ate && 'border-purple-300 bg-purple-50 text-purple-700')}
+          {/* Pílulas rápidas para trocar de funcionário com 1 toque no celular */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+            <span className="mr-1 inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
+              <Users className="h-3.5 w-3.5" /> Equipe:
+            </span>
+            <button
+              type="button"
+              onClick={() => setVendedorId('todos')}
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-xs font-bold transition',
+                vendedorId === 'todos'
+                  ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+              )}
+            >
+              Todos
+            </button>
+            {db.vendedores.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setVendedorId(vendedorId === v.id ? 'todos' : v.id)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-xs font-bold transition',
+                  vendedorId === v.id
+                    ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                )}
               >
-                {a.label}
-              </Botao>
+                {v.nome}
+              </button>
             ))}
-            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-              <CalendarClock className="h-4 w-4 text-purple-600" />
+            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <CalendarClock className="h-4 w-4 shrink-0 text-purple-600" />
               {LABEL_CAMPO[campo]}: {periodoTexto}
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-400">
-            Entram aqui <b>todas as filas concluídas</b> do período — marcadas como pagas ou não: o "pago" é só
-            orientação da equipe. Para a contabilidade, use <b>Data do pagamento</b>; sem essa data, vale a data do
-            pedido.
-          </p>
         </Cartao>
 
-        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
           <CartaoResumo
             titulo="Filas concluídas"
             valor={totais.pedidos}
@@ -291,10 +496,92 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         {/* resumo por vendedor */}
         <Cartao className="mb-3" hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-extrabold text-slate-800">Resumo por vendedor</h2>
-            <span className="text-xs font-semibold text-slate-500">{resumoVendedores.length} vendedor(es)</span>
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Resumo por vendedor</h2>
+            <div className="flex items-center gap-2">
+              {vendedorId !== 'todos' ? (
+                <Botao tamanho="sm" variante="secundario" onClick={() => setVendedorId('todos')}>
+                  Mostrar todos
+                </Botao>
+              ) : null}
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {resumoVendedores.length} vendedor(es)
+              </span>
+            </div>
           </div>
-          <div className="tabela-scroll overflow-x-auto">
+
+          {/* Visão mobile em cartões (sem precisar rolar tabela nem baixar PDF) */}
+          <div className="space-y-2.5 md:hidden">
+            {resumoVendedores.map((linha) => {
+              const chaveFiltro = linha.chave === '__sem_vendedor__' ? 'sem-vendedor' : linha.chave
+              const selecionado = vendedorId === chaveFiltro
+              return (
+                <div
+                  key={linha.chave}
+                  className={cn(
+                    'rounded-2xl border p-3 transition',
+                    selecionado
+                      ? 'border-purple-300 bg-purple-50/40 dark:border-purple-700 dark:bg-purple-950/30'
+                      : 'border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/60',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-extrabold text-slate-800 dark:text-slate-100">
+                        {linha.vendedor?.nome ?? 'Sem vendedor'}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {linha.pedidos} pedido(s) • {numeroBR(linha.metragem)} m • ticket{' '}
+                        {moeda(linha.faturamento / (linha.pedidos || 1))}
+                      </p>
+                    </div>
+                    <Botao
+                      tamanho="sm"
+                      variante="secundario"
+                      icone={Eye}
+                      onClick={() => setVendedorId(selecionado ? 'todos' : chaveFiltro)}
+                    >
+                      {selecionado ? 'Todos' : 'Filtrar'}
+                    </Botao>
+                  </div>
+
+                  <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Faturamento
+                      </span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        {moeda(linha.faturamento)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        Comissão ({numeroBR(linha.percentualMedio, 2)}%)
+                      </span>
+                      <span className="text-sm font-black text-amber-600 dark:text-amber-400">
+                        {moeda(linha.comissao)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {resumoVendedores.length > 1 ? (
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-100/80 px-3.5 py-2.5 text-xs font-extrabold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                <span>TOTAL ({totais.pedidos} pedidos • {numeroBR(totais.metragem)} m)</span>
+                <span className="text-right">
+                  <span className="block text-emerald-700 dark:text-emerald-400">{moeda(totais.faturamento)}</span>
+                  <span className="block text-amber-700 dark:text-amber-400">Comissão: {moeda(totais.comissao)}</span>
+                </span>
+              </div>
+            ) : null}
+            {resumoVendedores.length === 0 ? (
+              <p className="py-4 text-center text-sm text-slate-400">
+                Nenhuma fila concluída no período selecionado.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="tabela-scroll hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                 <tr>
@@ -326,7 +613,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         tamanho="sm"
                         variante="secundario"
                         icone={Eye}
-                        onClick={() => setVendedorId(linha.chave === 'sem-vendedor' ? 'sem-vendedor' : linha.chave)}
+                        onClick={() =>
+                          setVendedorId(linha.chave === '__sem_vendedor__' ? 'sem-vendedor' : linha.chave)
+                        }
                       >
                         Ver só este
                       </Botao>
@@ -367,22 +656,22 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               Comissão por faixa de metragem
             </h2>
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Regra definida em ⚙️ Painel → Comissões
+              Regra definida em ⚙️ Ajustes → Comissões
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             {[...resultado.porFaixa, resultado.semMetragem]
               .filter((l) => l.pedidos > 0)
               .map((l) => (
                 <div
                   key={l.id}
-                  className="rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-4 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
+                  className="rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-3 shadow-sm sm:p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
                 >
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                     {l.rotulo}
                   </p>
                   <p className="text-lg font-black text-purple-600 dark:text-purple-400">
-                    {numeroBR(l.percentual, 1)}%
+                    {percentualBR(l.percentual)}
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {moeda(l.comissao)}
@@ -393,7 +682,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 </div>
               ))}
             {!resultado.porFaixa.some((l) => l.pedidos > 0) && resultado.semMetragem.pedidos === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500">Nenhuma fila concluída no período.</p>
+              <p className="col-span-full text-sm text-slate-400 dark:text-slate-500">
+                Nenhuma fila concluída no período.
+              </p>
             ) : null}
           </div>
         </Cartao>
@@ -401,9 +692,11 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         {/* detalhamento */}
         <Cartao hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-extrabold text-slate-800">Detalhamento das filas concluídas</h2>
+            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
+              Detalhamento das filas concluídas
+            </h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">{visiveis.length} filas</span>
+              <span className="text-xs font-semibold text-slate-500">{visiveisBusca.length} filas</span>
               {excluidos.length ? (
                 <Botao tamanho="sm" variante="secundario" icone={RotateCcw} onClick={() => setExcluidos([])}>
                   Restaurar todos ({excluidos.length})
@@ -412,6 +705,18 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </div>
           </div>
 
+          {visiveis.length > 5 ? (
+            <div className="relative mb-3">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Entrada
+                value={buscaPedido}
+                onChange={(e) => setBuscaPedido(e.target.value)}
+                placeholder="Buscar pedido por cliente, #número ou funcionário..."
+                className="pl-9"
+              />
+            </div>
+          ) : null}
+
           {excluidos.length ? (
             <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
               <Undo2 className="mr-1 inline h-3.5 w-3.5" />
@@ -419,64 +724,139 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </p>
           ) : null}
 
-          {visiveis.length === 0 ? (
+          {visiveisBusca.length === 0 ? (
             <Vazio
               icone={Receipt}
               titulo="Nenhuma fila concluída no período"
               descricao="Só entram no relatório as filas marcadas como concluídas em Pedidos. Ajuste o período ou o filtro de vendedor."
             />
           ) : (
-            <div className="tabela-scroll overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th className="border border-slate-200 px-3 py-2">Nº</th>
-                    <th className="border border-slate-200 px-3 py-2">Cliente</th>
-                    <th className="border border-slate-200 px-3 py-2">Vendedor</th>
-                    <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
-                    <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
-                    <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
-                    <th className="border border-slate-200 px-3 py-2">Pagamento</th>
-                    <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
-                    <th className="border border-slate-200 px-3 py-2 text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visiveis.map((p, i) => (
-                    <tr key={p.id} className={cn(i % 2 === 1 ? 'bg-slate-50/70' : 'bg-white', 'hover:bg-purple-50/40')}>
-                      <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700">#{p.numero}</td>
-                      <td className="border border-slate-200 px-3 py-2">
-                        <span className="font-semibold text-slate-700">{p.cliente_nome}</span>
-                        {p.descricao ? <span className="block text-xs text-slate-400">{p.descricao}</span> : null}
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2">{nomeVendedor(p.vendedor_id)}</td>
-                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
-                        {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
-                        {moeda(p.valor)}
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
-                        {moeda(comissaoDoPedido(p, faixas, semMetragem))}
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">{dataBR(p.data_pagamento)}</td>
-                      <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
-                        {numeroBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual, 1)}%
-                      </td>
-                      <td className="border border-slate-200 px-3 py-2 text-center">
+            <>
+              {/* Lista mobile em cartões compactos (leitura fácil na tela do celular) */}
+              <div className="space-y-2 md:hidden">
+                {visiveisTela.map((p) => {
+                  const pct = faixaDoPedido(p.metragem, faixas, semMetragem).percentual
+                  const valorComissao = comissaoDoPedido(p, faixas, semMetragem)
+                  return (
+                    <div
+                      key={p.id}
+                      className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/60"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-md bg-gradient-to-r from-pink-500 to-purple-600 px-1.5 py-0.5 text-[11px] font-black text-white">
+                              #{p.numero}
+                            </span>
+                            <span className="break-words text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                              {p.cliente_nome}
+                            </span>
+                          </div>
+                          {p.descricao ? (
+                            <p className="mt-0.5 break-words text-xs text-slate-500 dark:text-slate-400">
+                              {p.descricao}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            {nomeVendedor(p.vendedor_id)} • {p.metragem ? `${numeroBR(p.metragem)} m` : 'Sem metragem'} •{' '}
+                            {dataBR(p.data_pagamento || p.data_pedido)}
+                          </p>
+                        </div>
                         <button
                           title="Tirar do relatório (não apaga o pedido)"
                           onClick={() => setExcluidos((e) => [...e, p.id])}
-                          className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50"
+                          className="rounded-lg p-1 text-rose-500 transition hover:bg-rose-50"
                         >
                           <X className="h-4 w-4" />
                         </button>
-                      </td>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between border-t border-slate-200/70 pt-2 text-xs dark:border-slate-800">
+                        <div>
+                          <span className="text-slate-400">Valor: </span>
+                          <b className="text-sm font-black text-emerald-600 dark:text-emerald-400">{moeda(p.valor)}</b>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-400">Comissão ({percentualBR(pct)}): </span>
+                          <b className="text-sm font-black text-amber-600 dark:text-amber-400">{moeda(valorComissao)}</b>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="tabela-scroll hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
+                <table className="w-full border-collapse text-sm">
+                  <thead className="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                    <tr>
+                      <th className="border border-slate-200 px-3 py-2">Nº</th>
+                      <th className="border border-slate-200 px-3 py-2">Cliente</th>
+                      <th className="border border-slate-200 px-3 py-2">Vendedor</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
+                      <th className="border border-slate-200 px-3 py-2">Pagamento</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
+                      <th className="border border-slate-200 px-3 py-2 text-center">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {visiveisTela.map((p, i) => (
+                      <tr key={p.id} className={cn(i % 2 === 1 ? 'bg-slate-50/70' : 'bg-white', 'hover:bg-purple-50/40')}>
+                        <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700">#{p.numero}</td>
+                        <td className="border border-slate-200 px-3 py-2">
+                          <span className="font-semibold text-slate-700">{p.cliente_nome}</span>
+                          {p.descricao ? <span className="block text-xs text-slate-400">{p.descricao}</span> : null}
+                        </td>
+                        <td className="border border-slate-200 px-3 py-2">{nomeVendedor(p.vendedor_id)}</td>
+                        <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
+                          {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
+                        </td>
+                        <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
+                          {moeda(p.valor)}
+                        </td>
+                        <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
+                          {moeda(comissaoDoPedido(p, faixas, semMetragem))}
+                        </td>
+                        <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">{dataBR(p.data_pagamento)}</td>
+                        <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
+                          {percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual)}
+                        </td>
+                        <td className="border border-slate-200 px-3 py-2 text-center">
+                          <button
+                            title="Tirar do relatório (não apaga o pedido)"
+                            onClick={() => setExcluidos((e) => [...e, p.id])}
+                            className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {visiveisBusca.length > limiteLista ? (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <Botao
+                    tamanho="sm"
+                    variante="secundario"
+                    onClick={() => setLimiteLista((atual) => atual + 150)}
+                  >
+                    Mostrar mais pedidos ({visiveisBusca.length - limiteLista} restantes)
+                  </Botao>
+                  <Botao
+                    tamanho="sm"
+                    variante="ghost"
+                    onClick={() => setLimiteLista(visiveisBusca.length)}
+                  >
+                    Mostrar todos ({visiveisBusca.length})
+                  </Botao>
+                </div>
+              ) : null}
+            </>
           )}
         </Cartao>
       </div>
@@ -487,19 +867,17 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           <LogoImpressao />
           <div className="ml-auto text-right text-[13px] leading-tight">
             <p className="text-lg font-black uppercase">{db.configuracoes.empresa_nome || 'Altoprints'}</p>
-            <p className="font-bold">
-              Relatório de vendas pagas e comissões da equipe
+            <p className="font-bold">Relatório de vendas pagas e comissões da equipe</p>
+            <p>
+              Período ({LABEL_CAMPO[campo].toLowerCase()}): {periodoTexto}
             </p>
-            <p>Período ({LABEL_CAMPO[campo].toLowerCase()}): {periodoTexto}</p>
             <p>Emitido em {dataBR(new Date().toISOString())}</p>
           </div>
         </div>
 
         {/* comissão de cada pessoa da equipe — é o que o dono confere no papel */}
         <div className="sem-quebra mb-4">
-          <p className="mb-1 font-bold">
-            Comissões da equipe
-          </p>
+          <p className="mb-1 font-bold">Comissões da equipe</p>
           <table className="tabela-print">
             <thead>
               <tr>
@@ -549,7 +927,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 .map((l) => (
                   <tr key={l.id}>
                     <td>{l.rotulo}</td>
-                    <td className="num">{numeroBR(l.percentual, 1)}%</td>
+                    <td className="num">{percentualBR(l.percentual)}</td>
                     <td className="num">{l.pedidos}</td>
                     <td className="num">{numeroBR(l.metragem)} m</td>
                     <td className="num">{moeda(l.faturamento)}</td>
