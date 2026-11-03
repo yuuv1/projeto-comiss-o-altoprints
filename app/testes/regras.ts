@@ -658,6 +658,41 @@ igual('backup histórico sem proprietário preserva acesso atual', backupHistori
 igual('backup histórico: pedido continua ligado ao funcionário', backupHistorico.pedidos[0].vendedor_id, 'v-jessica')
 igual('backup histórico: pedido antigo mantém status concluído e pago', [backupHistorico.pedidos[0].estagio, backupHistorico.pedidos[0].pago], ['concluido', true])
 
+const backupComOutroDonoEOrfaos = prepararBackup(
+  {
+    pedidos: [{ id: 'pedido-valido', numero: 1, cliente_nome: 'CLIENTE', vendedor_id: 'v-jessica' }],
+    clientes: [],
+    vendedores: [{ id: 'v-jessica', nome: 'JESSICA', created_at: '2024-01-01' }],
+    arquivos: [
+      { id: 'arq-ok', pedido_id: 'pedido-valido', nome: 'arte.png', tipo: 'image/png', tamanho: 100, url: '' },
+      { id: 'arq-orfao', pedido_id: 'pedido-apagado', nome: 'orfao.png', tipo: 'image/png', tamanho: 100, url: '' },
+    ],
+    impressoes: [
+      { id: 'imp-ok', pedido_id: 'pedido-valido', metros: 2, quem: 'JESSICA', tipo: 'impressao' },
+      { id: 'imp-orfao', pedido_id: 'pedido-apagado', metros: 2, quem: 'JESSICA', tipo: 'impressao' },
+    ],
+    usuarios: [
+      {
+        id: 'dono-do-backup',
+        nome: 'Proprietário Antigo',
+        usuario: 'donoantigo',
+        senha_hash: 'hash-valido',
+        papel: 'proprietario',
+        ativo: true,
+        criado_em: '2024-01-01',
+      },
+    ],
+  },
+  [donoTeste],
+)
+igual('backup remove arquivos órfãos sem pedido correspondente', backupComOutroDonoEOrfaos.arquivos.map((a) => a.id), ['arq-ok'])
+igual('backup remove impressões órfãs sem pedido correspondente', backupComOutroDonoEOrfaos.impressoes.map((i) => i.id), ['imp-ok'])
+igual(
+  'backup com outro dono mantém também o proprietário atual da nuvem',
+  backupComOutroDonoEOrfaos.usuarios.map((u) => u.usuario),
+  ['donoantigo', donoTeste.usuario],
+)
+
 const pedidoDaJessica = normalizarPedido({
   id: 'pedido-jessica-recente',
   numero: 20,

@@ -1,0 +1,28 @@
+name: Manter banco Supabase sempre ativo
+
+on:
+  schedule:
+    # Roda a cada 3 dias para impedir que o plano gratuito do Supabase pause por inatividade
+    - cron: '0 9 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar o banco central (keep-alive)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://eeurdquvrdmoyjgzgpac.supabase.co' }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || vars.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ebcfV_dIMgKSe_d1SlX5aw_EBT3P1pS' }}
+        run: |
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/configuracoes?select=id&limit=1")
+          echo "Status da resposta do Supabase: ${STATUS}"
+          if [ "${STATUS}" != "200" ]; then
+            echo "::error::Resposta inesperada do Supabase (${STATUS})."
+            exit 1
+          fi

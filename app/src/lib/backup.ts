@@ -65,6 +65,55 @@ const normalizarCliente = (bruto: Objeto): Cliente | null => {
 
 const nomeChave = (nome: string) => nome.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
 
+const semDuplicadosPorId = <T extends { id: string }>(lista: T[]): T[] => {
+  const vistos = new Set<string>()
+  const resultado: T[] = []
+  for (const item of lista) {
+    if (!item.id || vistos.has(item.id)) continue
+    vistos.add(item.id)
+    resultado.push(item)
+  }
+  return resultado
+}
+
+const normalizarArquivo = (bruto: Objeto, idsPedidos: Set<string>): Arquivo | null => {
+  const pedidoId = texto(bruto.pedido_id).trim()
+  if (!pedidoId || !idsPedidos.has(pedidoId)) return null
+  const tamanhoBruto = Number(bruto.tamanho ?? 0)
+  return {
+    id: texto(bruto.id).trim() || novoId(),
+    pedido_id: pedidoId,
+    nome: texto(bruto.nome ?? 'arquivo').trim() || 'arquivo',
+    tipo: texto(bruto.tipo),
+    tamanho: Number.isFinite(tamanhoBruto) && tamanhoBruto >= 0 ? Math.trunc(tamanhoBruto) : 0,
+    url: texto(bruto.url),
+    created_at: texto(bruto.created_at ?? bruto.criado_em) || agoraISO(),
+  }
+}
+
+const normalizarImpressao = (bruto: Objeto, idsPedidos: Set<string>): Impressao | null => {
+  const pedidoId = texto(bruto.pedido_id).trim()
+  if (!pedidoId || !idsPedidos.has(pedidoId)) return null
+  const numeroBruto = Number(bruto.pedido_numero ?? 0)
+  const metrosBruto = Number(String(bruto.metros ?? 0).replace(',', '.'))
+  return {
+    id: texto(bruto.id).trim() || novoId(),
+    pedido_id: pedidoId,
+    pedido_numero: Number.isFinite(numeroBruto) ? Math.trunc(numeroBruto) : 0,
+    cliente_nome: texto(bruto.cliente_nome),
+    arquivo_id: texto(bruto.arquivo_id),
+    arquivo_nome: texto(bruto.arquivo_nome),
+    metros: Number.isFinite(metrosBruto) ? metrosBruto : 0,
+    quem: texto(bruto.quem),
+    usuario_id: texto(bruto.usuario_id),
+    tipo: texto(bruto.tipo) === 'reimpressao' ? 'reimpressao' : 'impressao',
+    motivo: texto(bruto.motivo),
+    observacao: texto(bruto.observacao),
+    quando: texto(bruto.quando ?? bruto.created_at) || agoraISO(),
+    created_at: texto(bruto.created_at ?? bruto.quando) || agoraISO(),
+  }
+}
+
 /**
  * Converte backups baixados pelas versões antigas do Altoprints para o formato atual.
  * Não restaura logins de funcionário: seus nomes/vínculos viram cadastros de equipe.
@@ -73,9 +122,11 @@ export function prepararBackup(bruto: unknown, usuariosAtuais: Usuario[] = []): 
   const dados = lerDados(bruto)
   const usuariosDoArquivo = listaDeObjetos(dados.usuarios)
 
-  const vendedores: Vendedor[] = listaDeObjetos(dados.vendedores)
-    .map(normalizarVendedor)
-    .filter((v): v is Vendedor => Boolean(v))
+  const vendedores: Vendedor[] = semDuplicadosPorId(
+    listaDeObjetos(dados.vendedores)
+      .map(normalizarVendedor)
+      .filter((v): v is Vendedor => Boolean(v)),
+  )
   const idsVendedores = new Set(vendedores.map((v) => v.id))
   const nomesVendedores = new Map(vendedores.map((v) => [nomeChave(v.nome), v.id]))
   const aliasesVendedores = new Map<string, string>()
@@ -100,30 +151,56 @@ export function prepararBackup(bruto: unknown, usuariosAtuais: Usuario[] = []): 
     nomesVendedores.set(nomeChave(nome), id)
   }
 
-  const clientes: Cliente[] = listaDeObjetos(dados.clientes)
-    .map(normalizarCliente)
-    .filter((c): c is Cliente => Boolean(c))
-    .map((c) => ({ ...c, vendedor_id: aliasesVendedores.get(c.vendedor_id) ?? c.vendedor_id }))
+  const clientes: Cliente[] = semDuplicadosPorId(
+    listaDeObjetos(dados.clientes)
+      .map(normalizarCliente)
+      .filter((c): c is Cliente => Boolean(c))
+      .map((c) => ({ ...c, vendedor_id: aliasesVendedores.get(c.vendedor_id) ?? c.vendedor_id })),
+  )
 
-  const pedidos: Pedido[] = listaDeObjetos(dados.pedidos)
-    .map((p) => normalizarPedido(p as Partial<Pedido> & Record<string, unknown>))
-    .map((p) => ({ ...p, vendedor_id: aliasesVendedores.get(p.vendedor_id) ?? p.vendedor_id }))
+  const pedidos: Pedido[] = semDuplicadosPorId(
+    listaDeObjetos(dados.pedidos)
+      .map((p) => {
+        const normalizado = normalizarPedido(p as Partial<Pedido> & Record<string, unknown>)
+        return {
+          ...normalizado,
+          id: texto(normalizado.id).trim() || novoId(),
+          vendedor_id: aliasesVendedores.get(normalizado.vendedor_id) ?? normalizado.vendedor_id,
+        }
+      }),
+  )
+  const idsPedidos = new Set(pedidos.map((p) => p.id))
+
+  const donosAtuais = usuariosAtuais.filter((u) => u.papel === 'proprietario')
+  const donosAtuaisPorUsuario = new Map(donosAtuais.map((u) => [u.usuario.trim().toLowerCase(), u]))
 
   const donosDoArquivo: Usuario[] = usuariosDoArquivo
     .filter((u) => u.papel !== 'vendedor' && Boolean(texto(u.senha_hash)))
-    .map((u) => ({
-      id: texto(u.id) || novoId(),
-      nome: texto(u.nome).trim(),
-      usuario: texto(u.usuario),
-      senha_hash: texto(u.senha_hash),
-      papel: 'proprietario' as const,
-      vendedor_id: '',
-      ativo: typeof u.ativo === 'boolean' ? u.ativo : true,
-      auth_id: texto(u.auth_id) || undefined,
-      telas: ehObjeto(u.telas) ? (u.telas as Usuario['telas']) : {},
-      criado_em: texto(u.criado_em ?? u.created_at) || agoraISO(),
-    }))
+    .map((u) => {
+      const login = texto(u.usuario).trim()
+      const atualMesmoLogin = donosAtuaisPorUsuario.get(login.toLowerCase())
+      return {
+        id: atualMesmoLogin?.id || texto(u.id) || novoId(),
+        nome: texto(u.nome).trim(),
+        usuario: login,
+        senha_hash: texto(u.senha_hash),
+        papel: 'proprietario' as const,
+        vendedor_id: '',
+        ativo: typeof u.ativo === 'boolean' ? u.ativo : true,
+        auth_id: texto(u.auth_id) || undefined,
+        telas: ehObjeto(u.telas) ? (u.telas as Usuario['telas']) : {},
+        criado_em: texto(u.criado_em ?? u.created_at) || agoraISO(),
+      }
+    })
     .filter((u) => u.nome && u.usuario)
+
+  const loginsDoArquivo = new Set(donosDoArquivo.map((u) => u.usuario.trim().toLowerCase()))
+  const usuariosPreservados = donosDoArquivo.length
+    ? [
+        ...donosDoArquivo,
+        ...donosAtuais.filter((u) => !loginsDoArquivo.has(u.usuario.trim().toLowerCase())),
+      ]
+    : donosAtuais
 
   const configuracoes = ehObjeto(dados.configuracoes) ? dados.configuracoes : {}
 
@@ -131,11 +208,17 @@ export function prepararBackup(bruto: unknown, usuariosAtuais: Usuario[] = []): 
     vendedores,
     clientes,
     pedidos,
-    arquivos: listaDeObjetos(dados.arquivos).map((a) => ({ ...a, id: texto(a.id) || novoId() }) as unknown as Arquivo),
-    impressoes: listaDeObjetos(dados.impressoes).map((i) => ({ ...i, id: texto(i.id) || novoId() }) as unknown as Impressao),
-    usuarios: donosDoArquivo.length
-      ? donosDoArquivo
-      : usuariosAtuais.filter((u) => u.papel === 'proprietario'),
+    arquivos: semDuplicadosPorId(
+      listaDeObjetos(dados.arquivos)
+        .map((a) => normalizarArquivo(a, idsPedidos))
+        .filter((a): a is Arquivo => Boolean(a)),
+    ),
+    impressoes: semDuplicadosPorId(
+      listaDeObjetos(dados.impressoes)
+        .map((i) => normalizarImpressao(i, idsPedidos))
+        .filter((i): i is Impressao => Boolean(i)),
+    ),
+    usuarios: semDuplicadosPorId(usuariosPreservados),
     configuracoes: { ...CONFIG_PADRAO, ...configuracoes, modo_exemplo: false },
   }
 }
