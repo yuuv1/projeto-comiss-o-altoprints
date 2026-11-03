@@ -25,10 +25,8 @@ export default function Administracao() {
   const navegar = useNavigate()
 
   const criando = !temProprietario
-  const [nome, setNome] = useState('')
   const [login, setLogin] = useState('')
   const [senha, setSenha] = useState('')
-  const [repetir, setRepetir] = useState('')
   const [mostrar, setMostrar] = useState(false)
   const [manter, setManter] = useState(true)
   const [erro, setErro] = useState('')
@@ -47,8 +45,7 @@ export default function Administracao() {
     setEnviando(true)
     try {
       if (criando) {
-        if (senha !== repetir) throw new Error('As duas senhas precisam ser iguais.')
-        await criarContaProprietario({ nome, usuario: login, senha })
+        await criarContaProprietario({ nome: login.trim(), usuario: login, senha })
       } else {
         await entrar(login, senha, manter)
       }
@@ -85,16 +82,10 @@ export default function Administracao() {
             </h1>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {criando
-                ? 'A equipe usa o sistema sem login. Aqui você cria a sua senha de dono — ela libera Painel, Relatório, Funcionários e Configurações.'
+                ? 'A equipe usa o sistema sem login. Escolha seu usuário e senha de dono — eles liberam Painel, Relatório, Funcionários e Configurações.'
                 : 'Entre com o seu usuário e senha para ver os recursos do proprietário.'}
             </p>
           </div>
-
-          {criando ? (
-            <Campo label="Seu nome" obrigatorio className="mb-3">
-              <Entrada value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required autoFocus />
-            </Campo>
-          ) : null}
 
           <Campo
             label="Usuário"
@@ -113,7 +104,7 @@ export default function Administracao() {
               autoCapitalize="none"
               autoCorrect="off"
               required
-              autoFocus={!criando}
+              autoFocus
             />
           </Campo>
 
@@ -138,27 +129,15 @@ export default function Administracao() {
             </div>
           </Campo>
 
-          {criando ? (
-            <Campo label="Repita a senha" obrigatorio className="mb-3">
-              <Entrada
-                type={mostrar ? 'text' : 'password'}
-                value={repetir}
-                onChange={(e) => setRepetir(e.target.value)}
-                placeholder="••••••"
-                required
-              />
-            </Campo>
-          ) : (
-            <label className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={manter}
-                onChange={(e) => setManter(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
-              />
-              Manter conectado neste aparelho
-            </label>
-          )}
+          <label className="mb-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={manter}
+              onChange={(e) => setManter(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 dark:border-slate-600"
+            />
+            Manter conectado neste aparelho
+          </label>
 
           {erro ? (
             <p className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-sm font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">

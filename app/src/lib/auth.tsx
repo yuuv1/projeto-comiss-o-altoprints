@@ -153,11 +153,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lsGravar(CHAVE_SESSAO, JSON.stringify({ usuario_id: id, expira_em: expira, conectado: manter }))
   }
 
+  /* --------------------------- criar acessos --------------------------- */
+
+  /**
+   * Cria um acesso de proprietário. `entrarAgora` só é `true` no primeiro acesso
+   * (a pessoa acabou de ser convidada a criar o login dela).
+   */
+  const criarDono = useCallback(
+    async (dados: { nome: string; usuario: string; senha: string }, entrarAgora: boolean) => {
+      const erro = validarUsuario(dados.usuario)
+      if (erro) throw new Error(erro)
+      const erroSenha = validarSenha(dados.senha)
+      if (erroSenha) throw new Error(erroSenha)
+      const nomeResolvido = dados.nome.trim() || dados.usuario.trim()
+      if (!nomeResolvido) throw new Error('Informe o seu nome.')
+
+      const nomeUsuario = normalizarUsuario(dados.usuario)
+      const noBanco = await lerUsuarios()
+      const lista = noBanco.length ? noBanco : usuarios
+      if (lista.some((u) => u.usuario === nomeUsuario)) throw new Error('Este login já está em uso.')
+
+      const conta: Usuario = {
+        id: novoId(),
+        nome: nomeResolvido,
+        usuario: nomeUsuario,
+        senha_hash: await gerarHashSenha(dados.senha),
+        papel: 'proprietario',
+        vendedor_id: '',
+        ativo: true,
+        criado_em: new Date().toISOString(),
+      }
+      await salvarRegistro('usuarios', conta)
+      await recarregar()
+      if (entrarAgora) {
+        lsRemover(CHAVE_TENTATIVAS)
+        setUsuarioId(conta.id)
+        guardarSessao(conta.id, true)
+        avisar(`Bem-vindo, ${conta.nome}! Sua senha de proprietário está valendo.`)
+      } else {
+        avisar(`Acesso de ${conta.nome} criado. Usuário: ${conta.usuario}.`)
+      }
+    },
+    [avisar, recarregar, usuarios],
+  )
+
   /* ------------------------------ entrar ------------------------------ */
 
   const entrar = useCallback(
     async (login: string, senha: string, manter: boolean) => {
       const nomeUsuario = normalizarUsuario(login)
+      const noBanco = await lerUsuarios()
+      if (emNuvem() && !noBanco.some((u) => u.papel === 'proprietario')) {
+        await criarDono({ nome: login.trim(), usuario: login, senha }, true)
+        return
+      }
+
       const tentativas = lerTentativas()
       const registroTentativa = tentativas[nomeUsuario]
       if (registroTentativa?.bloqueado_ate && new Date(registroTentativa.bloqueado_ate).getTime() > Date.now()) {
@@ -165,7 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(`Muitas tentativas. Tente novamente em ${minutos} minuto(s).`)
       }
 
-      const noBanco = await lerUsuarios()
       const lista = noBanco.length ? noBanco : usuarios
       const conta = lista.find((u) => u.usuario === nomeUsuario)
       const registrarErro = () => {
@@ -195,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsuarioId(conta.id)
       guardarSessao(conta.id, manter)
     },
-    [usuarios],
+    [criarDono, usuarios],
   )
 
   const sair = useCallback(async () => {
@@ -203,48 +252,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuarioId(null)
     avisar('Você saiu do acesso do proprietário. O sistema continua aberto para a equipe.', 'info')
   }, [avisar])
-
-  /* --------------------------- criar acessos --------------------------- */
-
-  /**
-   * Cria um acesso de proprietário. `entrarAgora` só é `true` no primeiro acesso
-   * (a pessoa acabou de ser convidada a criar o login dela).
-   */
-  const criarDono = useCallback(
-    async (dados: { nome: string; usuario: string; senha: string }, entrarAgora: boolean) => {
-      const erro = validarUsuario(dados.usuario)
-      if (erro) throw new Error(erro)
-      const erroSenha = validarSenha(dados.senha)
-      if (erroSenha) throw new Error(erroSenha)
-      if (!dados.nome.trim()) throw new Error('Informe o seu nome.')
-
-      const nomeUsuario = normalizarUsuario(dados.usuario)
-      const noBanco = await lerUsuarios()
-      const lista = noBanco.length ? noBanco : usuarios
-      if (lista.some((u) => u.usuario === nomeUsuario)) throw new Error('Este login já está em uso.')
-
-      const conta: Usuario = {
-        id: novoId(),
-        nome: dados.nome.trim(),
-        usuario: nomeUsuario,
-        senha_hash: await gerarHashSenha(dados.senha),
-        papel: 'proprietario',
-        vendedor_id: '',
-        ativo: true,
-        criado_em: new Date().toISOString(),
-      }
-      await salvarRegistro('usuarios', conta)
-      await recarregar()
-      if (entrarAgora) {
-        setUsuarioId(conta.id)
-        guardarSessao(conta.id, true)
-        avisar(`Bem-vindo, ${conta.nome}! Sua senha de proprietário está valendo.`)
-      } else {
-        avisar(`Acesso de ${conta.nome} criado. Usuário: ${conta.usuario}.`)
-      }
-    },
-    [avisar, recarregar, usuarios],
-  )
 
   const criarContaProprietario = useCallback<AuthContexto['criarContaProprietario']>(
     async (dados) => {
