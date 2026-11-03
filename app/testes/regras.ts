@@ -33,10 +33,12 @@ import {
 } from '../src/lib/impressoes'
 import { gerarDadosDemo, TAMANHO_DEMO } from '../src/lib/seed'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
+import { prepararBackup } from '../src/lib/backup'
 import {
   combinaFiltro,
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
+  normalizarPedido,
   filasDaComissao,
   isPedidoCompleto,
   naFilaDeImpressao,
@@ -557,6 +559,106 @@ igual(
   extrairConexaoDoTexto('sb_secret_x sb_publishable_bom').chave,
   'sb_publishable_bom',
 )
+
+/* ----------------- backups legados e histórico da equipe ---------------- */
+const pedidoLegado = normalizarPedido({
+  id: 'pedido-antigo',
+  numero: 17,
+  cliente_nome: 'CLIENTE DE HISTORICO',
+  vendedor_id: 'v-jessica',
+  data_pedido: '2025-04-11T10:00:00.000Z',
+  status_producao: 'dtf_pronto',
+  status_pagamento: 'pago',
+  impresso: true,
+  impresso_em: '2025-04-12T10:00:00.000Z',
+  data_entrega: '2025-04-15',
+} as never)
+igual('backup antigo: DTF pronto vira fila concluída', pedidoLegado.estagio, 'concluido')
+igual('backup antigo: status pago continua pago', pedidoLegado.pago, true)
+igual('backup antigo: data de impressão é preservada', pedidoLegado.iniciado_em, '2025-04-12T10:00:00.000Z')
+igual('backup antigo: data de entrega marca entregue', pedidoLegado.entregue, true)
+const pedidoNaFilaAntiga = normalizarPedido({
+  id: 'pedido-na-fila',
+  status_producao: 'imprimir',
+  status_pagamento: 'pago',
+  impresso: false,
+} as never)
+igual('backup antigo: “imprimir” ainda não é concluído', pedidoNaFilaAntiga.estagio, 'em_andamento')
+igual('backup antigo: “imprimir” não finge que já iniciou a máquina', pedidoNaFilaAntiga.iniciado_em, null)
+
+const pedidoAtualExplicito = normalizarPedido({
+  id: 'pedido-atual',
+  estagio: 'em_andamento',
+  entregue: false,
+  pago: false,
+  data_entrega: '2025-04-15',
+  data_pagamento: '2025-04-12',
+} as never)
+igual('backup atual: marcação explícita de não entregue não é sobrescrita', pedidoAtualExplicito.entregue, false)
+igual('backup atual: marcação explícita de não pago não é sobrescrita', pedidoAtualExplicito.pago, false)
+
+const backupHistorico = prepararBackup(
+  {
+    versao: '1.2.0',
+    dados: {
+      vendedores: [{ id: 'v-jessica', nome: 'JESSICA', created_at: '2024-01-01' }],
+      clientes: [
+        {
+          id: 'cliente-antigo',
+          nome: 'CLIENTE DE HISTORICO',
+          telefone: '0000000000',
+          email: '',
+          observacoes: '',
+          vendedor_id: 'v-jessica',
+          valor_especial_metro: null,
+          especial: false,
+          created_at: '2024-01-02',
+        },
+      ],
+      pedidos: [
+        {
+          id: 'pedido-antigo',
+          numero: 17,
+          cliente_nome: 'CLIENTE DE HISTORICO',
+          cliente_id: 'cliente-antigo',
+          vendedor_id: 'v-jessica',
+          data_pedido: '2025-04-11T10:00:00.000Z',
+          status_producao: 'dtf_pronto',
+          status_pagamento: 'pago',
+          impresso: true,
+          impresso_em: '2025-04-12T10:00:00.000Z',
+          data_entrega: '2025-04-15',
+        },
+      ],
+      // Em versões antigas cada funcionário também tinha uma conta de usuário.
+      // Se faltar em vendedores, o nome/vínculo é recuperado daqui.
+      usuarios: [
+        {
+          id: 'usuario-raissa',
+          nome: 'RAISSA',
+          usuario: 'raissa',
+          senha_hash: 'hash-antigo-nao-restaurar',
+          papel: 'vendedor',
+          vendedor_id: 'v-raissa',
+          ativo: true,
+          criado_em: '2024-01-03',
+        },
+      ],
+    },
+  },
+  [donoTeste],
+)
+igual('backup histórico: clientes são importados', backupHistorico.clientes.map((c) => c.nome), ['CLIENTE DE HISTORICO'])
+igual('backup histórico: funcionário de conta antiga continua na equipe', backupHistorico.vendedores.map((v) => v.nome), ['JESSICA', 'RAISSA'])
+igual('backup histórico: ID do funcionário antigo é preservado', backupHistorico.vendedores[1].id, 'v-raissa')
+igual('backup histórico: conta de funcionário vira só nome (sem login)', backupHistorico.usuarios.some((u) => u.nome === 'RAISSA'), false)
+igual('backup histórico sem proprietário preserva acesso atual', backupHistorico.usuarios.map((u) => u.id), [donoTeste.id])
+igual('backup histórico: pedido continua ligado ao funcionário', backupHistorico.pedidos[0].vendedor_id, 'v-jessica')
+igual('backup histórico: pedido antigo mantém status concluído e pago', [backupHistorico.pedidos[0].estagio, backupHistorico.pedidos[0].pago], ['concluido', true])
+
+const sqlSupabase = readFileSync('supabase/schema.sql', 'utf8')
+igual('SQL do Supabase inclui os campos atuais do fluxo', ['estagio', 'iniciado_em', 'entregue', 'pago'].every((campo) => sqlSupabase.includes(campo)), true)
+igual('SQL converte o status antigo em concluído durante a migração', /status_producao = 'dtf_pronto'/.test(sqlSupabase), true)
 
 try {
   lerCodigoConexao('codigo-errado')

@@ -30,6 +30,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
 import { useAuth } from '../lib/auth'
+import { prepararBackup } from '../lib/backup'
 import type { DiagnosticoArmazenamento } from '../lib/armazenamento'
 import { tamanhoLegivel } from '../lib/files'
 import { dataBR, moeda, numeroBR } from '../lib/format'
@@ -798,15 +799,24 @@ export default function Configuracoes() {
                     const arquivo = e.target.files?.[0]
                     e.target.value = ''
                     if (!arquivo) return
-                    const ok = await confirmar({
-                      titulo: 'Restaurar este backup?',
-                      mensagem:
-                        'Os dados atuais (pedidos, clientes, funcionários, acessos e configurações) serão substituídos pelos do arquivo. Com a nuvem conectada, essa troca vale para todos os aparelhos.',
-                      textoBotao: 'Restaurar',
-                    })
-                    if (!ok) return
                     try {
-                      await restaurarBackup(arquivo)
+                      let conteudo: unknown
+                      try {
+                        conteudo = JSON.parse(await arquivo.text())
+                      } catch {
+                        throw new Error('Este arquivo não é um backup do sistema (não é um JSON válido).')
+                      }
+                      const previa = prepararBackup(conteudo, db.usuarios)
+                      const semPessoas = previa.clientes.length === 0 && previa.vendedores.length === 0
+                      const avisoSemPessoas = semPessoas
+                        ? '\n\nATENÇÃO: este arquivo não contém clientes nem funcionários. Se você esperava recuperar pessoas antigas, cancele e confira se escolheu o backup certo.'
+                        : ''
+                      const ok = await confirmar({
+                        titulo: 'Restaurar este backup?',
+                        mensagem: `O arquivo contém ${previa.pedidos.length} pedidos, ${previa.clientes.length} clientes e ${previa.vendedores.length} funcionários. Os dados atuais serão substituídos por esses. Com a nuvem conectada, a troca vale para todos os aparelhos.${avisoSemPessoas}`,
+                        textoBotao: 'Restaurar',
+                      })
+                      if (ok) await restaurarBackup(arquivo)
                     } catch (erro) {
                       avisar((erro as Error).message, 'erro')
                     }
@@ -815,8 +825,9 @@ export default function Configuracoes() {
               </label>
             </div>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              O backup inclui pedidos, clientes, funcionários, arquivos (links) e os acessos de proprietário. Fotos e
-              artes enviadas ficam no Supabase Storage e continuam lá. Para restaurar um backup em outro computador:
+              O backup inclui pedidos, clientes, funcionários, arquivos (links) e os acessos de proprietário. Antes de
+              aplicar, o sistema mostra os totais e avisa se o arquivo não tiver clientes nem funcionários. Fotos e artes
+              enviadas ficam no Supabase Storage e continuam lá. Para restaurar um backup em outro computador:
               abra o sistema nele e use <b>Restaurar backup</b>; com a nuvem conectada, o conteúdo vale para todos.
             </p>
           </Cartao>

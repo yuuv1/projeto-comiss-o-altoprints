@@ -63,7 +63,7 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.0** — agora o site também pode ser instalado como aplicativo (PWA).
+> **Versão atual: 1.5.1** — correção para restaurar backups antigos com os clientes, funcionários e estados da fila preservados.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
 | Tela | Rota | Para que serve |
@@ -178,9 +178,13 @@ usuário e senha. Quem abrir o endereço sem a senha não encontra dados: apenas
 - **Baixar backup** (*Configurações → Dados*) gera um `.json` com pedidos, clientes,
   funcionários, arquivos (links) e os acessos de proprietário.
 - **Restaurar backup** lê esse arquivo em qualquer aparelho — inclusive backups de versões
-  antigas (as contas de funcionário que existiam antes são descartadas, porque hoje só o
-  dono tem login; os acessos de dono já existentes no aparelho são mantidos se o arquivo
-  não trouxer nenhum).
+  antigas e embrulhados. Recupera clientes e funcionários; se uma versão antiga só tiver
+  o funcionário em `usuarios`, o nome e o vínculo também são recuperados. As contas antigas
+  de funcionário deixam de ser logins; os acessos de proprietário do aparelho são mantidos
+  se o arquivo não trouxer nenhum.
+- Antes de aplicar, a restauração mostra quantos pedidos, clientes e funcionários há no arquivo
+  (e avisa se não houver clientes/funcionários). Ela **substitui os dados atuais**; não mescla.
+  Guarde uma cópia do banco atual antes de aplicar.
 - Com o **Supabase conectado**, a restauração sobe para a nuvem e **todos os aparelhos
   passam a ver os mesmos dados**. Sem recarregar a página: o sistema relê o banco a cada
   15 segundos, ao voltar para a aba e ao ganhar foco na janela.
