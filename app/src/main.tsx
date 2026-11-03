@@ -15,6 +15,38 @@ import { prepararAparicao } from './lib/tema'
 // Workbox usa skipWaiting/clientsClaim na config para não exigir limpeza manual do cache.
 const origemSegura = window.location.protocol === 'https:' || window.location.hostname === 'localhost'
 if (import.meta.env.PROD && origemSegura && 'serviceWorker' in navigator) {
+  let recarregando = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recarregando) return
+    recarregando = true
+    window.location.reload()
+  })
+
+  const checarBundleMaisNovo = async () => {
+    try {
+      if (!navigator.onLine) return
+      const scriptAtual = document.querySelector('script[type="module"][src*="index-"]')?.getAttribute('src')
+      if (!scriptAtual) return
+      const resp = await fetch(`./index.html?_t=${Date.now()}`, { cache: 'no-store' })
+      if (!resp.ok) return
+      const html = await resp.text()
+      if (!html.includes(scriptAtual) && /index-[A-Za-z0-9_-]+\.js/.test(html)) {
+        if ('caches' in window) {
+          const chaves = await caches.keys()
+          await Promise.all(chaves.map((k) => caches.delete(k)))
+        }
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.update()))
+        if (!recarregando) {
+          recarregando = true
+          window.location.reload()
+        }
+      }
+    } catch {
+      // ignora falha temporária de rede
+    }
+  }
+
   registerSW({
     immediate: true,
     onRegisteredSW(_url, registration) {
@@ -24,9 +56,10 @@ if (import.meta.env.PROD && origemSegura && 'serviceWorker' in navigator) {
         void registration.update().catch(() => {
           // Falha temporária de rede: a próxima verificação tenta novamente.
         })
+        void checarBundleMaisNovo()
       }
       verificarAtualizacao()
-      window.setInterval(verificarAtualizacao, 5 * 60 * 1000)
+      window.setInterval(verificarAtualizacao, 2 * 60 * 1000)
       window.addEventListener('online', verificarAtualizacao)
       window.addEventListener('focus', verificarAtualizacao)
       window.addEventListener('pageshow', verificarAtualizacao)
