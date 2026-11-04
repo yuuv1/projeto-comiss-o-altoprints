@@ -53,11 +53,11 @@ Outros comandos:
 
 | Tela | Rota | Para que serve |
 | --- | --- | --- |
-| **Painel** (dono) | `/` | Resumo de hoje, atalhos grandes, checklist de primeiros passos, desempenho por funcionário, comissão por faixa e a equipe em tabela |
+| **Painel** (dono) | `/` | Resumo de hoje, atalhos grandes, checklist de primeiros passos, desempenho por funcionário, comissão pelo valor do metro e a equipe em tabela |
 | **Início da equipe** | `/` | Sem login, cai direto em **Pedidos** (não existe mais “Minha área”) |
 | **Pedidos** | `/pedidos` | As filas de impressão com quatro filtros (Em andamento, A pagar, Concluídas, Entregues) e os selos clicáveis no cartão. Aceita `?filtro=` e `?vendedor=` |
 | **Clientes** | `/clientes` | Cadastro, vendedor responsável, ★ cliente especial, valor especial do metro e a aba **Especiais** |
-| **Relatório** | `/relatorio` | Resumo por funcionário, comissão pelas faixas de metragem, CSV e impressão em A4 (só o dono) |
+| **Relatório** | `/relatorio` | Resumo por funcionário, comissão pelas faixas do valor do metro, CSV e impressão em A4 (só o dono) |
 | **Cliente especial** | `/relatorio-cliente-especial` | Extrato do cliente especial (pagos e pendentes) em A4 (só o dono) |
 | **Configurações** | `/configuracoes` | 10 abas: Comissões, Preços, **Funcionários e acessos**, Empresa, Comprovantes (IA), Dados, Nuvem, Meu acesso e Aparência. Aceita `?aba=` |
 | **Login proprietário** | `/administracao` | Criar o primeiro acesso de dono (com senha) e, depois, só entrar/sair |
@@ -77,31 +77,37 @@ precisam de internet. Veja [`app/PWA.md`](app/PWA.md) para o passo a passo.
 
 ---
 
-## Comissão por faixas de metragem (configurável)
+## Comissão pelo valor do metro (configurável)
 
-A comissão de cada pedido é calculada pela **metragem do pedido**: o percentual da faixa
-em que ele cai é aplicado sobre o valor do pedido. Vale apenas para pedidos com
-pagamento confirmado.
+Desde **01/11/2026** a comissão de cada pedido **não é mais pela metragem**: ela usa o
+**valor do metro** praticado no pedido (valor ÷ metragem). O percentual da faixa em que
+esse valor cai é aplicado sobre o valor do pedido.
 
 Tabela oficial (toda editável pelo proprietário):
 
-| Metragem | Comissão |
+| Valor do metro | Comissão |
 | --- | --- |
-| 1 a 5 m | 4% |
-| 5 a 10 m | 3,5% |
-| 10 a 20 m | 3% |
-| 20 a 50 m | 2,5% |
-| 50 a 100 m | 2% |
-| acima de 100 m | 1,5% |
-| sem metragem informada | 0% (editável) |
+| R$ 59,90 ou mais | 3% |
+| R$ 54,90 a R$ 59,89 | 2,75% |
+| R$ 49,90 a R$ 54,89 | 2,5% |
+| R$ 44,90 a R$ 49,89 | 2,25% |
+| R$ 39,90 a R$ 44,89 | 2% |
+| abaixo de R$ 39,90 | 1,5% |
 
-> Cada faixa vale de `de` até **antes** de `ate` — ou seja, um pedido de 5 m entra na faixa
-> "5 a 10 m".
+> Cada faixa vale de `de` até **antes** de `ate` — ou seja, R$ 59,89 o metro ainda é 2,75%.
+> Pedido com **valor especial do cliente** também entra pela faixa certa, porque o cálculo
+> olha o valor do metro que foi realmente cobrado.
+
+Pedidos **anteriores a 01/11/2026** continuam com a tabela antiga, por metragem
+(1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · 50–100 m 2% · acima de 100 m 1,5%),
+para o histórico e as comissões já pagas não mudarem. A data de vigência fica em
+**Configurações → Comissões → Vale a partir de**.
 
 Onde alterar: **Configurações → Comissões** (só o proprietário entra lá). A tela tem uma
 **prévia ao vivo** que mostra, com os pedidos pagos do mês, quantos pedidos caem em cada
 faixa e quanto sai de comissão — antes mesmo de salvar — e um botão **"Usar tabela oficial"**
-para restaurar os valores acima.
+para restaurar os valores acima. A tabela antiga continua acessível no mesmo lugar
+(botão **"Mostrar tabela antiga"**), para consulta e ajuste do histórico.
 
 Em **Configurações → Meu acesso** (ou no cartão do topo) o proprietário troca o próprio
 usuário, o nome e a senha.
@@ -225,7 +231,8 @@ app/
 - [x] Hospedagem gratuita documentada (`app/DEPLOY.md`) + robô de publicação no GitHub Pages
 - [x] Tema claro/escuro
 - [x] Instalação do site como aplicativo PWA (Android, iOS e computador)
-- [x] Comissão por faixas de metragem, configurável em Configurações → Comissões
+- [x] Comissão pelo **valor do metro** (desde 01/11/2026), configurável em Configurações → Comissões
+- [x] Tabela histórica por metragem, preservada para os pedidos anteriores à vigência
 - [x] **Só o proprietário tem login** (a equipe escolhe o próprio nome ao registrar a fila)
 - [x] **“Login proprietário”** no topo + endereço `#/administracao`, 5 toques no logo, Ctrl+Alt+D
 - [x] **Funcionários e acessos**: o dono cadastra funcionários (sem conta) e outros donos

@@ -7,8 +7,16 @@ import {
   calcularComissao,
   comissaoDoPedido,
   faixaDoPedido,
+  faixaDoValor,
   migrarFaixas,
+  normalizarFaixasValor,
+  regraDoPedido,
+  regrasDaConfig,
+  rotuloFaixaValor,
+  usaRegraPorValor,
   validarFaixas,
+  validarFaixasValor,
+  valorDoMetroPedido,
 } from '../src/lib/comissao'
 import { buscarTudo, LIMITE_BUSCA, normalizarBusca } from '../src/lib/busca'
 import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
@@ -40,6 +48,7 @@ import {
   combinaFiltro,
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
+  FAIXAS_VALOR_PADRAO,
   normalizarPedido,
   filasDaComissao,
   isPedidoCompleto,
@@ -402,82 +411,127 @@ igual('período “hoje” começa à meia-noite', inicioDoPeriodo('hoje')?.getH
 igual('período “tudo” não tem início', inicioDoPeriodo('tudo'), null)
 
 /* ------------------------------ comissão ------------------------------ */
-const pedidoCom = (metragem: number | null, valor: number): Pedido =>
-  ({ ...base, metragem, valor })
+/** pedido do HISTÓRICO (antes de 01/11/2026): vale a tabela antiga, por metragem */
+const pedidoCom = (metragem: number | null, valor: number): Pedido => ({ ...base, metragem, valor })
+const pedidoAntigo = (metragem: number | null, valor: number, data = '2026-10-15'): Pedido => ({
+  ...base,
+  metragem,
+  valor,
+  data_pedido: data,
+  data_pagamento: data,
+})
+/** pedido a partir de 01/11/2026: vale a regra nova, pelo VALOR do metro */
+const pedidoNovo = (metragem: number | null, valor: number, data = '2026-11-04'): Pedido => ({
+  ...base,
+  metragem,
+  valor,
+  data_pedido: data,
+  data_pagamento: data,
+})
 
-igual('tabela oficial tem 6 faixas', FAIXAS_PADRAO.length, 6)
-igual('sem metragem começa em 0%', CONFIG_PADRAO.comissao_sem_metragem, 0)
-igual('faixa 3 m -> 4%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 4)
-igual('faixa 4,99 m -> 4%', faixaDoPedido(4.99, FAIXAS_PADRAO, 3).percentual, 4)
-igual('faixa 5 m -> 3,5% (já é a faixa seguinte)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 3.5)
-igual('faixa 9,99 m -> 3,5%', faixaDoPedido(9.99, FAIXAS_PADRAO, 3).percentual, 3.5)
-igual('faixa 10 m -> 3%', faixaDoPedido(10, FAIXAS_PADRAO, 3).percentual, 3)
-igual('faixa 19,99 m -> 3%', faixaDoPedido(19.99, FAIXAS_PADRAO, 3).percentual, 3)
-igual('faixa 20 m -> 2,5%', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 2.5)
-igual('faixa 49,99 m -> 2,5%', faixaDoPedido(49.99, FAIXAS_PADRAO, 0).percentual, 2.5)
-igual('faixa 50 m -> 2%', faixaDoPedido(50, FAIXAS_PADRAO, 0).percentual, 2)
-igual('faixa 80,25 m -> 2%', faixaDoPedido(80.25, FAIXAS_PADRAO, 0).percentual, 2)
-igual('faixa 99,99 m -> 2%', faixaDoPedido(99.99, FAIXAS_PADRAO, 0).percentual, 2)
-igual('faixa 100 m -> 1,5%', faixaDoPedido(100, FAIXAS_PADRAO, 0).percentual, 1.5)
-igual('faixa 250 m -> 1,5%', faixaDoPedido(250, FAIXAS_PADRAO, 0).percentual, 1.5)
-igual('sem metragem -> 0% (padrão do sistema)', faixaDoPedido(null, FAIXAS_PADRAO, CONFIG_PADRAO.comissao_sem_metragem).percentual, 0)
-igual('sem metragem -> percentual configurado quando o dono quiser', faixaDoPedido(null, FAIXAS_PADRAO, 2).percentual, 2)
-igual('pedido sem metragem não gera comissão por padrão', comissaoDoPedido(pedidoCom(null, 500), FAIXAS_PADRAO, 0), 0)
-igual('comissão de 2 m (R$ 119,80) a 4%', Number(comissaoDoPedido(pedidoCom(2, 119.8), FAIXAS_PADRAO).toFixed(3)), 4.792)
-igual('comissão de 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoCom(10, 549), FAIXAS_PADRAO), 16.47)
-igual('comissão de 80,25 m (R$ 3.602,77) a 2%', Number(comissaoDoPedido(pedidoCom(80.25, 3602.77), FAIXAS_PADRAO).toFixed(2)), 72.06)
-igual('percentualBR formata 4 -> 4%', percentualBR(4), '4%')
-igual('percentualBR formata 3.5 -> 3,5%', percentualBR(3.5), '3,5%')
-igual('percentualBR preserva duas casas decimais exatas (2.75 -> 2,75%)', percentualBR(2.75), '2,75%')
-const faixasCom275 = FAIXAS_PADRAO.map((f, i) => (i === 0 ? { ...f, percentual: 2.75 } : f))
-igual('comissão com faixa exata de 2,75% (R$ 100,00 -> R$ 2,75)', comissaoDoPedido(pedidoCom(2, 100), faixasCom275), 2.75)
+igual('tabela antiga (metragem) tem 6 faixas', FAIXAS_PADRAO.length, 6)
+igual('tabela nova (valor do metro) tem 6 faixas (incluindo o piso)', FAIXAS_VALOR_PADRAO.length, 6)
+igual('sem metragem começa em 0% na regra antiga', CONFIG_PADRAO.comissao_sem_metragem, 0)
+igual('regra nova começa em 01/11/2026', CONFIG_PADRAO.comissao_por_valor_desde, '2026-11-01')
+igual('sem valor do metro: cai na menor faixa (1,5%)', CONFIG_PADRAO.comissao_sem_valor_metro, 1.5)
 
-const listaVendedoresTeste = [
-  { id: 'v-jessica', nome: 'JESSICA', created_at: '2026-01-01' },
-  { id: 'v-raissa', nome: 'RAISSA', created_at: '2026-01-01' },
-  { id: 'v-andreia', nome: 'ANDREIA', created_at: '2026-11-01' },
-  { id: 'v-flavia', nome: 'FLÁVIA', created_at: '2026-01-01' },
-  { id: 'v-vitoria', nome: 'VITORIA', created_at: '2026-01-01' },
-]
-const pedidosSetembro = [
-  { ...pedidoCom(10, 500), vendedor_id: 'v-jessica', data_pedido: '2026-09-15', data_pagamento: '2026-09-15' },
-  { ...pedidoCom(10, 500), vendedor_id: 'v-raissa', data_pedido: '2026-09-20', data_pagamento: '2026-09-20' },
-]
-const pedidosJunho = [
-  { ...pedidoCom(10, 500), vendedor_id: 'v-flavia', data_pedido: '2026-06-10', data_pagamento: '2026-06-10' },
-  { ...pedidoCom(10, 500), vendedor_id: 'v-vitoria', data_pedido: '2026-06-11', data_pagamento: '2026-06-11' },
-]
-igual(
-  'vendedoresDoPeriodo em setembro mostra apenas quem trabalhou em setembro',
-  vendedoresDoPeriodo(listaVendedoresTeste, pedidosSetembro).map((v) => v.nome),
-  ['JESSICA', 'RAISSA'],
-)
-igual(
-  'vendedoresDoPeriodo em junho mostra quem trabalhou em junho',
-  vendedoresDoPeriodo(listaVendedoresTeste, pedidosJunho).map((v) => v.nome),
-  ['FLÁVIA', 'VITORIA'],
-)
-igual(
-  'vendedoresAtivosAtual oculta ex-funcionárias antigas e mantém equipe atual',
-  vendedoresAtivosAtual(listaVendedoresTeste, [...pedidosSetembro, ...pedidosJunho], '2026-11-03').map((v) => v.nome),
-  ['JESSICA', 'RAISSA', 'ANDREIA'],
-)
+/* --- tabela antiga (só histórico) --- */
+igual('histórico: 3 m -> 4%', faixaDoPedido(3, FAIXAS_PADRAO, 3).percentual, 4)
+igual('histórico: 4,99 m -> 4%', faixaDoPedido(4.99, FAIXAS_PADRAO, 3).percentual, 4)
+igual('histórico: 5 m -> 3,5% (já é a faixa seguinte)', faixaDoPedido(5, FAIXAS_PADRAO, 3).percentual, 3.5)
+igual('histórico: 10 m -> 3%', faixaDoPedido(10, FAIXAS_PADRAO, 3).percentual, 3)
+igual('histórico: 20 m -> 2,5%', faixaDoPedido(20, FAIXAS_PADRAO, 3).percentual, 2.5)
+igual('histórico: 50 m -> 2%', faixaDoPedido(50, FAIXAS_PADRAO, 0).percentual, 2)
+igual('histórico: 100 m -> 1,5%', faixaDoPedido(100, FAIXAS_PADRAO, 0).percentual, 1.5)
+igual('histórico sem metragem -> 0%', faixaDoPedido(null, FAIXAS_PADRAO, CONFIG_PADRAO.comissao_sem_metragem).percentual, 0)
+igual('histórico: pedido sem metragem não gera comissão', comissaoDoPedido(pedidoAntigo(null, 500), FAIXAS_PADRAO, 0), 0)
+igual('histórico: 2 m (R$ 119,80) a 4%', Number(comissaoDoPedido(pedidoAntigo(2, 119.8), FAIXAS_PADRAO).toFixed(3)), 4.792)
+igual('histórico: 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoAntigo(10, 549), FAIXAS_PADRAO), 16.47)
 
-const resultado = calcularComissao(
-  [pedidoCom(2, 119.8), pedidoCom(10, 549), pedidoCom(80.25, 3602.77), pedidoCom(null, 200)],
+/* --- regra nova: percentual pela faixa do valor do metro --- */
+igual('valor do metro: R$ 59,90 -> 3%', faixaDoValor(59.9).percentual, 3)
+igual('valor do metro: R$ 59,89 -> 2,75%', faixaDoValor(59.89).percentual, 2.75)
+igual('valor do metro: R$ 54,90 -> 2,75%', faixaDoValor(54.9).percentual, 2.75)
+igual('valor do metro: R$ 54,89 -> 2,5%', faixaDoValor(54.89).percentual, 2.5)
+igual('valor do metro: R$ 49,90 -> 2,5%', faixaDoValor(49.9).percentual, 2.5)
+igual('valor do metro: R$ 49,89 -> 2,25%', faixaDoValor(49.89).percentual, 2.25)
+igual('valor do metro: R$ 44,90 -> 2,25%', faixaDoValor(44.9).percentual, 2.25)
+igual('valor do metro: R$ 44,89 -> 2%', faixaDoValor(44.89).percentual, 2)
+igual('valor do metro: R$ 39,90 -> 2%', faixaDoValor(39.9).percentual, 2)
+igual('valor do metro: abaixo de R$ 39,90 -> 1,5% (piso)', faixaDoValor(39.89).percentual, 1.5)
+igual('valor do metro: muito abaixo da tabela -> 1,5%', faixaDoValor(10).percentual, 1.5)
+igual('valor do metro: acima de R$ 59,90 -> 3% (teto)', faixaDoValor(142.33).percentual, 3)
+igual('valor do metro: sem valor -> 1,5%', faixaDoValor(null).percentual, 1.5)
+igual('valor do metro: pedido de 3 m por R$ 427,00 = R$ 142,33/m', Number(valorDoMetroPedido({ metragem: 3, valor: 427 })!.toFixed(2)), 142.33)
+igual('valor do metro: pedido sem metragem não tem valor do metro', valorDoMetroPedido({ metragem: null, valor: 400 }), null)
+const regrasOficiais = regrasDaConfig({ ...CONFIG_PADRAO, faixas_comissao: FAIXAS_PADRAO, faixas_comissao_valor: FAIXAS_VALOR_PADRAO })
+igual('pedido novo de 1 m a R$ 59,90 -> 3% sobre o valor', Number(comissaoDoPedido(pedidoNovo(1, 59.9), regrasOficiais).toFixed(2)), 1.8)
+igual('pedido novo de 2 m a R$ 119,80 -> 3%', Number(comissaoDoPedido(pedidoNovo(2, 119.8), regrasOficiais).toFixed(3)), 3.594)
+igual('pedido novo de 20 m a R$ 44,90 -> 2,25%', Number(comissaoDoPedido(pedidoNovo(20, 898), regrasOficiais).toFixed(2)), 20.2)
+igual('pedido novo com valor especial (142,33/m) -> 3%', Number(comissaoDoPedido(pedidoNovo(3, 427), regrasOficiais).toFixed(2)), 12.81)
+igual('pedido novo sem metragem -> 1,5% (piso)', Number(comissaoDoPedido(pedidoNovo(null, 500), regrasOficiais).toFixed(2)), 7.5)
+
+/* --- quem decide a regra é a data --- */
+const regrasTeste = regrasDaConfig(CONFIG_PADRAO)
+igual('pedido de outubro continua na regra por metragem', usaRegraPorValor(pedidoAntigo(10, 549), regrasTeste), false)
+igual('pedido de novembro entra na regra por valor', usaRegraPorValor(pedidoNovo(10, 549), regrasTeste), true)
+igual(
+  'mesmo pedido: outubro 3% (metragem) e novembro 2,5% (valor do metro)... comparando percentuais',
+  [regraDoPedido(pedidoAntigo(10, 549), regrasTeste).percentual, regraDoPedido(pedidoNovo(10, 549), regrasTeste).percentual],
+  [3, 2.75],
+)
+igual('data do pagamento manda (pagou em novembro, pedido de outubro)', usaRegraPorValor({ ...pedidoAntigo(10, 549), data_pagamento: '2026-11-02' }, regrasTeste), true)
+igual('sem data nenhuma: fica na regra antiga', usaRegraPorValor({ ...base, data_pedido: '', created_at: '', data_pagamento: null }, regrasTeste), false)
+
+/* --- mistura de meses na mesma conta --- */
+const misturado = calcularComissao([pedidoAntigo(10, 549), pedidoNovo(10, 549), pedidoNovo(null, 500)], regrasTeste)
+igual('mistura: 1 pedido na regra antiga e 2 na nova', [misturado.pedidosPorMetragem, misturado.pedidosPorValor], [1, 2])
+igual('mistura: total = 16,47 + 15,0975 + 7,50', Number(misturado.total.toFixed(2)), Number((16.47 + 15.0975 + 7.5).toFixed(2)))
+igual('mistura: base é o faturamento somado', Number(misturado.base.toFixed(2)), 1598)
+
+const resultadoAntigo = calcularComissao(
+  [pedidoAntigo(2, 119.8), pedidoAntigo(10, 549), pedidoAntigo(80.25, 3602.77), pedidoAntigo(null, 200)],
   FAIXAS_PADRAO,
   3,
 )
 igual(
-  'comissão total das 4 faixas',
-  Number(resultado.total.toFixed(2)),
+  'comissão total das 4 faixas (tabela antiga)',
+  Number(resultadoAntigo.total.toFixed(2)),
   Number((4.792 + 16.47 + 72.0554 + 6).toFixed(2)),
 )
-igual('base de cálculo = faturamento', Number(resultado.base.toFixed(2)), Number((119.8 + 549 + 3602.77 + 200).toFixed(2)))
-igual('percentual médio entre 0 e 5', resultado.percentualMedio > 0 && resultado.percentualMedio < 5, true)
-igual('resumo por faixa agrupa os pedidos certos', resultado.porFaixa.filter((l) => l.pedidos > 0).length + (resultado.semMetragem.pedidos > 0 ? 1 : 0), 4)
-igual('as 6 faixas aparecem no resumo', resultado.porFaixa.length, 6)
+igual('base de cálculo = faturamento', Number(resultadoAntigo.base.toFixed(2)), Number((119.8 + 549 + 3602.77 + 200).toFixed(2)))
+igual('percentual médio entre 0 e 5', resultadoAntigo.percentualMedio > 0 && resultadoAntigo.percentualMedio < 5, true)
+igual('resumo por faixa agrupa os pedidos certos', resultadoAntigo.porFaixa.filter((l) => l.pedidos > 0).length + (resultadoAntigo.semMetragem.pedidos > 0 ? 1 : 0), 4)
+igual(
+  'resumo mostra as faixas que têm pedidos (regra antiga)',
+  [resultadoAntigo.porFaixa.length, resultadoAntigo.semMetragem.pedidos],
+  [3, 1],
+)
 igual('faixas válidas (padrão)', validarFaixas(FAIXAS_PADRAO), [])
+igual('faixas de valor válidas (padrão)', validarFaixasValor(FAIXAS_VALOR_PADRAO), [])
+igual(
+  'faixas de valor sobrepostas são recusadas',
+  validarFaixasValor([
+    { id: 'a', de: 39.9, ate: 50, percentual: 2, rotulo: 'a' },
+    { id: 'b', de: 45, ate: null, percentual: 3, rotulo: 'b' },
+  ]).length > 0,
+  true,
+)
+igual('rótulo da faixa de valor mostra o intervalo em reais', rotuloFaixaValor(44.9, 49.9), 'R$ 44,90 a R$ 49,89')
+igual('rótulo da última faixa de valor é aberto', rotuloFaixaValor(59.9, null), 'R$ 59,90 ou mais')
+igual('rótulo da faixa do piso', rotuloFaixaValor(0, 39.9), 'Abaixo de R$ 39,90')
+igual(
+  'faixas prontas para salvar saem ordenadas e com rótulo novo',
+  normalizarFaixasValor(FAIXAS_VALOR_PADRAO).map((f) => f.rotulo),
+  [
+    'Abaixo de R$ 39,90',
+    'R$ 39,90 a R$ 44,89',
+    'R$ 44,90 a R$ 49,89',
+    'R$ 49,90 a R$ 54,89',
+    'R$ 54,90 a R$ 59,89',
+    'R$ 59,90 ou mais',
+  ],
+)
 igual(
   'faixas encostadas (1 a 5 e 5 a 10) são aceitas',
   validarFaixas([
@@ -516,6 +570,40 @@ igual('faixas sobrepostas são recusadas', validarFaixas([
   { id: 'a', de: 1, ate: 10, percentual: 5, rotulo: '1 a 10 m' },
   { id: 'b', de: 5, ate: 20, percentual: 4, rotulo: '5 a 20 m' },
 ]).length > 0, true)
+igual('percentualBR formata 4 -> 4%', percentualBR(4), '4%')
+igual('percentualBR formata 3.5 -> 3,5%', percentualBR(3.5), '3,5%')
+igual('percentualBR preserva duas casas decimais exatas (2.75 -> 2,75%)', percentualBR(2.75), '2,75%')
+
+const listaVendedoresTeste = [
+  { id: 'v-jessica', nome: 'JESSICA', created_at: '2026-01-01' },
+  { id: 'v-raissa', nome: 'RAISSA', created_at: '2026-01-01' },
+  { id: 'v-andreia', nome: 'ANDREIA', created_at: '2026-11-01' },
+  { id: 'v-flavia', nome: 'FLÁVIA', created_at: '2026-01-01' },
+  { id: 'v-vitoria', nome: 'VITORIA', created_at: '2026-01-01' },
+]
+const pedidosSetembro = [
+  { ...pedidoCom(10, 500), vendedor_id: 'v-jessica', data_pedido: '2026-09-15', data_pagamento: '2026-09-15' },
+  { ...pedidoCom(10, 500), vendedor_id: 'v-raissa', data_pedido: '2026-09-20', data_pagamento: '2026-09-20' },
+]
+const pedidosJunho = [
+  { ...pedidoCom(10, 500), vendedor_id: 'v-flavia', data_pedido: '2026-06-10', data_pagamento: '2026-06-10' },
+  { ...pedidoCom(10, 500), vendedor_id: 'v-vitoria', data_pedido: '2026-06-11', data_pagamento: '2026-06-11' },
+]
+igual(
+  'vendedoresDoPeriodo em setembro mostra apenas quem trabalhou em setembro',
+  vendedoresDoPeriodo(listaVendedoresTeste, pedidosSetembro).map((v) => v.nome),
+  ['JESSICA', 'RAISSA'],
+)
+igual(
+  'vendedoresDoPeriodo em junho mostra quem trabalhou em junho',
+  vendedoresDoPeriodo(listaVendedoresTeste, pedidosJunho).map((v) => v.nome),
+  ['FLÁVIA', 'VITORIA'],
+)
+igual(
+  'vendedoresAtivosAtual oculta ex-funcionárias antigas e mantém equipe atual',
+  vendedoresAtivosAtual(listaVendedoresTeste, [...pedidosSetembro, ...pedidosJunho], '2026-11-03').map((v) => v.nome),
+  ['JESSICA', 'RAISSA', 'ANDREIA'],
+)
 
 /* --------------------- telas liberadas por acesso ---------------------- */
 const vendedorTeste = {

@@ -28,7 +28,16 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { calcularComissao, normalizarFaixas, rotuloFaixa, validarFaixas } from '../lib/comissao'
+import {
+  calcularComissao,
+  normalizarFaixas,
+  normalizarFaixasValor,
+  regrasDaConfig,
+  rotuloFaixa,
+  rotuloFaixaValor,
+  validarFaixas,
+  validarFaixasValor,
+} from '../lib/comissao'
 import { useAuth } from '../lib/auth'
 import { prepararBackup } from '../lib/backup'
 import { prepararMesclaRelatorioCSV } from '../lib/relatorio-backup'
@@ -42,7 +51,9 @@ import { nuvemObrigatoria } from '../lib/supabase'
 import {
   FAIXAS_PADRAO,
   FAIXAS_PRECO_PADRAO,
+  FAIXAS_VALOR_PADRAO,
   type FaixaComissao,
+  type FaixaComissaoValor,
   type FaixaPreco,
 } from '../lib/types'
 import { faixaDePreco } from '../lib/pricing'
@@ -76,7 +87,7 @@ const ABAS_CONFIG: Aba[] = [
 
 /** Explicação curta de cada aba ("para que serve") */
 const AJUDA_ABA: Record<Aba, string> = {
-  comissoes: 'As faixas de metragem que definem o percentual de comissão de cada pedido concluído.',
+  comissoes: 'As faixas do valor do metro que definem o percentual de comissão de cada pedido concluído (a tabela por metragem fica só para o histórico).',
   precos: 'O preço do metro por faixa de metragem — é o que calcula o valor dos pedidos novos.',
   equipe: 'Os funcionários que aparecem nos pedidos e os acessos de proprietário (login com senha).',
   empresa: 'Nome e logo da empresa, que aparecem no sistema e nas folhas impressas.',
@@ -177,12 +188,32 @@ export default function Configuracoes() {
   const [senhaRepetida, setSenhaRepetida] = useState('')
 
   /* ------------------------------ comissões ------------------------------ */
+  /** tabela EM VIGOR: percentual pela faixa do valor do metro */
+  const [faixasValor, setFaixasValor] = useState<FaixaComissaoValor[]>(
+    db.configuracoes.faixas_comissao_valor?.length
+      ? db.configuracoes.faixas_comissao_valor
+      : FAIXAS_VALOR_PADRAO,
+  )
+  const [rascunhoPercentualValor, setRascunhoPercentualValor] = useState<Record<string, string>>({})
+  /** percentual de fallback (pedido sem metragem/valor) — padrão: o da menor faixa */
+  const [semValorMetro, setSemValorMetro] = useState<string>(
+    db.configuracoes.comissao_sem_valor_metro === null ||
+      db.configuracoes.comissao_sem_valor_metro === undefined
+      ? ''
+      : String(db.configuracoes.comissao_sem_valor_metro).replace('.', ','),
+  )
+  const [desde, setDesde] = useState<string>(db.configuracoes.comissao_por_valor_desde ?? '2026-11-01')
+  const problemasValor = useMemo(() => validarFaixasValor(faixasValor), [faixasValor])
+
+  /** tabela ANTIGA (por metragem) — vale só para os pedidos anteriores à vigência */
   const [faixas, setFaixas] = useState<FaixaComissao[]>(db.configuracoes.faixas_comissao ?? FAIXAS_PADRAO)
   const [rascunhoPercentual, setRascunhoPercentual] = useState<Record<string, string>>({})
   const [semMetragem, setSemMetragem] = useState(
     String(db.configuracoes.comissao_sem_metragem ?? 0).replace('.', ','),
   )
+  const [mostrarAntiga, setMostrarAntiga] = useState(false)
   const problemas = useMemo(() => validarFaixas(faixas), [faixas])
+  const problemasComissoes = [...problemasValor, ...problemas]
 
   const pagosDoMes = useMemo(() => {
     const prefixo = new Date().toISOString().slice(0, 7)
@@ -192,13 +223,29 @@ export default function Configuracoes() {
     })
   }, [db.pedidos])
 
+  /** prévia com a tabela que está na tela (ainda não salva) */
   const previa = useMemo(
-    () => calcularComissao(pagosDoMes, normalizarFaixas(faixas), Number(String(semMetragem).replace(',', '.')) || 0),
-    [faixas, pagosDoMes, semMetragem],
+    () =>
+      calcularComissao(
+        pagosDoMes,
+        regrasDaConfig({
+          faixas_comissao: normalizarFaixas(faixas),
+          comissao_sem_metragem: Number(String(semMetragem).replace(',', '.')) || 0,
+          faixas_comissao_valor: normalizarFaixasValor(faixasValor),
+          comissao_por_valor_desde: desde || null,
+          comissao_sem_valor_metro: semValorMetro.trim()
+            ? Number(String(semValorMetro).replace(',', '.')) || 0
+            : null,
+        }),
+      ),
+    [desde, faixas, faixasValor, pagosDoMes, semMetragem, semValorMetro],
   )
 
   const atualizarFaixa = (id: string, patch: Partial<FaixaComissao>) =>
     setFaixas((f) => f.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
+
+  const atualizarFaixaValor = (id: string, patch: Partial<FaixaComissaoValor>) =>
+    setFaixasValor((f) => f.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
 
   /* ------------------------------- preços -------------------------------- */
   const [precos, setPrecos] = useState<FaixaPreco[]>(
@@ -240,10 +287,15 @@ export default function Configuracoes() {
   }
 
   const salvarComissoes = async () => {
-    if (problemas.length) return avisar(problemas[0], 'erro')
+    if (problemasComissoes.length) return avisar(problemasComissoes[0], 'erro')
     setSalvando(true)
     try {
       await salvarConfig({
+        faixas_comissao_valor: normalizarFaixasValor(faixasValor),
+        comissao_por_valor_desde: desde || null,
+        comissao_sem_valor_metro: semValorMetro.trim()
+          ? Number(String(semValorMetro).replace(',', '.')) || 0
+          : null,
         faixas_comissao: normalizarFaixas(faixas),
         comissao_sem_metragem: Number(String(semMetragem).replace(',', '.')) || 0,
       })
@@ -300,7 +352,12 @@ export default function Configuracoes() {
         acoes={
           <>
             {aba === 'comissoes' ? (
-              <Botao icone={Save} onClick={salvarComissoes} carregando={salvando} disabled={problemas.length > 0}>
+              <Botao
+                icone={Save}
+                onClick={salvarComissoes}
+                carregando={salvando}
+                disabled={problemasComissoes.length > 0}
+              >
                 Salvar comissões
               </Botao>
             ) : null}
@@ -319,15 +376,18 @@ export default function Configuracoes() {
       {aba === 'comissoes' ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-            <b>Como funciona:</b> entram no relatório <b>todas as filas concluídas</b> do período (marcadas como pagas ou
-            não — o "pago" é só orientação da equipe). A comissão de cada fila é calculada pela <b>metragem</b>: o
-            percentual da faixa em que ela cai é aplicado sobre o valor da fila. O relatório mostra a comissão de cada
-            funcionário, com o total.
+            <b>Como funciona agora:</b> entram no relatório <b>todas as filas concluídas</b> do período. A comissão é
+            definida pelo <b>valor do metro</b> do pedido (valor ÷ metragem): o percentual da faixa em que esse valor
+            cai é aplicado sobre o valor da fila. Pedido com valor especial do cliente também entra pela faixa certa.
+            A tabela por metragem deixou de valer em <b>{dataBR(desde || '2026-11-01')}</b> e só continua sendo usada
+            nos pedidos anteriores a essa data.
           </div>
 
           <Cartao hover={false}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">Faixas de metragem</p>
+              <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
+                Faixas pelo valor do metro (em vigor)
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Botao
                   tamanho="sm"
@@ -337,12 +397,12 @@ export default function Configuracoes() {
                     const ok = await confirmar({
                       titulo: 'Usar a tabela oficial de comissão?',
                       mensagem:
-                        'As faixas atuais serão substituídas por 1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · 50–100 m 2% · acima de 100 m 1,5%.',
+                        'As faixas atuais serão substituídas por: R$ 59,90 ou mais 3% · R$ 54,90 a 59,89 2,75% · R$ 49,90 a 54,89 2,5% · R$ 44,90 a 49,89 2,25% · R$ 39,90 a 44,89 2% · abaixo de R$ 39,90 1,5%.',
                       textoBotao: 'Usar tabela oficial',
                     })
                     if (ok) {
-                      setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
-                      setRascunhoPercentual({})
+                      setFaixasValor(FAIXAS_VALOR_PADRAO.map((f) => ({ ...f })))
+                      setRascunhoPercentualValor({})
                     }
                   }}
                 >
@@ -352,15 +412,16 @@ export default function Configuracoes() {
                   tamanho="sm"
                   variante="secundario"
                   icone={Plus}
-                onClick={() => {
-                  const ordenadas = [...faixas].sort((a, b) => a.de - b.de)
-                  const ultima = ordenadas[ordenadas.length - 1]
-                  const de = ultima ? (ultima.ate ?? ultima.de) + 1 : 1
-                  setFaixas((f) => [
-                    ...f,
-                    { id: `faixa-${Date.now()}`, de, ate: de + 9, percentual: 2, rotulo: rotuloFaixa(de, de + 9) },
-                  ])
-                }}
+                  onClick={() => {
+                    const ordenadas = [...faixasValor].sort((a, b) => a.de - b.de)
+                    const ultima = ordenadas[ordenadas.length - 1]
+                    const de = ultima ? Number(((ultima.ate ?? ultima.de) + 0.1).toFixed(2)) : 39.9
+                    const ate = Number((de + 5).toFixed(2))
+                    setFaixasValor((f) => [
+                      ...f,
+                      { id: `valor-${Date.now()}`, de, ate, percentual: 2, rotulo: rotuloFaixaValor(de, ate) },
+                    ])
+                  }}
                 >
                   Adicionar faixa
                 </Botao>
@@ -368,23 +429,32 @@ export default function Configuracoes() {
             </div>
 
             <div className="space-y-2">
-              {[...faixas]
+              {[...faixasValor]
                 .sort((a, b) => a.de - b.de)
                 .map((f) => (
                   <div
                     key={f.id}
                     className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
                   >
-                    <Campo label="De (m)" className="w-24">
-                      <Entrada type="number" min={1} value={f.de} onChange={(e) => atualizarFaixa(f.id, { de: Number(e.target.value) })} />
-                    </Campo>
-                    <Campo label="Até (m)" className="w-24">
+                    <Campo label="Metro de (R$)" className="w-32">
                       <Entrada
                         type="number"
-                        min={1}
+                        min={0}
+                        step="0.01"
+                        value={f.de}
+                        onChange={(e) => atualizarFaixaValor(f.id, { de: Number(e.target.value) })}
+                      />
+                    </Campo>
+                    <Campo label="Metro até (R$)" className="w-32">
+                      <Entrada
+                        type="number"
+                        min={0}
+                        step="0.01"
                         value={f.ate ?? ''}
                         placeholder="sem limite"
-                        onChange={(e) => atualizarFaixa(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })}
+                        onChange={(e) =>
+                          atualizarFaixaValor(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })
+                        }
                       />
                     </Campo>
                     <Campo label="Comissão (%)" className="w-32">
@@ -392,33 +462,35 @@ export default function Configuracoes() {
                         type="text"
                         inputMode="decimal"
                         placeholder="Ex.: 2,75"
-                        value={rascunhoPercentual[f.id] ?? String(f.percentual).replace('.', ',')}
+                        value={rascunhoPercentualValor[f.id] ?? String(f.percentual).replace('.', ',')}
                         onChange={(e) => {
                           const texto = e.target.value.replace(/[^0-9.,]/g, '')
-                          setRascunhoPercentual((atual) => ({ ...atual, [f.id]: texto }))
+                          setRascunhoPercentualValor((atual) => ({ ...atual, [f.id]: texto }))
                           const numero = Number(texto.replace(',', '.'))
-                          if (!Number.isNaN(numero)) {
-                            atualizarFaixa(f.id, { percentual: numero })
-                          }
+                          if (!Number.isNaN(numero)) atualizarFaixaValor(f.id, { percentual: numero })
                         }}
-                        onBlur={() => {
-                          setRascunhoPercentual((atual) => {
+                        onBlur={() =>
+                          setRascunhoPercentualValor((atual) => {
                             const copia = { ...atual }
                             delete copia[f.id]
                             return copia
                           })
-                        }}
+                        }
                       />
                     </Campo>
-                    <div className="min-w-[120px] flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {rotuloFaixa(f.de, f.ate)} → <b className="text-purple-600 dark:text-purple-400">{percentualBR(f.percentual)}</b>
+                    <div className="min-w-[150px] flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {rotuloFaixaValor(f.de, f.ate)} →{' '}
+                      <b className="text-purple-600 dark:text-purple-400">{percentualBR(f.percentual)}</b>
+                      <span className="ml-2 text-slate-400 dark:text-slate-500">
+                        ex.: 10 m = {moeda(f.de * 10)} → {moeda(f.de * 10 * (f.percentual / 100))}
+                      </span>
                     </div>
                     <Botao
                       tamanho="sm"
                       variante="ghost"
                       className="text-rose-500 hover:bg-rose-50"
                       icone={Trash2}
-                      onClick={() => setFaixas((lista) => lista.filter((x) => x.id !== f.id))}
+                      onClick={() => setFaixasValor((lista) => lista.filter((x) => x.id !== f.id))}
                     >
                       Remover
                     </Botao>
@@ -428,34 +500,42 @@ export default function Configuracoes() {
 
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <Campo
-                label="Comissão de pedidos sem metragem (%)"
-                className="w-full sm:w-64"
-                dica="Usado quando o pedido não tem metragem informada (aceita vírgula, ex.: 2,75)."
+                label="Vale a partir de"
+                className="w-full sm:w-52"
+                dica="Pedidos com data anterior a esta continuam na tabela por metragem, para o histórico não mudar."
+              >
+                <Entrada type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+              </Campo>
+              <Campo
+                label="Sem valor do metro (%)"
+                className="w-full sm:w-56"
+                dica="Pedido sem metragem (ou sem valor) não tem como entrar numa faixa. Em branco = usa o percentual da menor faixa."
               >
                 <Entrada
                   type="text"
                   inputMode="decimal"
-                  placeholder="Ex.: 0 ou 2,75"
-                  value={semMetragem}
-                  onChange={(e) => setSemMetragem(e.target.value.replace(/[^0-9.,]/g, ''))}
+                  placeholder="menor faixa"
+                  value={semValorMetro}
+                  onChange={(e) => setSemValorMetro(e.target.value.replace(/[^0-9.,]/g, ''))}
                 />
               </Campo>
               <Botao
                 variante="secundario"
                 icone={RefreshCw}
                 onClick={() => {
-                  setFaixas(FAIXAS_PADRAO)
-                  setRascunhoPercentual({})
-                  setSemMetragem('0')
+                  setFaixasValor(FAIXAS_VALOR_PADRAO.map((f) => ({ ...f })))
+                  setRascunhoPercentualValor({})
+                  setSemValorMetro('')
+                  setDesde('2026-11-01')
                 }}
               >
                 Restaurar padrão
               </Botao>
             </div>
 
-            {problemas.length ? (
+            {problemasValor.length ? (
               <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-                {problemas.map((p) => (
+                {problemasValor.map((p) => (
                   <p key={p} className="flex items-start gap-1.5">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {p}
                   </p>
@@ -468,10 +548,152 @@ export default function Configuracoes() {
             )}
 
             <div className="mt-3 flex justify-end">
-              <Botao icone={Save} onClick={salvarComissoes} carregando={salvando} disabled={problemas.length > 0}>
+              <Botao
+                icone={Save}
+                onClick={salvarComissoes}
+                carregando={salvando}
+                disabled={problemasComissoes.length > 0}
+              >
                 Salvar comissões
               </Botao>
             </div>
+          </Cartao>
+
+          <Cartao hover={false}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
+                  Tabela antiga — por metragem (histórico)
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Só vale para pedidos anteriores a {dataBR(desde || '2026-11-01')}.
+                </p>
+              </div>
+              <Botao tamanho="sm" variante="secundario" onClick={() => setMostrarAntiga((v) => !v)}>
+                {mostrarAntiga ? 'Ocultar' : 'Mostrar tabela antiga'}
+              </Botao>
+            </div>
+
+            {mostrarAntiga ? (
+              <>
+                <div className="space-y-2">
+                  {[...faixas]
+                    .sort((a, b) => a.de - b.de)
+                    .map((f) => (
+                      <div
+                        key={f.id}
+                        className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <Campo label="De (m)" className="w-24">
+                          <Entrada
+                            type="number"
+                            min={1}
+                            value={f.de}
+                            onChange={(e) => atualizarFaixa(f.id, { de: Number(e.target.value) })}
+                          />
+                        </Campo>
+                        <Campo label="Até (m)" className="w-24">
+                          <Entrada
+                            type="number"
+                            min={1}
+                            value={f.ate ?? ''}
+                            placeholder="sem limite"
+                            onChange={(e) =>
+                              atualizarFaixa(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })
+                            }
+                          />
+                        </Campo>
+                        <Campo label="Comissão (%)" className="w-32">
+                          <Entrada
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="Ex.: 2,75"
+                            value={rascunhoPercentual[f.id] ?? String(f.percentual).replace('.', ',')}
+                            onChange={(e) => {
+                              const texto = e.target.value.replace(/[^0-9.,]/g, '')
+                              setRascunhoPercentual((atual) => ({ ...atual, [f.id]: texto }))
+                              const numero = Number(texto.replace(',', '.'))
+                              if (!Number.isNaN(numero)) atualizarFaixa(f.id, { percentual: numero })
+                            }}
+                            onBlur={() =>
+                              setRascunhoPercentual((atual) => {
+                                const copia = { ...atual }
+                                delete copia[f.id]
+                                return copia
+                              })
+                            }
+                          />
+                        </Campo>
+                        <div className="min-w-[120px] flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          {rotuloFaixa(f.de, f.ate)} →{' '}
+                          <b className="text-purple-600 dark:text-purple-400">{percentualBR(f.percentual)}</b>
+                        </div>
+                        <Botao
+                          tamanho="sm"
+                          variante="ghost"
+                          className="text-rose-500 hover:bg-rose-50"
+                          icone={Trash2}
+                          onClick={() => setFaixas((lista) => lista.filter((x) => x.id !== f.id))}
+                        >
+                          Remover
+                        </Botao>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-end gap-3">
+                  <Campo
+                    label="Comissão de pedidos sem metragem (%)"
+                    className="w-full sm:w-64"
+                    dica="Usado na tabela antiga quando o pedido não tem metragem informada."
+                  >
+                    <Entrada
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Ex.: 0 ou 2,75"
+                      value={semMetragem}
+                      onChange={(e) => setSemMetragem(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    />
+                  </Campo>
+                  <Botao
+                    variante="secundario"
+                    icone={Plus}
+                    onClick={() => {
+                      const ordenadas = [...faixas].sort((a, b) => a.de - b.de)
+                      const ultima = ordenadas[ordenadas.length - 1]
+                      const de = ultima ? (ultima.ate ?? ultima.de) + 1 : 1
+                      setFaixas((f) => [
+                        ...f,
+                        { id: `faixa-${Date.now()}`, de, ate: de + 9, percentual: 2, rotulo: rotuloFaixa(de, de + 9) },
+                      ])
+                    }}
+                  >
+                    Adicionar faixa antiga
+                  </Botao>
+                  <Botao
+                    variante="secundario"
+                    icone={RefreshCw}
+                    onClick={() => {
+                      setFaixas(FAIXAS_PADRAO.map((f) => ({ ...f })))
+                      setRascunhoPercentual({})
+                      setSemMetragem('0')
+                    }}
+                  >
+                    Restaurar tabela antiga
+                  </Botao>
+                </div>
+
+                {problemas.length ? (
+                  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                    {problemas.map((p) => (
+                      <p key={p} className="flex items-start gap-1.5">
+                        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {p}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </Cartao>
 
           <Cartao hover={false}>

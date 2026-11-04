@@ -216,6 +216,10 @@ export interface FaixaComissao {
  * Faixas de comissão definidas pelo proprietário.
  * Cada faixa vale de `de` até antes de `ate` (o valor de `ate` já entra na
  * faixa seguinte) — só podem ser mudadas por ele, em Configurações.
+ *
+ * ⚠️ Modelo ANTIGO (pela metragem). Continua valendo para os pedidos feitos
+ * ANTES da data de vigência da regra nova (ver `comissao_por_valor_desde`),
+ * para o histórico não mudar de valor.
  */
 export const FAIXAS_PADRAO: FaixaComissao[] = [
   { id: 'faixa-1', de: 1, ate: 5, percentual: 4, rotulo: '1 a 5 m' },
@@ -224,6 +228,49 @@ export const FAIXAS_PADRAO: FaixaComissao[] = [
   { id: 'faixa-4', de: 20, ate: 50, percentual: 2.5, rotulo: '20 a 50 m' },
   { id: 'faixa-5', de: 50, ate: 100, percentual: 2, rotulo: '50 a 100 m' },
   { id: 'faixa-6', de: 100, ate: null, percentual: 1.5, rotulo: 'acima de 100 m' },
+]
+
+/**
+ * Faixa de **valor do metro** (R$) que define o percentual de comissão.
+ *
+ * Regra em vigor desde novembro/2026: a comissão não olha mais a metragem e sim
+ * quanto o cliente pagou por metro naquele pedido.
+ */
+export interface FaixaComissaoValor {
+  id: string
+  /** valor do metro inicial da faixa (inclusive) */
+  de: number
+  /** valor do metro final da faixa (o valor de `ate` já entra na faixa seguinte) — null = sem limite */
+  ate: number | null
+  /** percentual de comissão sobre o valor do pedido */
+  percentual: number
+  rotulo: string
+}
+
+/**
+ * Tabela oficial da comissão por valor do metro:
+ *
+ * | valor do metro | comissão |
+ * | -------------- | -------- |
+ * | R$ 59,90 ou mais | 3%     |
+ * | R$ 54,90 a 59,89 | 2,75% |
+ * | R$ 49,90 a 54,89 | 2,5%  |
+ * | R$ 44,90 a 49,89 | 2,25% |
+ * | R$ 39,90 a 44,89 | 2%    |
+ * | abaixo de R$ 39,90 | 1,5% |
+ *
+ * (o piso de R$ 0 também é uma faixa, para o proprietário poder mudar o 1,5%.)
+ *
+ * O sistema usa o valor do metro **do próprio pedido** (valor ÷ metragem), então
+ * pedido com valor especial do cliente também cai na faixa certa.
+ */
+export const FAIXAS_VALOR_PADRAO: FaixaComissaoValor[] = [
+  { id: 'valor-0', de: 0, ate: 39.9, percentual: 1.5, rotulo: 'Abaixo de R$ 39,90' },
+  { id: 'valor-39.9', de: 39.9, ate: 44.9, percentual: 2, rotulo: 'R$ 39,90 a R$ 44,89' },
+  { id: 'valor-44.9', de: 44.9, ate: 49.9, percentual: 2.25, rotulo: 'R$ 44,90 a R$ 49,89' },
+  { id: 'valor-49.9', de: 49.9, ate: 54.9, percentual: 2.5, rotulo: 'R$ 49,90 a R$ 54,89' },
+  { id: 'valor-54.9', de: 54.9, ate: 59.9, percentual: 2.75, rotulo: 'R$ 54,90 a R$ 59,89' },
+  { id: 'valor-59.9', de: 59.9, ate: null, percentual: 3, rotulo: 'R$ 59,90 ou mais' },
 ]
 
 /* ------------------------------------------------------------------ */
@@ -321,10 +368,25 @@ export interface Configuracoes {
   logo_url: string
   revisao_ultima_em: string | null
   openai_key: string
-  /** faixas de metragem x percentual de comissão */
+  /** faixas de metragem x percentual de comissão (regra ANTIGA, usada antes da vigência) */
   faixas_comissao: FaixaComissao[]
   /** percentual aplicado em pedidos sem metragem informada (padrão: 0) */
   comissao_sem_metragem: number
+  /**
+   * Faixas de **valor do metro** x percentual — regra que vale a partir de
+   * `comissao_por_valor_desde` (dia 1º de novembro de 2026 por padrão).
+   */
+  faixas_comissao_valor?: FaixaComissaoValor[]
+  /**
+   * Primeiro dia ('AAAA-MM-DD') em que a comissão passa a ser calculada pelo
+   * valor do metro. Pedidos anteriores continuam com a tabela por metragem.
+   */
+  comissao_por_valor_desde?: string | null
+  /**
+   * Percentual aplicado quando o pedido não tem metragem ou valor suficiente
+   * para descobrir o valor do metro (padrão: o da menor faixa, 1,5%).
+   */
+  comissao_sem_valor_metro?: number | null
   /** o que o vendedor pode fazer com os próprios pedidos */
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
@@ -345,6 +407,9 @@ export const CONFIG_PADRAO: Configuracoes = {
   openai_key: '',
   faixas_comissao: FAIXAS_PADRAO,
   comissao_sem_metragem: 0,
+  faixas_comissao_valor: FAIXAS_VALOR_PADRAO,
+  comissao_por_valor_desde: '2026-11-01',
+  comissao_sem_valor_metro: 1.5,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
   modo_exemplo: false,

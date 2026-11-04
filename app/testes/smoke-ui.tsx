@@ -607,12 +607,22 @@ async function main() {
   await espera(400)
   const textoComissoes = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const tabelaOk =
-    textoComissoes.includes('1 a 5 m') &&
-    textoComissoes.includes('50 a 100 m') &&
-    textoComissoes.includes('acima de 100 m') &&
+    textoComissoes.includes('Faixas pelo valor do metro') &&
+    textoComissoes.includes('R$ 39,90 a R$ 44,89') &&
+    textoComissoes.includes('R$ 59,90 ou mais') &&
+    textoComissoes.includes('Mostrar tabela antiga') &&
     textoComissoes.includes('Usar tabela oficial')
   if (!tabelaOk) falhas++
-  console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela oficial e o botão de restaurar`)
+  console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela por valor do metro (e a antiga recolhida)`)
+  if (!tabelaOk) console.log('     TEXTO:', textoComissoes.slice(0, 400))
+
+  // a tabela antiga, por metragem, continua acessível (histórico)
+  await clicar(raiz, 'Mostrar tabela antiga')
+  await espera(400)
+  const textoAntiga = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const antigaOk = textoAntiga.includes('1 a 5 m') && textoAntiga.includes('acima de 100 m')
+  if (!antigaOk) falhas++
+  console.log(`  ${antigaOk ? '✅' : '❌'} a tabela antiga por metragem abre no histórico`)
 
   // ---------- equipe sem login: o sistema abre direto, sem pedir senha ----------
   dom.window.localStorage.removeItem('altoprints:sessao')
