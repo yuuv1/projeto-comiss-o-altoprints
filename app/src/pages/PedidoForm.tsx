@@ -33,7 +33,7 @@ import {
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
-import { dataBR, hojeISO, moeda, metros, paraInputDate, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, percentualBR } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
@@ -493,12 +493,13 @@ export default function PedidoForm() {
               <Campo label="Valor do pedido">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 select-none text-sm font-bold text-slate-400">
                       R$
                     </span>
                     <Entrada
-                      className="pl-10"
-                      value={form.valor_modo === 'auto' ? valorAuto.toFixed(2).replace('.', ',') : valorTxt}
+                      className="pl-11 font-bold"
+                      style={{ paddingLeft: '2.65rem' }}
+                      value={form.valor_modo === 'auto' ? numeroBR(valorAuto) : valorTxt}
                       onChange={(e) => {
                         setValorTxt(e.target.value.replace(/[^\d.,]/g, ''))
                         set({ valor_modo: 'manual' })
@@ -511,7 +512,14 @@ export default function PedidoForm() {
                     type="button"
                     variante={form.valor_modo === 'auto' ? 'primario' : 'secundario'}
                     icone={Calculator}
-                    onClick={() => set({ valor_modo: form.valor_modo === 'auto' ? 'manual' : 'auto' })}
+                    onClick={() => {
+                      if (form.valor_modo === 'auto') {
+                        if (!valorTxt && valorAuto > 0) setValorTxt(valorAuto.toFixed(2).replace('.', ','))
+                        set({ valor_modo: 'manual' })
+                      } else {
+                        set({ valor_modo: 'auto' })
+                      }
+                    }}
                     title="Alternar entre valor automático e manual"
                   >
                     {form.valor_modo === 'auto' ? 'Auto' : 'Manual'}
