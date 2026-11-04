@@ -12,7 +12,6 @@ import {
   Ruler,
   Search,
   Undo2,
-  Users,
   X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -34,27 +33,23 @@ import { baixarCSV } from '../lib/csv'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
-import { FAIXAS_PADRAO, filasDaComissao, type Pedido, type Vendedor } from '../lib/types'
+import { imprimirDocumento } from '../lib/tema'
+import { FAIXAS_PADRAO, filasDaComissao, rotuloTipoDtf, type Pedido, type Vendedor } from '../lib/types'
 
 type CampoData = 'pagamento' | 'pedido' | 'envio'
 
 const LABEL_CAMPO: Record<CampoData, string> = {
   pagamento: 'Data do pagamento',
-  pedido: 'Data do pedido',
+  pedido: 'Data de registro',
   envio: 'Data do envio',
 }
 
 const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 const dataRef = (p: Pedido, campo: CampoData) => {
-  if (campo === 'pedido') return (p.data_pedido || '').slice(0, 10)
-  if (campo === 'envio') return p.data_envio || (p.data_pedido || '').slice(0, 10)
-  return p.data_pagamento || (p.data_pedido || '').slice(0, 10)
-}
-
-const primeiroDiaDoMes = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  if (campo === 'pedido') return (p.data_pedido || p.created_at || '').slice(0, 10)
+  if (campo === 'envio') return p.data_envio || (p.data_pedido || p.created_at || '').slice(0, 10)
+  return p.data_pagamento || (p.data_pedido || p.created_at || '').slice(0, 10)
 }
 
 const formatarDataISO = (d: Date) =>
@@ -239,39 +234,35 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const exportarCSV = () => {
     const linhas: (string | number)[][] = [
       [
-        'Nº',
+        'Tipo DTF',
         'Cliente',
         'Vendedor',
         'Metragem',
         'Valor',
         'Comissão',
-        'Data do pagamento',
+        'Data',
         '% comissão',
-        'Data do pedido',
+        'Nº',
         'Descrição',
         'Forma de pagamento',
         'Pago',
         'Entregue',
       ],
       ...visiveis.map((p) => [
-        p.numero,
+        rotuloTipoDtf(p.tipo_dtf),
         p.cliente_nome,
         nomeVendedor(p.vendedor_id),
         numeroBR(p.metragem),
         numeroBR(p.valor),
         numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
-        p.data_pagamento ? dataBR(p.data_pagamento) : '',
+        dataBR(p.data_pedido || p.created_at),
         percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual),
-        dataBR(p.data_pedido),
+        p.numero,
         p.descricao,
         p.forma_pagamento,
-        p.pago ? 'Sim' : 'Não',
+        'Sim',
         p.entregue ? 'Sim' : 'Não',
       ]),
-      [],
-      ...resultado.porFaixa
-        .filter((l) => l.pedidos > 0)
-        .map((l) => [`COMISSÃO ${l.rotulo} (${percentualBR(l.percentual)})`, '', '', '', '', numeroBR(l.comissao), '', '']),
     ]
     baixarCSV(`relatorio-altoprints-${inicio}-a-${fim}`, linhas)
     avisar('CSV gerado! O arquivo abre no Excel com os acentos corretos.')
@@ -322,7 +313,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
       <div className="print:hidden">
         {embutido ? (
           <BarraAcoes>
-            <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => window.print()}>
+            <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => imprimirDocumento()}>
               Imprimir / PDF
             </Botao>
             <Botao tamanho="sm" variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
@@ -336,7 +327,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             subtitulo="Veja comissões, vendas e filas concluídas direto na tela do celular ou computador."
             acoes={
               <>
-                <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => window.print()}>
+                <Botao tamanho="sm" variante="secundario" icone={Printer} onClick={() => imprimirDocumento()}>
                   Imprimir / PDF
                 </Botao>
                 <Botao tamanho="sm" variante="secundario" icone={FileSpreadsheet} onClick={exportarCSV}>
@@ -611,13 +602,29 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 </div>
               )
             })}
-            {resumoVendedores.length > 1 ? (
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3 text-sm font-extrabold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                <span>TOTAL ({totais.pedidos} pedidos • {numeroBR(totais.metragem)} m)</span>
-                <span className="text-right">
-                  <span className="block text-base font-black text-emerald-700 dark:text-emerald-400">{moeda(totais.faturamento)}</span>
-                  <span className="block text-xs font-extrabold text-amber-700 dark:text-amber-400">Comissão: {moeda(totais.comissao)}</span>
-                </span>
+            {resumoVendedores.length > 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-100/90 p-3.5 text-sm font-extrabold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Total das colunas (equipe)
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Pedidos</span>
+                    <span className="text-base font-black text-slate-800 dark:text-slate-100">{totais.pedidos}</span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Metragem</span>
+                    <span className="text-base font-black text-slate-800 dark:text-slate-100">{numeroBR(totais.metragem)} m</span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Faturamento</span>
+                    <span className="text-base font-black text-emerald-700 dark:text-emerald-400">{moeda(totais.faturamento)}</span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Comissão</span>
+                    <span className="text-base font-black text-amber-700 dark:text-amber-400">{moeda(totais.comissao)}</span>
+                  </div>
+                </div>
               </div>
             ) : null}
             {resumoVendedores.length === 0 ? (
@@ -695,46 +702,6 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           </div>
         </Cartao>
 
-        {/* comissão por faixa de metragem */}
-        <Cartao className="mb-3" hover={false}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
-              Comissão por faixa de metragem
-            </h2>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Regra definida em ⚙️ Ajustes → Comissões
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            {[...resultado.porFaixa, resultado.semMetragem]
-              .filter((l) => l.pedidos > 0)
-              .map((l) => (
-                <div
-                  key={l.id}
-                  className="rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50/60 p-3 shadow-sm sm:p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
-                >
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    {l.rotulo}
-                  </p>
-                  <p className="text-lg font-black text-purple-600 dark:text-purple-400">
-                    {percentualBR(l.percentual)}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    {moeda(l.comissao)}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                    {l.pedidos} pedido(s) • {numeroBR(l.metragem)} m • {moeda(l.faturamento)}
-                  </p>
-                </div>
-              ))}
-            {!resultado.porFaixa.some((l) => l.pedidos > 0) && resultado.semMetragem.pedidos === 0 ? (
-              <p className="col-span-full text-sm text-slate-400 dark:text-slate-500">
-                Nenhuma fila concluída no período.
-              </p>
-            ) : null}
-          </div>
-        </Cartao>
-
         {/* detalhamento */}
         <Cartao hover={false}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -757,7 +724,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               <Entrada
                 value={buscaPedido}
                 onChange={(e) => setBuscaPedido(e.target.value)}
-                placeholder="Buscar pedido por cliente, #número ou funcionário..."
+                placeholder="Buscar pedido por cliente, tipo de DTF ou funcionário..."
                 className="pl-9"
               />
             </div>
@@ -783,6 +750,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 {visiveisTela.map((p) => {
                   const pct = faixaDoPedido(p.metragem, faixas, semMetragem).percentual
                   const valorComissao = comissaoDoPedido(p, faixas, semMetragem)
+                  const ehUv = p.tipo_dtf === 'uv'
                   return (
                     <div
                       key={p.id}
@@ -791,8 +759,15 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="rounded-md bg-gradient-to-r from-pink-500 to-purple-600 px-1.5 py-0.5 text-[11px] font-black text-white">
-                              #{p.numero}
+                            <span
+                              className={cn(
+                                'rounded-md px-1.5 py-0.5 text-[11px] font-black text-white',
+                                ehUv
+                                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600'
+                                  : 'bg-gradient-to-r from-pink-500 to-purple-600',
+                              )}
+                            >
+                              {rotuloTipoDtf(p.tipo_dtf)}
                             </span>
                             <span className="break-words text-sm font-extrabold text-slate-800 dark:text-slate-100">
                               {p.cliente_nome}
@@ -810,7 +785,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                           ) : null}
                           <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {nomeVendedor(p.vendedor_id)} • {p.metragem ? `${numeroBR(p.metragem)} m` : 'Sem metragem'} •{' '}
-                            {dataBR(p.data_pagamento || p.data_pedido)}
+                            {dataBR(p.data_pedido || p.created_at)}
                           </p>
                         </div>
                         <button
@@ -841,13 +816,13 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 <table className="w-full border-collapse text-sm">
                   <thead className="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                     <tr>
-                      <th className="border border-slate-200 px-3 py-2">Nº</th>
+                      <th className="border border-slate-200 px-3 py-2">Tipo DTF</th>
                       <th className="border border-slate-200 px-3 py-2">Cliente</th>
                       <th className="border border-slate-200 px-3 py-2">Vendedor</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
-                      <th className="border border-slate-200 px-3 py-2">Pagamento</th>
+                      <th className="border border-slate-200 px-3 py-2">Data</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
                       <th className="border border-slate-200 px-3 py-2 text-center">Ações</th>
                     </tr>
@@ -855,7 +830,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   <tbody>
                     {visiveisTela.map((p, i) => (
                       <tr key={p.id} className={cn(i % 2 === 1 ? 'bg-slate-50/70' : 'bg-white', 'hover:bg-purple-50/40')}>
-                        <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700">#{p.numero}</td>
+                        <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700 whitespace-nowrap">
+                          {rotuloTipoDtf(p.tipo_dtf)}
+                        </td>
                         <td className="border border-slate-200 px-3 py-2">
                           <span className="font-semibold text-slate-700">{p.cliente_nome}</span>
                           {p.descricao ? <span className="block text-xs text-slate-400">{p.descricao}</span> : null}
@@ -873,7 +850,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
                           {moeda(comissaoDoPedido(p, faixas, semMetragem))}
                         </td>
-                        <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">{dataBR(p.data_pagamento)}</td>
+                        <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">
+                          {dataBR(p.data_pedido || p.created_at)}
+                        </td>
                         <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
                           {percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual)}
                         </td>
@@ -929,7 +908,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           </div>
         </div>
 
-        {/* comissão de cada pessoa da equipe — é o que o dono confere no papel */}
+        {/* comissão de cada pessoa da equipe — com totais abaixo de cada coluna */}
         <div className="sem-quebra mb-4">
           <p className="mb-1 font-bold">Comissões da equipe</p>
           <table className="tabela-print">
@@ -955,40 +934,13 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4}>TOTAL DE COMISSÕES</td>
+                <td>TOTAL</td>
+                <td className="num">{totais.pedidos}</td>
+                <td className="num">{numeroBR(totais.metragem)} m</td>
+                <td className="num">{moeda(totais.faturamento)}</td>
                 <td className="num">{moeda(totais.comissao)}</td>
               </tr>
             </tfoot>
-          </table>
-        </div>
-
-        <div className="sem-quebra mb-4">
-          <p className="mb-1 font-bold">Comissão por faixa de metragem</p>
-          <table className="tabela-print">
-            <thead>
-              <tr>
-                <th>Faixa</th>
-                <th className="num">%</th>
-                <th className="num">Pedidos</th>
-                <th className="num">Metragem</th>
-                <th className="num">Faturamento</th>
-                <th className="num">Comissão</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...resultado.porFaixa, resultado.semMetragem]
-                .filter((l) => l.pedidos > 0)
-                .map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.rotulo}</td>
-                    <td className="num">{percentualBR(l.percentual)}</td>
-                    <td className="num">{l.pedidos}</td>
-                    <td className="num">{numeroBR(l.metragem)} m</td>
-                    <td className="num">{moeda(l.faturamento)}</td>
-                    <td className="num">{moeda(l.comissao)}</td>
-                  </tr>
-                ))}
-            </tbody>
           </table>
         </div>
 
@@ -996,19 +948,19 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         <table className="tabela-print">
           <thead>
             <tr>
-              <th>Nº</th>
+              <th>Tipo DTF</th>
               <th>Cliente</th>
               <th>Vendedor</th>
               <th className="num">Metragem</th>
               <th className="num">Valor</th>
               <th className="num">Comissão</th>
-              <th>Pagamento</th>
+              <th>Data</th>
             </tr>
           </thead>
           <tbody>
             {visiveis.map((p) => (
               <tr key={p.id}>
-                <td>#{p.numero}</td>
+                <td>{rotuloTipoDtf(p.tipo_dtf)}</td>
                 <td>
                   {p.cliente_nome}
                   {p.descricao ? <div style={{ fontSize: '11px' }}>{p.descricao}</div> : null}
@@ -1017,7 +969,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 <td className="num">{p.metragem ? `${numeroBR(p.metragem)} m` : '—'}</td>
                 <td className="num">{moeda(p.valor)}</td>
                 <td className="num">{moeda(comissaoDoPedido(p, faixas, semMetragem))}</td>
-                <td>{dataBR(p.data_pagamento)}</td>
+                <td>{dataBR(p.data_pedido || p.created_at)}</td>
               </tr>
             ))}
           </tbody>

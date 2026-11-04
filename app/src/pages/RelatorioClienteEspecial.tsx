@@ -104,10 +104,8 @@ export default function RelatorioClienteEspecial({ embutido = false }: { embutid
                   <td className="border border-slate-200 px-3 py-2 text-xs text-slate-500">
                     {p.descricao || 'Sem descrição'}
                   </td>
-                  <td className="border border-slate-200 px-3 py-2 text-xs">
-                    {p.estagio === 'concluido' ? 'Impresso' : p.iniciado_em ? 'Imprimindo' : 'A imprimir'}
-                  </td>
-                  <td className="border border-slate-200 px-3 py-2 text-xs">{p.pago ? 'Pago' : 'A pagar'}</td>
+                  <td className="border border-slate-200 px-3 py-2 text-xs">Concluído</td>
+                  <td className="border border-slate-200 px-3 py-2 text-xs">Pago</td>
                   <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
                     {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
                   </td>

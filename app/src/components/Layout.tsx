@@ -99,7 +99,7 @@ export function Layout() {
       ]
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-28 transition-colors xl:pb-10 print:bg-white dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-fuchsia-50 via-slate-50 to-sky-50 pb-28 transition-colors xl:pb-10 print:m-0 print:min-h-0 print:bg-white print:p-0 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-100 transition-opacity print:hidden dark:opacity-25">
         <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-pink-300/40 to-purple-300/30 blur-3xl" />
         <div className="absolute -right-24 top-32 h-80 w-80 rounded-full bg-gradient-to-br from-sky-300/40 to-emerald-200/30 blur-3xl" />
@@ -308,7 +308,7 @@ export function Layout() {
         ) : null}
       </header>
 
-      <main className="relative mx-auto max-w-[1900px] overflow-x-hidden px-2.5 py-2 sm:px-3">
+      <main className="relative mx-auto max-w-[1900px] overflow-x-hidden px-2.5 py-2 sm:px-3 print:m-0 print:max-w-none print:overflow-visible print:p-0">
         {db.configuracoes.modo_exemplo ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border-2 border-amber-400 bg-amber-50 p-2.5 shadow-soft dark:border-amber-600 dark:bg-amber-950/40 print:hidden">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">

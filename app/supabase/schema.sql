@@ -45,14 +45,15 @@ create table if not exists public.pedidos (
   cliente_id       text,
   vendedor_id      text default '',
   descricao        text default '',
+  tipo_dtf         text not null default 'textil',
   metragem         double precision,
   valor            double precision default 0,
   valor_modo       text default 'auto',
   -- campos atuais da fila; as colunas antigas abaixo são mantidas para migrar backups
-  estagio          text not null default 'em_andamento',
+  estagio          text not null default 'concluido',
   iniciado_em      text,
   entregue         boolean not null default false,
-  pago             boolean not null default false,
+  pago             boolean not null default true,
   status_producao  text default 'editar_arte',
   status_pagamento text default 'pendente',
   forma_pagamento  text default '',
@@ -158,6 +159,7 @@ alter table public.pedidos add column if not exists estagio text;
 alter table public.pedidos add column if not exists iniciado_em text;
 alter table public.pedidos add column if not exists entregue boolean;
 alter table public.pedidos add column if not exists pago boolean;
+alter table public.pedidos add column if not exists tipo_dtf text not null default 'textil';
 
 update public.pedidos
 set estagio = case

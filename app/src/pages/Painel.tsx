@@ -3,29 +3,28 @@ import {
   CalendarClock,
   CheckCircle2,
   Crown,
+  Layers,
   Package,
   PackageCheck,
   Percent,
   Plus,
-  Printer,
-  RotateCcw,
+  Ruler,
   Settings,
+  Sparkles,
   TrendingUp,
   Users,
-  Wallet,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, cn } from '../components/ui'
 import { calcularComissao, comissaoPorVendedor } from '../lib/comissao'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
-import { dataBR, hojeISO, moeda, numeroBR, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import {
   FAIXAS_PADRAO,
   filasDaComissao,
-  pedidoPendenteFinanceiro,
   type Pedido,
 } from '../lib/types'
 
@@ -39,7 +38,7 @@ const formatarDataISO = (d: Date) =>
 
 const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
-const dataPagamento = (p: Pedido) => p.data_pagamento || (p.data_pedido || '').slice(0, 10)
+const dataRegistro = (p: Pedido) => (p.data_pedido || p.created_at || '').slice(0, 10)
 
 type PeriodoPainel = 'hoje' | 'ontem' | '7' | 'mes' | 'mes-passado' | '30' | '90' | 'tudo' | 'personalizado'
 
@@ -83,22 +82,22 @@ export default function Painel() {
   }, [fimPersonalizado, inicioPersonalizado, periodo])
 
   const pedidosPeriodo = useMemo(
-    () => db.pedidos.filter((p) => dataPagamento(p) >= inicio && dataPagamento(p) <= fim),
+    () => db.pedidos.filter((p) => dataRegistro(p) >= inicio && dataRegistro(p) <= fim),
     [db.pedidos, fim, inicio],
   )
 
-  const pagos = pedidosPeriodo.filter((p) => p.pago)
+  const pagos = filasDaComissao(pedidosPeriodo)
   const faturamento = pagos.reduce((s, p) => s + Number(p.valor || 0), 0)
+  const metragemPeriodo = pagos.reduce((s, p) => s + Number(p.metragem || 0), 0)
   const comissao = calcularComissao(pagos, faixas, semMetragem)
 
-  const aReceberTodos = db.pedidos
-    .filter(pedidoPendenteFinanceiro)
-    .reduce((s, p) => s + Number(p.valor || 0), 0)
+  const filasTextilPeriodo = pagos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const filasUvPeriodo = pagos.filter((p) => p.tipo_dtf === 'uv')
 
-  const aPagar = db.pedidos.filter((p) => !p.pago)
-  const emAndamento = db.pedidos.filter((p) => p.estagio !== 'concluido')
+  const todasTextil = db.pedidos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const todasUv = db.pedidos.filter((p) => p.tipo_dtf === 'uv')
   const concluidas = db.pedidos.filter((p) => p.estagio === 'concluido')
-  const aEntregar = db.pedidos.filter((p) => p.estagio === 'concluido' && !p.entregue)
+  const entregues = db.pedidos.filter((p) => p.entregue)
 
   const hoje = hojeISO()
 
@@ -106,7 +105,7 @@ export default function Painel() {
     const conjunto = new Set<string>()
     conjunto.add(hoje.slice(0, 7))
     for (const p of db.pedidos) {
-      const d = dataPagamento(p)
+      const d = dataRegistro(p)
       if (/^\d{4}-\d{2}/.test(d)) conjunto.add(d.slice(0, 7))
     }
     return [...conjunto]
@@ -127,7 +126,7 @@ export default function Painel() {
 
   const mesAtual = hoje.slice(0, 7)
   const equipe = useMemo(() => {
-    const pedidosMesAtual = db.pedidos.filter((p) => dataPagamento(p).startsWith(mesAtual))
+    const pedidosMesAtual = db.pedidos.filter((p) => dataRegistro(p).startsWith(mesAtual))
     const basePeriodo = pedidosPeriodo.length > 0 ? pedidosPeriodo : pedidosMesAtual
     const vendedoresVisiveis =
       basePeriodo.length > 0
@@ -172,17 +171,17 @@ export default function Painel() {
 
   /** os atalhos caem direto na fila certa dentro de Pedidos */
   const atalhos = [
-    { label: 'Em andamento', valor: emAndamento.length, icone: RotateCcw, to: '/pedidos?filtro=em_andamento', cor: 'from-sky-500 to-blue-600' },
-    { label: 'A pagar', valor: aPagar.length, icone: Wallet, to: '/pedidos?filtro=a_pagar', cor: 'from-amber-500 to-orange-600' },
-    { label: 'Concluídas', valor: concluidas.length, icone: CheckCircle2, to: '/pedidos?filtro=concluida', cor: 'from-emerald-500 to-green-600' },
-    { label: 'A entregar', valor: aEntregar.length, icone: PackageCheck, to: '/pedidos?filtro=concluida', cor: 'from-violet-500 to-indigo-600' },
+    { label: 'Concluídas', valor: concluidas.length, icone: CheckCircle2, to: '/pedidos', cor: 'from-emerald-500 to-green-600' },
+    { label: 'DTF Têxtil', valor: todasTextil.length, icone: Layers, to: '/pedidos?filtro=textil', cor: 'from-pink-500 to-purple-600' },
+    { label: 'DTF UV', valor: todasUv.length, icone: Sparkles, to: '/pedidos?filtro=uv', cor: 'from-indigo-500 to-blue-600' },
+    { label: 'Entregues', valor: entregues.length, icone: PackageCheck, to: '/pedidos?filtro=entregue', cor: 'from-violet-500 to-indigo-600' },
   ]
 
   /** botões grandes: o que o chefe faz todos os dias, em um toque */
   const acoesGrandes = [
     { label: 'Novo pedido', sub: 'registrar uma fila', icone: Plus, cor: 'from-pink-500 to-purple-600', to: '/pedido/novo' },
-    { label: 'A receber', sub: moeda(aReceberTodos), icone: Wallet, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=a_pagar' },
-    { label: 'Na máquina', sub: `${emAndamento.length} fila(s)`, icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
+    { label: 'DTF Têxtil', sub: `${todasTextil.length} fila(s)`, icone: Layers, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=textil' },
+    { label: 'DTF UV', sub: `${todasUv.length} fila(s)`, icone: Sparkles, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=uv' },
     { label: 'Equipe', sub: `${equipe.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
     { label: 'Relatório', sub: 'ver ou baixar PDF / CSV', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
@@ -322,7 +321,14 @@ export default function Painel() {
           valor={pagos.length}
           icone={Package}
           gradiente="from-pink-500 to-purple-600"
-          sub={`${pedidosPeriodo.length} pedidos no período`}
+          sub={`${filasTextilPeriodo.length} Têxtil • ${filasUvPeriodo.length} UV`}
+        />
+        <CartaoResumo
+          titulo="Metragem total"
+          valor={`${numeroBR(metragemPeriodo)} m`}
+          icone={Ruler}
+          gradiente="from-sky-500 to-blue-600"
+          sub="metros impressos no período"
         />
         <CartaoResumo
           titulo="Faturamento"
@@ -337,13 +343,6 @@ export default function Painel() {
           icone={Percent}
           gradiente="from-amber-500 to-orange-600"
           sub={`${numeroBR(comissao.percentualMedio, 2)}% médio no período`}
-        />
-        <CartaoResumo
-          titulo="A receber (total)"
-          valor={moeda(aReceberTodos)}
-          icone={Wallet}
-          gradiente="from-violet-500 to-indigo-600"
-          sub="pedidos pendentes ou parciais"
         />
       </div>
 
@@ -418,7 +417,7 @@ export default function Painel() {
 
         <div className="space-y-4">
           <Cartao hover={false}>
-            <h2 className="mb-3 text-base font-extrabold text-slate-800 dark:text-slate-100">O que precisa de atenção</h2>
+            <h2 className="mb-3 text-base font-extrabold text-slate-800 dark:text-slate-100">Catálogo de filas</h2>
             <div className="grid gap-2">
               {atalhos.map(({ label, valor, icone: Icone, to, cor }) => (
                 <button
@@ -438,30 +437,6 @@ export default function Painel() {
                   <span className="text-lg font-black text-slate-800 dark:text-slate-100">{valor}</span>
                 </button>
               ))}
-            </div>
-          </Cartao>
-
-          <Cartao hover={false}>
-            <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-              <Percent className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Comissão por faixa (período)
-            </h2>
-            <div className="space-y-2">
-              {[...comissao.porFaixa, comissao.semMetragem]
-                .filter((l) => l.pedidos > 0)
-                .map((l) => (
-                  <div
-                    key={l.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm dark:border-slate-800"
-                  >
-                    <span className="text-slate-600 dark:text-slate-300">
-                      {l.rotulo} <b className="text-purple-600 dark:text-purple-400">{percentualBR(l.percentual)}</b>
-                    </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100">{moeda(l.comissao)}</span>
-                  </div>
-                ))}
-              {!comissao.porFaixa.some((l) => l.pedidos > 0) && comissao.semMetragem.pedidos === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum pedido pago no período.</p>
-              ) : null}
             </div>
             <Botao
               variante="secundario"

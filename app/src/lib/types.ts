@@ -48,8 +48,19 @@ export const LABEL_ENTREGA: Record<TipoEntrega, string> = {
   correios: 'Correios',
 }
 
+export const TIPOS_DTF = ['textil', 'uv'] as const
+export type TipoDtf = (typeof TIPOS_DTF)[number]
+
+export const LABEL_TIPO_DTF: Record<TipoDtf, string> = {
+  textil: 'DTF Têxtil',
+  uv: 'DTF UV',
+}
+
+export const rotuloTipoDtf = (tipo?: string | null): string =>
+  tipo === 'uv' ? LABEL_TIPO_DTF.uv : LABEL_TIPO_DTF.textil
+
 export const ESTADOS = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
+  'AC','AL','AP','AM','BA','DF','CE','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
 ] as const
 
 export type ValorModo = 'auto' | 'manual'
@@ -61,6 +72,8 @@ export interface Pedido {
   cliente_id: ID | null
   vendedor_id: ID | ''
   descricao: string
+  /** tipo de DTF vendido na fila (obrigatório ao cadastrar: DTF Têxtil ou DTF UV) */
+  tipo_dtf: TipoDtf
   metragem: number | null
   valor: number
   valor_modo: ValorModo
@@ -352,13 +365,17 @@ export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown
   const estagioValido = estagioAntigo === 'em_andamento' || estagioAntigo === 'concluido'
   const statusProducao = typeof bruto.status_producao === 'string' ? bruto.status_producao : ''
 
+  p.tipo_dtf = bruto.tipo_dtf === 'uv' ? 'uv' : 'textil'
+
   // Consultamos o backup bruto antes dos valores padrão: pedidoVazio() já
   // preenche estagio/pago/entregue e mascararia os campos das versões antigas.
   if (estagioValido) {
     p.estagio = estagioAntigo
-  } else {
+  } else if (typeof bruto.status_producao === 'string' || typeof bruto.impresso === 'boolean') {
     const concluido = Boolean(bruto.impresso) || statusProducao === 'dtf_pronto'
     p.estagio = concluido ? 'concluido' : 'em_andamento'
+  } else {
+    p.estagio = 'concluido'
   }
 
   if (typeof bruto.iniciado_em === 'string' || bruto.iniciado_em === null) {
@@ -371,7 +388,11 @@ export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown
   p.entregue =
     typeof bruto.entregue === 'boolean' ? bruto.entregue : Boolean(p.data_entrega || p.data_retirada)
   p.pago =
-    typeof bruto.pago === 'boolean' ? bruto.pago : bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
+    typeof bruto.pago === 'boolean'
+      ? bruto.pago
+      : typeof bruto.status_pagamento === 'string'
+        ? bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
+        : true
 
   return p
 }
@@ -397,36 +418,40 @@ export interface DB {
   configuracoes: Configuracoes
 }
 
-export const pedidoVazio = (): Omit<Pedido, 'id'> => ({
-  numero: 0,
-  cliente_nome: '',
-  cliente_id: null,
-  vendedor_id: '',
-  descricao: '',
-  metragem: null,
-  valor: 0,
-  valor_modo: 'auto',
-  estagio: 'em_andamento',
-  iniciado_em: null,
-  entregue: false,
-  pago: false,
-  forma_pagamento: '',
-  data_pagamento: null,
-  data_pedido: new Date().toISOString(),
-  observacoes: '',
-  tipo_entrega: 'retirada',
-  endereco: '',
-  cidade: '',
-  estado: '',
-  cep: '',
-  codigo_rastreio: '',
-  data_envio: null,
-  data_entrega: null,
-  retirado_por: '',
-  data_retirada: null,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-})
+export const pedidoVazio = (): Omit<Pedido, 'id'> => {
+  const agora = new Date().toISOString()
+  return {
+    numero: 0,
+    cliente_nome: '',
+    cliente_id: null,
+    vendedor_id: '',
+    descricao: '',
+    tipo_dtf: 'textil',
+    metragem: null,
+    valor: 0,
+    valor_modo: 'auto',
+    estagio: 'concluido',
+    iniciado_em: agora,
+    entregue: false,
+    pago: true,
+    forma_pagamento: '',
+    data_pagamento: agora.slice(0, 10),
+    data_pedido: agora,
+    observacoes: '',
+    tipo_entrega: 'retirada',
+    endereco: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    codigo_rastreio: '',
+    data_envio: null,
+    data_entrega: null,
+    retirado_por: '',
+    data_retirada: null,
+    created_at: agora,
+    updated_at: agora,
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Estágios da fila                                                   */
@@ -477,18 +502,21 @@ export const passoFeito = (p: Pedido, passo: PassoFila) =>
 /* Filtros da tela Pedidos                                             */
 /* ------------------------------------------------------------------ */
 
-export type FiltroFila = 'todas' | 'em_andamento' | 'a_pagar' | 'concluida' | 'entregue'
+export type FiltroFila = 'todas' | 'textil' | 'uv' | 'entregue' | 'em_andamento' | 'a_pagar' | 'concluida'
 
 export const FILTROS_FILA: { id: FiltroFila; label: string; ajuda: string }[] = [
-  { id: 'todas', label: 'Todas', ajuda: 'Todas as filas registradas.' },
-  { id: 'em_andamento', label: 'Em andamento', ajuda: 'Filas que ainda estão na máquina.' },
-  { id: 'a_pagar', label: 'A pagar', ajuda: 'Filas que ainda não foram marcadas como pagas.' },
-  { id: 'concluida', label: 'Concluídas', ajuda: 'Filas que já saíram da máquina.' },
+  { id: 'todas', label: 'Todas', ajuda: 'Todas as filas catalogadas.' },
+  { id: 'textil', label: 'DTF Têxtil', ajuda: 'Filas de DTF Têxtil.' },
+  { id: 'uv', label: 'DTF UV', ajuda: 'Filas de DTF UV.' },
   { id: 'entregue', label: 'Entregues', ajuda: 'Filas que o cliente já recebeu.' },
 ]
 
 export const combinaFiltro = (p: Pedido, filtro: FiltroFila) => {
   switch (filtro) {
+    case 'textil':
+      return (p.tipo_dtf || 'textil') === 'textil'
+    case 'uv':
+      return p.tipo_dtf === 'uv'
     case 'em_andamento':
       return p.estagio !== 'concluido'
     case 'a_pagar':
