@@ -56,6 +56,7 @@
 @page {
   size: A4 portrait;
   margin: 10mm;
+  background: #fff;
 }
 
 .tabela-print {
@@ -67,7 +68,7 @@
 
 .tabela-print th,
 .tabela-print td {
-  border: 1px solid #000;
+  border: 1px solid #333;
   padding: 4px 6px;
   vertical-align: top;
 }
@@ -95,22 +96,35 @@
 @media print {
   /*
    * O papel sai sempre branco com letra preta — mesmo com o tema noite ligado.
-   * Aqui a gente apaga o fundo degradê da tela (que é uma IMAGEM de fundo e,
-   * sem isso, saía impresso escuro no tema noite) e força o branco/preto.
+   * Forçamos color-scheme: light e fundo branco em todos os contêineres raiz
+   * para eliminar barras pretas nas bordas da folha A4.
    */
+  :root,
   html,
   body,
   #root,
-  #root > div {
+  #root > div,
+  main {
+    color-scheme: light !important;
     background: #fff !important;
+    background-color: #fff !important;
     color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
   }
 
   html.dark,
   html.dark body,
   html.dark #root,
-  html.dark #root > div {
+  html.dark #root > div,
+  html.dark main {
+    color-scheme: light !important;
     background: #fff !important;
+    background-color: #fff !important;
     color: #000 !important;
   }
 
@@ -118,6 +132,8 @@
   body,
   body * {
     color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
   }
 
   /* nenhuma imagem/gradiente de fundo vai para o papel */
@@ -152,6 +168,11 @@
 
   .print-area {
     display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
   }
 
   thead {
@@ -172,7 +193,8 @@
 .print-area {
   display: none;
   color: #000;
-  max-width: 190mm;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* rolagem discreta nas tabelas da tela */

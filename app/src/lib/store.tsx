@@ -472,8 +472,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ? calcularValor(dados.metragem, valorEspecial, db.configuracoes.faixas_preco)
           : Number(Number(dados.valor || 0).toFixed(2))
 
+      const dataPedidoISO = dados.data_pedido || agora
       const registro: Pedido = {
         ...dados,
+        tipo_dtf: dados.tipo_dtf === 'uv' ? 'uv' : 'textil',
+        estagio: 'concluido',
+        iniciado_em: dados.iniciado_em || dataPedidoISO,
+        pago: true,
+        data_pagamento: dados.data_pagamento || dataPedidoISO.slice(0, 10),
         cliente_nome: dados.cliente_nome.trim(),
         cliente_id: clienteVinculado?.id ?? existente?.cliente_id ?? null,
         valor,

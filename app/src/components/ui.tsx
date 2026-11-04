@@ -125,19 +125,19 @@ export function CartaoResumo({
   sub?: string
 }) {
   return (
-    <Cartao className="flex items-center gap-2.5 p-3">
+    <Cartao className="flex items-center gap-3 p-3.5 sm:p-4">
       <div
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-soft dark:shadow-dark-soft',
           gradiente,
         )}
       >
-        <Icone className="h-4 w-4" />
+        <Icone className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
-        <p className="break-words text-base font-extrabold leading-tight text-slate-800 sm:text-lg dark:text-slate-100">{valor}</p>
-        {sub ? <p className="truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p> : null}
+        <p className="truncate text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{titulo}</p>
+        <p className="break-words text-xl font-black leading-tight text-slate-800 sm:text-2xl dark:text-slate-100">{valor}</p>
+        {sub ? <p className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{sub}</p> : null}
       </div>
     </Cartao>
   )

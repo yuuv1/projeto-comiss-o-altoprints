@@ -3,8 +3,8 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../lib/format'
 import { useStore } from '../lib/store'
-import { isPedidoCompleto, passoFeito, type PassoFila, type Pedido } from '../lib/types'
-import { EtiquetaEntrega, EtiquetaEstagio, EtiquetaPago } from './StatusBadges'
+import { isPedidoCompleto, passoFeito, rotuloTipoDtf, type PassoFila, type Pedido } from '../lib/types'
+import { EtiquetaEntrega, EtiquetaEstagio } from './StatusBadges'
 import { Etiqueta, cn, useConfirmacao } from './ui'
 
 /** Cartão de pedido usado nas listas */
@@ -20,7 +20,7 @@ export function PedidoCartao({
   pedido: Pedido
   acoes?: ReactNode
   extras?: ReactNode
-  /** quando vem, os selos do cartão ficam clicáveis (marcar/desfazer) */
+  /** quando vem, o selo de entrega do cartão fica clicável (marcar/desfazer) */
   onPasso?: (passo: PassoFila) => void
   mostrarVendedor?: boolean
   mostrarEntrega?: boolean
@@ -29,6 +29,7 @@ export function PedidoCartao({
 }) {
   const { nomeVendedor } = useStore()
   const pronto = isPedidoCompleto(pedido)
+  const ehUv = pedido.tipo_dtf === 'uv'
 
   return (
     <div
@@ -42,6 +43,15 @@ export function PedidoCartao({
           <span className="shrink-0 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-2 py-0.5 text-xs font-black text-white">
             #{pedido.numero}
           </span>
+          <Etiqueta
+            className={
+              ehUv
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                : 'border-pink-200 bg-pink-50 text-pink-700'
+            }
+          >
+            {rotuloTipoDtf(pedido.tipo_dtf)}
+          </Etiqueta>
           <span className="min-w-0 max-w-full break-words text-base font-extrabold text-slate-800">{pedido.cliente_nome}</span>
           {pedido.tipo_entrega === 'correios' ? (
             <Etiqueta className="border-sky-200 bg-sky-50 text-sky-700" icone={Truck}>
@@ -74,16 +84,15 @@ export function PedidoCartao({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <EtiquetaEstagio status={pedido.estagio} onClick={onPasso ? () => onPasso('concluida') : undefined} />
+        <EtiquetaEstagio status="concluido" />
         <EtiquetaEntrega entregue={pedido.entregue} onClick={onPasso ? () => onPasso('entregue') : undefined} />
-        {mostrarValor ? <EtiquetaPago pago={pedido.pago} onClick={onPasso ? () => onPasso('pago') : undefined} /> : null}
       </div>
 
       {mostrarValor ? (
-        <div className="w-[110px] text-right">
+        <div className="w-[115px] text-right">
           <p className="text-base font-extrabold text-slate-800">{moeda(pedido.valor)}</p>
           <p className="text-[11px] text-slate-400">
-            {pedido.data_pagamento ? `Pago em ${dataBR(pedido.data_pagamento)}` : pedido.forma_pagamento || '—'}
+            {dataBR(pedido.data_pedido || pedido.created_at)}
           </p>
         </div>
       ) : null}

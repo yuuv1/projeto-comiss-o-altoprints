@@ -176,60 +176,28 @@ async function main() {
     '/rota-inexistente',
   ])
 
-  // ---------- Pedidos: filtros da fila e os passos clicáveis ----------
+  // ---------- Pedidos: filtros do catálogo (Todas, DTF Têxtil, DTF UV, Entregues) e selo de entrega ----------
   dom.window.location.hash = '#/pedidos'
   await espera(800)
   const textoPedidos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
 
-  const filtrosFilaOk = ['Todas', 'Em andamento', 'A pagar', 'Concluídas', 'Entregues'].every((f) =>
+  const filtrosFilaOk = ['Todas', 'DTF Têxtil', 'DTF UV', 'Entregues'].every((f) =>
     textoPedidos.includes(f),
   )
-  const filtrosVelhosFora = ['A imprimir', 'Imprimindo'].every((f) => !textoPedidos.includes(f))
+  const filtrosVelhosFora = ['A pagar', 'A imprimir', 'Imprimindo'].every((f) => !textoPedidos.includes(f))
   if (!filtrosFilaOk || !filtrosVelhosFora) falhas++
   console.log(
-    `\n  ${filtrosFilaOk && filtrosVelhosFora ? '✅' : '❌'} Pedidos traz só os filtros do fluxo novo (em andamento, a pagar, concluídas, entregues)`,
+    `\n  ${filtrosFilaOk && filtrosVelhosFora ? '✅' : '❌'} Pedidos traz os filtros do catálogo (Todas, DTF Têxtil, DTF UV, Entregues) sem “A pagar”`,
   )
 
   const botoesDaTela = () => [...(raiz?.querySelectorAll('button') ?? [])]
   /** acha o selo que ainda NÃO foi marcado (quando marcado, o título ganha “clicar desfaz”) */
   const acharPasso = (titulo: string) => botoesDaTela().find((b) => (b.getAttribute('title') ?? '') === titulo)
 
-  const passosOk = ['Marcar como pago', 'Clique quando a fila sair da máquina', 'Marcar como entregue ao cliente'].every(
-    (t) => Boolean(acharPasso(t)),
-  )
-  if (!passosOk) falhas++
-  console.log(`  ${passosOk ? '✅' : '❌'} cada fila tem os 3 selos clicáveis no cartão (pago, concluída, entregue)`)
-
   const lerPedidos = (): { estagio: string; pago: boolean; entregue: boolean }[] =>
     JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).pedidos
 
-  // clicar no selo "Pago" marca o pagamento da fila
-  clicar(raiz, 'A pagar')
-  await espera(600)
-  const antesPagos = lerPedidos().filter((p) => p.pago).length
-  const botaoPago = acharPasso('Marcar como pago')
-  botaoPago?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
-  await espera(900)
-  const depoisPagos = lerPedidos().filter((p) => p.pago).length
-  const pagouOk = Boolean(botaoPago) && depoisPagos === antesPagos + 1
-  if (!pagouOk) falhas++
-  console.log(`  ${pagouOk ? '✅' : '❌'} “Pago” marca o pagamento pela tela Pedidos (${antesPagos} → ${depoisPagos})`)
-
-  // clicar no selo do estágio conclui a fila
-  clicar(raiz, 'Em andamento')
-  await espera(600)
-  const antesConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
-  const botaoConcluir = acharPasso('Clique quando a fila sair da máquina')
-  botaoConcluir?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
-  await espera(900)
-  const depoisConcluidas = lerPedidos().filter((p) => p.estagio === 'concluido').length
-  const concluiuOk = Boolean(botaoConcluir) && depoisConcluidas === antesConcluidas + 1
-  if (!concluiuOk) falhas++
-  console.log(`  ${concluiuOk ? '✅' : '❌'} “sair da máquina” conclui a fila pela tela Pedidos (${antesConcluidas} → ${depoisConcluidas})`)
-
-  // entregue é uma marcação separada do estágio
-  clicar(raiz, 'Concluídas')
-  await espera(600)
+  // entregue é uma marcação opcional no cartão
   const antesEntregues = lerPedidos().filter((p) => p.entregue).length
   const botaoEntregar = acharPasso('Marcar como entregue ao cliente')
   botaoEntregar?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
@@ -237,20 +205,24 @@ async function main() {
   const depoisEntregues = lerPedidos().filter((p) => p.entregue).length
   const entregouOk = Boolean(botaoEntregar) && depoisEntregues === antesEntregues + 1
   if (!entregouOk) falhas++
-  console.log(`  ${entregouOk ? '✅' : '❌'} “entregue” marca a entrega sem mudar o estágio (${antesEntregues} → ${depoisEntregues})`)
+  console.log(`  ${entregouOk ? '✅' : '❌'} “entregue” marca a entrega no cartão (${antesEntregues} → ${depoisEntregues})`)
 
-  // ---------- formulário de pedido: essenciais na frente, resto em "Mais opções" ----------
+  // ---------- formulário de pedido: Tipo de DTF obrigatório na frente, resto em "Mais opções" ----------
   dom.window.location.hash = '#/pedido/novo'
   await espera(700)
   const textoNovo = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const enxuto =
     textoNovo.includes('Mais opções') &&
     textoNovo.includes('Cliente') &&
+    textoNovo.includes('Tipo de DTF') &&
+    textoNovo.includes('DTF Têxtil') &&
+    textoNovo.includes('DTF UV') &&
     textoNovo.includes('Metragem') &&
+    !textoNovo.includes('Ainda não pago') &&
     !textoNovo.includes('Data da retirada') &&
     !textoNovo.includes('Retirado por')
   if (!enxuto) falhas++
-  console.log(`\n  ${enxuto ? '✅' : '❌'} pedido novo começa enxuto (entrega e datas escondidas)`)
+  console.log(`\n  ${enxuto ? '✅' : '❌'} pedido novo exige Tipo de DTF (DTF Têxtil / DTF UV) e começa enxuto`)
 
   const abriuExtras = clicar(raiz, 'Mais opções')
   await espera(500)
@@ -369,15 +341,21 @@ async function main() {
   if (!engrenagem) falhas++
   console.log(`  ${engrenagem ? '✅' : '❌'} engrenagem no canto leva a Configurações (Equipe e Vendedores lá dentro)`)
 
-  // ---------- relatório: uma tela só, sem tela de impressões ----------
+  // ---------- relatório: uma tela só, sem comissão por faixa de metragem ----------
   dom.window.location.hash = '#/relatorio'
   await espera(900)
+  // o relatório começa no filtro diário ("Hoje (Diário)"); ao clicar em "Este mês" confere as concluídas do mês
+  clicar(raiz, 'Este mês')
+  await espera(400)
   const textoRel = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
-  const relatorioOk = textoRel.includes('Resumo por vendedor') && textoRel.includes('Comissão por faixa')
+  const relatorioOk =
+    textoRel.includes('Resumo por vendedor') &&
+    !textoRel.includes('Comissão por faixa de metragem') &&
+    textoRel.includes('Tipo DTF')
   if (!relatorioOk) falhas++
-  console.log(`\n  ${relatorioOk ? '✅' : '❌'} Relatório traz o resumo por vendedor e a comissão por faixa`)
+  console.log(`\n  ${relatorioOk ? '✅' : '❌'} Relatório traz o resumo por vendedor, coluna Tipo DTF e remove comissão por faixa`)
 
-  // o relatório do período (este mês, o padrão) só pode contar as filas CONCLUÍDAS
+  // o relatório do período (este mês) só pode contar as filas CONCLUÍDAS
   const pedidosNoBanco = JSON.parse(String(dom.window.localStorage.getItem('altoprints:db:v1'))).pedidos as {
     estagio: string
     data_pedido: string
@@ -404,32 +382,41 @@ async function main() {
   // ---------- comissões no relatório impresso (A4) ----------
   const areaImpressa = raiz?.querySelector('.print-area')
   const textoImpresso = (areaImpressa?.textContent ?? '').replace(/\s+/g, ' ')
+  const tabelasImpressas = Array.from(areaImpressa?.querySelectorAll('table') ?? [])
+  const tabelaEquipeImpressa = tabelasImpressas[0]
+  const celulasRodapeEquipe = Array.from(tabelaEquipeImpressa?.querySelectorAll('tfoot td') ?? []).map((td) =>
+    (td.textContent ?? '').trim(),
+  )
   const impressoComComissoes =
     textoImpresso.includes('Comissões da equipe') &&
-    textoImpresso.includes('TOTAL DE COMISSÕES') &&
-    textoImpresso.includes('Comissão por faixa de metragem') &&
+    !textoImpresso.includes('Comissão por faixa de metragem') &&
+    celulasRodapeEquipe.length === 5 &&
+    celulasRodapeEquipe[0] === 'TOTAL' &&
     textoImpresso.includes(nomeDoVinculo) &&
     textoImpresso.includes(outroVendedor)
   if (!impressoComComissoes) falhas++
   console.log(
-    `\n  ${impressoComComissoes ? '✅' : '❌'} relatório impresso do dono traz a comissão de cada vendedor (com total)`,
+    `\n  ${impressoComComissoes ? '✅' : '❌'} relatório impresso traz totais abaixo de cada coluna da equipe e remove comissão por faixa`,
   )
 
-  const tabelasImpressas = Array.from(areaImpressa?.querySelectorAll('table') ?? [])
   const tabelaDetalhamento = tabelasImpressas[tabelasImpressas.length - 1]
   const cabecalhosDetalhamento = Array.from(tabelaDetalhamento?.querySelectorAll('thead th') ?? []).map((th) =>
     (th.textContent ?? '').trim(),
   )
   const linhasDetalhamento = Array.from(tabelaDetalhamento?.querySelectorAll('tbody tr') ?? [])
   const detalheDoPedidoOk =
-    cabecalhosDetalhamento.join('|') === 'Nº|Cliente|Vendedor|Metragem|Valor|Comissão|Pagamento' &&
+    cabecalhosDetalhamento.join('|') === 'Tipo DTF|Cliente|Vendedor|Metragem|Valor|Comissão|Data' &&
     linhasDetalhamento.length > 0 &&
-    linhasDetalhamento.every((linha) => linha.cells[5]?.textContent?.includes('R$')) &&
+    linhasDetalhamento.every(
+      (linha) =>
+        (linha.cells[0]?.textContent?.includes('DTF Têxtil') || linha.cells[0]?.textContent?.includes('DTF UV')) &&
+        linha.cells[5]?.textContent?.includes('R$'),
+    ) &&
     !tabelaDetalhamento?.querySelector('tfoot') &&
     !textoImpresso.includes('TOTAL GERAL')
   if (!detalheDoPedidoOk) falhas++
   console.log(
-    `  ${detalheDoPedidoOk ? '✅' : '❌'} detalhamento impresso remove observação/total geral e mostra comissão após o valor em cada pedido`,
+    `  ${detalheDoPedidoOk ? '✅' : '❌'} detalhamento impresso troca Nº por Tipo DTF e Pagamento pela Data de registro`,
   )
 
   dom.window.location.hash = '#/clientes'
@@ -488,16 +475,19 @@ async function main() {
   if (!avisoExemplo) falhas++
   console.log(`  ${avisoExemplo ? '✅' : '❌'} dados de exemplo avisam que "não são reais" e trazem o atalho para apagar`)
 
-  // ---------- painel do chefe: resumo de hoje, atalhos grandes, checklist e tabela ----------
-  const resumoHojeOk =
-    painel.includes('Resumo de hoje') &&
-    painel.includes('Na fila agora') &&
-    painel.includes('Parados 3+ dias') &&
-    painel.includes('Entregues hoje')
-  if (!resumoHojeOk) falhas++
-  console.log(`  ${resumoHojeOk ? '✅' : '❌'} painel abre com o “Resumo de hoje” (fila, entregas, parados)`)
+  // ---------- painel do chefe: resumo por filtro no topo (sem bloco redundante "Resumo de hoje") ----------
+  const resumoHojeRemovidoOk =
+    !painel.includes('Resumo de hoje') &&
+    painel.includes('Resumo por filtro:') &&
+    painel.includes('Hoje (Diário)') &&
+    painel.includes('Pedidos pagos') &&
+    painel.includes('Faturamento')
+  if (!resumoHojeRemovidoOk) falhas++
+  console.log(
+    `  ${resumoHojeRemovidoOk ? '✅' : '❌'} painel remove o “Resumo de hoje” e destaca primeiro o resumo por filtro (começando no diário)`,
+  )
 
-  const atalhosGrandesOk = ['Novo pedido', 'A receber', 'Na máquina', 'Equipe', 'Relatório'].every((t) =>
+  const atalhosGrandesOk = ['Novo pedido', 'DTF Têxtil', 'DTF UV', 'Equipe', 'Relatório'].every((t) =>
     painel.includes(t),
   )
   if (!atalhosGrandesOk) falhas++

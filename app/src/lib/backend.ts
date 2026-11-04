@@ -44,6 +44,7 @@ const COLUNAS_TABELA: Record<Tabela, readonly string[]> = {
     'cliente_id',
     'vendedor_id',
     'descricao',
+    'tipo_dtf',
     'metragem',
     'valor',
     'valor_modo',

@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardList, Filter, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Wallet } from 'lucide-react'
+import { CheckCircle2, ClipboardList, Filter, Layers, PackageCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
@@ -6,14 +6,10 @@ import { BarraBusca, Botao, CartaoResumo, Pilulas, TituloPagina, Vazio, cn } fro
 import { useAuth } from '../lib/auth'
 import { moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
-import { combinaFiltro, FILTROS_FILA, type FiltroFila, type PassoFila, type Pedido } from '../lib/types'
+import { combinaFiltro, FILTROS_FILA, rotuloTipoDtf, type FiltroFila, type PassoFila, type Pedido } from '../lib/types'
 
 /**
- * Pedidos — as filas de impressão.
- *
- * A pessoa registra a fila (cliente + metragem, com o valor já calculado) e
- * depois vai clicando nos passos: pago → imprimindo → concluída → entregue.
- * Os filtros separam cada etapa; "Todas" mostra tudo.
+ * Pedidos — catálogo de filas já feitas e pagas.
  */
 export default function Pedidos() {
   const { db, nomeVendedor } = useStore()
@@ -21,7 +17,6 @@ export default function Pedidos() {
   const acoes = useAcoesPedido()
   const navegar = useNavigate()
   const [busca, setBusca] = useState('')
-  // dá para chegar já filtrado: /pedidos?filtro=a_imprimir ou /pedidos?vendedor=<id>
   const [parametros, setParametros] = useSearchParams()
   const vendedorFiltro = parametros.get('vendedor') ?? ''
   const [filtro, setFiltro] = useState<FiltroFila>(() => {
@@ -61,7 +56,7 @@ export default function Pedidos() {
     const t = busca.trim().toLowerCase()
     if (!t) return daEtapa
     return daEtapa.filter((p) =>
-      [p.cliente_nome, String(p.numero), `#${p.numero}`, p.descricao, p.cidade, p.observacoes]
+      [p.cliente_nome, String(p.numero), `#${p.numero}`, rotuloTipoDtf(p.tipo_dtf), p.descricao, p.cidade, p.observacoes]
         .join(' ')
         .toLowerCase()
         .includes(t),
@@ -81,7 +76,6 @@ export default function Pedidos() {
     void promessa.catch(() => {})
   }
 
-  /** clique nos passos da fila: pago → imprimindo → concluída → entregue */
   const aoPasso = (p: Pedido, passo: PassoFila) => {
     disparar(acoes.alternarPasso(p, passo))
   }
@@ -112,7 +106,7 @@ export default function Pedidos() {
       <TituloPagina
         icone={ClipboardList}
         titulo="Pedidos"
-        subtitulo="Cada pedido é uma fila de impressão: cliente, metragem, valor automático e os dois estágios — em andamento e concluído."
+        subtitulo="Catálogo de filas já feitas e pagas — separadas entre DTF Têxtil e DTF UV."
         acoes={
           <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
             Registrar fila
@@ -122,8 +116,7 @@ export default function Pedidos() {
 
       {!ehProprietario ? (
         <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-          Você está usando o sistema <b>sem login</b>. Ao registrar uma fila, escolha o <b>seu nome</b> — ele fica
-          gravado no pedido e entra no relatório de comissão.
+          Você está usando o sistema <b>sem login</b>. Ao registrar uma fila, escolha o <b>seu nome</b> e o <b>tipo de DTF (Têxtil ou UV)</b> — eles ficam gravados no pedido e entram no relatório de comissão.
         </p>
       ) : null}
 
@@ -142,16 +135,33 @@ export default function Pedidos() {
 
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CartaoResumo
-          titulo="Em andamento"
-          valor={contagem.em_andamento}
-          icone={RotateCcw}
-          gradiente="from-sky-500 to-blue-600"
-          sub="ainda na máquina"
+          titulo="Concluídas"
+          valor={contagem.todas}
+          icone={CheckCircle2}
+          gradiente="from-emerald-500 to-green-600"
+          sub="filas feitas e pagas"
         />
-        <CartaoResumo titulo="A pagar" valor={contagem.a_pagar} icone={Wallet} gradiente="from-amber-500 to-orange-600" />
-        <CartaoResumo titulo="Concluídas" valor={contagem.concluida} icone={CheckCircle2} gradiente="from-emerald-500 to-green-600" />
-
-        <CartaoResumo titulo="Entregues" valor={contagem.entregue} icone={PackageCheck} gradiente="from-violet-500 to-indigo-600" />
+        <CartaoResumo
+          titulo="DTF Têxtil"
+          valor={contagem.textil}
+          icone={Layers}
+          gradiente="from-pink-500 to-purple-600"
+          sub="filas de DTF Têxtil"
+        />
+        <CartaoResumo
+          titulo="DTF UV"
+          valor={contagem.uv}
+          icone={Sparkles}
+          gradiente="from-indigo-500 to-blue-600"
+          sub="filas de DTF UV"
+        />
+        <CartaoResumo
+          titulo="Entregues"
+          valor={contagem.entregue}
+          icone={PackageCheck}
+          gradiente="from-violet-500 to-indigo-600"
+          sub="recebidas pelo cliente"
+        />
       </div>
 
       <Pilulas<FiltroFila>

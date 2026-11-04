@@ -1,12 +1,10 @@
 import {
-  AlertTriangle,
   ArrowLeft,
   Calculator,
   Download,
   FileText,
   Image as ImageIcon,
   Package,
-  PackageCheck,
   Paperclip,
   Pencil,
   Plus,
@@ -16,8 +14,6 @@ import {
   Sparkles,
   Trash2,
   Truck,
-  Wallet,
-  Wand2,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -37,23 +33,24 @@ import {
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { calcularComissao } from '../lib/comissao'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
-import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, paraInputDateTime, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, moeda, metros, paraInputDate, percentualBR } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { useStore } from '../lib/store'
 import {
   ESTADOS,
-  ESTAGIOS_FILA,
   FORMAS_PAGAMENTO,
   LABEL_ENTREGA,
-  LABEL_ESTAGIO,
+  LABEL_TIPO_DTF,
   pedidoVazio,
-  telasDoUsuario,
+  rotuloTipoDtf,
+  TIPOS_DTF,
   type Arquivo,
   type Pedido,
+  type TipoDtf,
 } from '../lib/types'
-import { EtiquetaEntrega, EtiquetaEstagio, EtiquetaPago } from '../components/StatusBadges'
+import { EtiquetaEntrega } from '../components/StatusBadges'
 
 /* ------------------------------ arquivos ------------------------------ */
 
@@ -131,6 +128,7 @@ export default function PedidoForm() {
   const podeExcluir = ehProprietario
 
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(() => ({ ...pedidoVazio() }))
+  const [tipoDtfEscolhido, setTipoDtfEscolhido] = useState<TipoDtf | ''>('')
   const [metragemTxt, setMetragemTxt] = useState('')
   const [valorTxt, setValorTxt] = useState('')
   const [arquivosNovos, setArquivosNovos] = useState<File[]>([])
@@ -154,6 +152,7 @@ export default function PedidoForm() {
     if (existente) {
       const { id: _id, ...resto } = existente
       setForm(resto)
+      setTipoDtfEscolhido(existente.tipo_dtf === 'uv' ? 'uv' : 'textil')
       setMetragemTxt(existente.metragem ? String(existente.metragem) : '')
       setValorTxt(String(existente.valor ?? ''))
     } else if (novo) {
@@ -162,6 +161,7 @@ export default function PedidoForm() {
         // já vem com o nome de quem usou o sistema pela última vez neste aparelho
         vendedor_id: params.get('vendedor') ?? ultimoFuncionario(),
       })
+      setTipoDtfEscolhido('')
       setMetragemTxt('')
       setValorTxt('')
     }
@@ -209,10 +209,23 @@ export default function PedidoForm() {
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!tipoDtfEscolhido) {
+      avisar('Escolha o tipo de DTF (DTF Têxtil ou DTF UV).', 'erro')
+      return
+    }
     setSalvando(true)
     try {
+      const dataRegistro = paraInputDate(form.data_pedido) || hojeISO()
       await salvarPedido(
-        { ...form, metragem: metrosNum || null, valor: valorFinal },
+        {
+          ...form,
+          tipo_dtf: tipoDtfEscolhido,
+          estagio: 'concluido',
+          pago: true,
+          data_pagamento: form.data_pagamento || dataRegistro,
+          metragem: metrosNum || null,
+          valor: valorFinal,
+        },
         existente?.id,
         arquivosNovos,
       )
@@ -418,6 +431,37 @@ export default function PedidoForm() {
                 />
               </Campo>
 
+              <Campo
+                label="Tipo de DTF"
+                obrigatorio
+                dica="Obrigatório — selecione se esta fila é DTF Têxtil ou DTF UV."
+                className="sm:col-span-2"
+              >
+                <div className="grid grid-cols-2 gap-2.5">
+                  {TIPOS_DTF.map((tipo) => {
+                    const ativo = tipoDtfEscolhido === tipo
+                    return (
+                      <button
+                        type="button"
+                        key={tipo}
+                        onClick={() => {
+                          setTipoDtfEscolhido(tipo)
+                          set({ tipo_dtf: tipo })
+                        }}
+                        className={cn(
+                          'min-h-[46px] rounded-xl border px-3 py-2.5 text-sm font-extrabold transition active:scale-[0.98]',
+                          ativo
+                            ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-purple-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                        )}
+                      >
+                        {LABEL_TIPO_DTF[tipo]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Campo>
+
               <Campo label="Descrição" className="sm:col-span-2">
                 <AreaTexto
                   value={form.descricao}
@@ -480,30 +524,7 @@ export default function PedidoForm() {
                 </p>
               </Campo>
 
-              <Campo
-                label="Estágio da fila"
-                dica="Em andamento enquanto está na máquina; concluído quando já saiu."
-              >
-                <div className="flex gap-2">
-                  {ESTAGIOS_FILA.map((e) => (
-                    <button
-                      type="button"
-                      key={e}
-                      onClick={() => set({ estagio: e })}
-                      className={cn(
-                        'h-10 flex-1 rounded-xl border text-sm font-bold transition',
-                        form.estagio === e
-                          ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-purple-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                      )}
-                    >
-                      {LABEL_ESTAGIO[e]}
-                    </button>
-                  ))}
-                </div>
-              </Campo>
-
-              <Campo label="Entregue ao cliente?" dica="Opcional — não entra no relatório.">
+              <Campo label="Entregue ao cliente?" dica="Opcional — não entra no relatório." className="sm:col-span-2">
                 <button
                   type="button"
                   onClick={() => set({ entregue: !form.entregue })}
@@ -520,22 +541,7 @@ export default function PedidoForm() {
 
               {mostrarExtras ? (
                 <>
-                  <Campo label="Pagamento" dica="Opcional — não é etapa da fila.">
-                    <button
-                      type="button"
-                      onClick={() => set({ pago: !form.pago, data_pagamento: !form.pago ? hojeISO() : null })}
-                      className={cn(
-                        'h-10 w-full rounded-xl border text-sm font-bold transition',
-                        form.pago
-                          ? 'border-transparent bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-soft'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                      )}
-                    >
-                      {form.pago ? 'Já foi pago' : 'Ainda não pago'}
-                    </button>
-                  </Campo>
-
-                  <Campo label="Forma de pagamento">
+                  <Campo label="Forma de pagamento" className="sm:col-span-2">
                     <Selecao value={form.forma_pagamento} onChange={(e) => set({ forma_pagamento: e.target.value })}>
                       <option value="">Não informada</option>
                       {FORMAS_PAGAMENTO.map((f) => (
@@ -544,17 +550,6 @@ export default function PedidoForm() {
                         </option>
                       ))}
                     </Selecao>
-                  </Campo>
-
-                  <Campo
-                    label="Data do pagamento"
-                    dica={form.pago ? 'Preenchida com hoje ao marcar como pago.' : undefined}
-                  >
-                    <Entrada
-                      type="date"
-                      value={paraInputDate(form.data_pagamento)}
-                      onChange={(e) => set({ data_pagamento: e.target.value || null })}
-                    />
                   </Campo>
 
                   <Campo label="Observações" className="sm:col-span-2">
@@ -567,7 +562,7 @@ export default function PedidoForm() {
                 </>
               ) : (
                 <p className="rounded-xl border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400 sm:col-span-2 dark:border-slate-700">
-                  Forma de pagamento, datas, observações, entrega e comprovante ficam em “Mais opções”, no topo
+                  Forma de pagamento, observações, entrega e comprovante ficam em “Mais opções”, no topo
                   deste cartão.
                 </p>
               )}
@@ -675,6 +670,12 @@ export default function PedidoForm() {
                 <span className="font-semibold text-slate-800">{nomeVendedor(form.vendedor_id)}</span>
               </div>
               <div className="flex items-center justify-between">
+                <span className="text-slate-500">Tipo de DTF</span>
+                <span className="font-semibold text-slate-800">
+                  {tipoDtfEscolhido ? rotuloTipoDtf(tipoDtfEscolhido) : 'Selecione acima'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-slate-500">Metragem</span>
                 <span className="font-semibold text-slate-800">{metros(metrosNum)}</span>
               </div>
@@ -693,52 +694,10 @@ export default function PedidoForm() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                <EtiquetaEstagio status={form.estagio} />
+                <Etiqueta className="border-emerald-200 bg-emerald-50 text-emerald-700">Concluída e paga</Etiqueta>
                 <EtiquetaEntrega entregue={form.entregue} />
-                <EtiquetaPago pago={form.pago} />
               </div>
             </div>
-          </Cartao>
-
-          {/* etapas da fila */}
-          <Cartao>
-            <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-              <Wand2 className="h-4 w-4 text-purple-600" /> Etapas da fila
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {ESTAGIOS_FILA.map((e) => (
-                <button
-                  type="button"
-                  key={e}
-                  onClick={() => set({ estagio: e })}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide transition',
-                    form.estagio === e
-                      ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-purple-200 hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-                  )}
-                >
-                  {LABEL_ESTAGIO[e]}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => set({ entregue: !form.entregue })}
-              className={cn(
-                'mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-bold uppercase tracking-wide transition',
-                form.entregue
-                  ? 'border-transparent bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-soft'
-                  : 'border-slate-200 bg-white text-slate-400 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-800',
-              )}
-            >
-              <PackageCheck className="h-3.5 w-3.5" />
-              {form.entregue ? 'Entregue' : 'Marcar entregue'}
-            </button>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              A fila nasce <b>em andamento</b> e sai da fila de impressão quando você marcar <b>concluído</b>.
-              “Entregue” é só um aviso de que o cliente já recebeu.
-            </p>
           </Cartao>
 
           {mostrarExtras ? (
@@ -865,21 +824,6 @@ export default function PedidoForm() {
           </Cartao>
             </>
           ) : null}
-
-          <Cartao>
-            <h3 className="mb-2 flex items-center gap-2 text-base font-extrabold text-slate-800">
-              <Wallet className="h-4 w-4 text-purple-600" /> Pagamento
-            </h3>
-            <div className="space-y-1.5 text-xs text-slate-500">
-              <p>Ao marcar como <b>Pago</b>, a data é preenchida com hoje automaticamente.</p>
-              <p>É só uma marcação de controle — não muda o estágio da fila.</p>
-              <div className="pt-1">
-                <Etiqueta className="border-slate-200 bg-slate-50 text-slate-600">
-                  {form.forma_pagamento || 'forma não informada'}
-                </Etiqueta>
-              </div>
-            </div>
-          </Cartao>
         </div>
       </div>
 

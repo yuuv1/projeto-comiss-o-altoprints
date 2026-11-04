@@ -50,6 +50,35 @@ function iniciar() {
     densidade: lerSalvo(CHAVE_DENSIDADE, ['compacto', 'confortavel'] as const, PADRAO.densidade),
   }
   aplicarAparicao()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeprint', () => {
+      if (!temDocumento()) return
+      const raiz = document.documentElement
+      raiz.classList.remove('dark')
+      raiz.style.colorScheme = 'light'
+    })
+    window.addEventListener('afterprint', () => {
+      aplicarAparicao()
+    })
+  }
+}
+
+/**
+ * Imprime a página atual garantindo que o navegador renderize a folha A4 em
+ * modo claro (sem barras pretas nas bordas quando o tema escuro está ativo).
+ */
+export function imprimirDocumento() {
+  if (typeof window === 'undefined') return
+  if (temDocumento()) {
+    const raiz = document.documentElement
+    raiz.classList.remove('dark')
+    raiz.style.colorScheme = 'light'
+  }
+  try {
+    window.print()
+  } finally {
+    window.setTimeout(() => aplicarAparicao(), 150)
+  }
 }
 
 function definir(parcial: Partial<Aparicao>) {

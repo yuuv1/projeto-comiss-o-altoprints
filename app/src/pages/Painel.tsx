@@ -1,32 +1,30 @@
 import {
   BarChart3,
+  CalendarClock,
   CheckCircle2,
-  ClipboardList,
   Crown,
+  Layers,
   Package,
   PackageCheck,
   Percent,
   Plus,
-  Printer,
-  RotateCcw,
+  Ruler,
   Settings,
+  Sparkles,
   TrendingUp,
-  TriangleAlert,
   Users,
-  Wallet,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Abas, Botao, Campo, Cartao, CartaoResumo, Entrada, TituloPagina, cn } from '../components/ui'
+import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, cn } from '../components/ui'
 import { calcularComissao, comissaoPorVendedor } from '../lib/comissao'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
-import { dataBR, diasEntre, hojeISO, moeda, numeroBR, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import {
   FAIXAS_PADRAO,
   filasDaComissao,
-  pedidoPendenteFinanceiro,
   type Pedido,
 } from '../lib/types'
 
@@ -40,7 +38,7 @@ const formatarDataISO = (d: Date) =>
 
 const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
-const dataPagamento = (p: Pedido) => p.data_pagamento || (p.data_pedido || '').slice(0, 10)
+const dataRegistro = (p: Pedido) => (p.data_pedido || p.created_at || '').slice(0, 10)
 
 type PeriodoPainel = 'hoje' | 'ontem' | '7' | 'mes' | 'mes-passado' | '30' | '90' | 'tudo' | 'personalizado'
 
@@ -53,7 +51,7 @@ export default function Painel() {
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
 
-  const [periodo, setPeriodo] = useState<PeriodoPainel>('mes')
+  const [periodo, setPeriodo] = useState<PeriodoPainel>('hoje')
   const [inicioPersonalizado, setInicioPersonalizado] = useState(primeiroDiaDoMes)
   const [fimPersonalizado, setFimPersonalizado] = useState(hojeISO)
 
@@ -84,54 +82,30 @@ export default function Painel() {
   }, [fimPersonalizado, inicioPersonalizado, periodo])
 
   const pedidosPeriodo = useMemo(
-    () => db.pedidos.filter((p) => dataPagamento(p) >= inicio && dataPagamento(p) <= fim),
+    () => db.pedidos.filter((p) => dataRegistro(p) >= inicio && dataRegistro(p) <= fim),
     [db.pedidos, fim, inicio],
   )
 
-  const pagos = pedidosPeriodo.filter((p) => p.pago)
+  const pagos = filasDaComissao(pedidosPeriodo)
   const faturamento = pagos.reduce((s, p) => s + Number(p.valor || 0), 0)
+  const metragemPeriodo = pagos.reduce((s, p) => s + Number(p.metragem || 0), 0)
   const comissao = calcularComissao(pagos, faixas, semMetragem)
 
-  const aReceberTodos = db.pedidos
-    .filter(pedidoPendenteFinanceiro)
-    .reduce((s, p) => s + Number(p.valor || 0), 0)
+  const filasTextilPeriodo = pagos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const filasUvPeriodo = pagos.filter((p) => p.tipo_dtf === 'uv')
 
-  const aPagar = db.pedidos.filter((p) => !p.pago)
-  const emAndamento = db.pedidos.filter((p) => p.estagio !== 'concluido')
+  const todasTextil = db.pedidos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const todasUv = db.pedidos.filter((p) => p.tipo_dtf === 'uv')
   const concluidas = db.pedidos.filter((p) => p.estagio === 'concluido')
-  const aEntregar = db.pedidos.filter((p) => p.estagio === 'concluido' && !p.entregue)
-
-  /* ------------------------------ resumo de hoje ------------------------------ */
+  const entregues = db.pedidos.filter((p) => p.entregue)
 
   const hoje = hojeISO()
-
-  const resumoHoje = useMemo(() => {
-    const noDia = (valor?: string | null) => (valor || '').slice(0, 10) === hoje
-    const naFila = db.pedidos.filter((p) => p.estagio !== 'concluido')
-    const parados = naFila.filter((p) => {
-      const quando = new Date(p.data_pedido)
-      return !Number.isNaN(quando.getTime()) && diasEntre(new Date(), quando) >= 3
-    })
-    return {
-      criados: db.pedidos.filter((p) => noDia(p.data_pedido)).length,
-      pagos: db.pedidos.filter((p) => p.pago && (p.data_pagamento || '') === hoje).length,
-      concluidos: db.pedidos.filter((p) => p.estagio === 'concluido' && noDia(p.iniciado_em)).length,
-      entregues: db.pedidos.filter(
-        (p) => p.entregue && (p.data_entrega === hoje || p.data_retirada === hoje),
-      ).length,
-      naFila: naFila.length,
-      parados: parados.length,
-      valorCriado: db.pedidos.filter((p) => noDia(p.data_pedido)).reduce((s, p) => s + Number(p.valor || 0), 0),
-    }
-  }, [db.pedidos, hoje])
-
-  /* ------------------------------ equipe em tabela ------------------------------ */
 
   const mesesDisponiveis = useMemo(() => {
     const conjunto = new Set<string>()
     conjunto.add(hoje.slice(0, 7))
     for (const p of db.pedidos) {
-      const d = dataPagamento(p)
+      const d = dataRegistro(p)
       if (/^\d{4}-\d{2}/.test(d)) conjunto.add(d.slice(0, 7))
     }
     return [...conjunto]
@@ -152,7 +126,7 @@ export default function Painel() {
 
   const mesAtual = hoje.slice(0, 7)
   const equipe = useMemo(() => {
-    const pedidosMesAtual = db.pedidos.filter((p) => dataPagamento(p).startsWith(mesAtual))
+    const pedidosMesAtual = db.pedidos.filter((p) => dataRegistro(p).startsWith(mesAtual))
     const basePeriodo = pedidosPeriodo.length > 0 ? pedidosPeriodo : pedidosMesAtual
     const vendedoresVisiveis =
       basePeriodo.length > 0
@@ -197,36 +171,47 @@ export default function Painel() {
 
   /** os atalhos caem direto na fila certa dentro de Pedidos */
   const atalhos = [
-    { label: 'Em andamento', valor: emAndamento.length, icone: RotateCcw, to: '/pedidos?filtro=em_andamento', cor: 'from-sky-500 to-blue-600' },
-    { label: 'A pagar', valor: aPagar.length, icone: Wallet, to: '/pedidos?filtro=a_pagar', cor: 'from-amber-500 to-orange-600' },
-    { label: 'Concluídas', valor: concluidas.length, icone: CheckCircle2, to: '/pedidos?filtro=concluida', cor: 'from-emerald-500 to-green-600' },
-    { label: 'A entregar', valor: aEntregar.length, icone: PackageCheck, to: '/pedidos?filtro=concluida', cor: 'from-violet-500 to-indigo-600' },
+    { label: 'Concluídas', valor: concluidas.length, icone: CheckCircle2, to: '/pedidos', cor: 'from-emerald-500 to-green-600' },
+    { label: 'DTF Têxtil', valor: todasTextil.length, icone: Layers, to: '/pedidos?filtro=textil', cor: 'from-pink-500 to-purple-600' },
+    { label: 'DTF UV', valor: todasUv.length, icone: Sparkles, to: '/pedidos?filtro=uv', cor: 'from-indigo-500 to-blue-600' },
+    { label: 'Entregues', valor: entregues.length, icone: PackageCheck, to: '/pedidos?filtro=entregue', cor: 'from-violet-500 to-indigo-600' },
   ]
 
   /** botões grandes: o que o chefe faz todos os dias, em um toque */
   const acoesGrandes = [
     { label: 'Novo pedido', sub: 'registrar uma fila', icone: Plus, cor: 'from-pink-500 to-purple-600', to: '/pedido/novo' },
-    { label: 'A receber', sub: moeda(aReceberTodos), icone: Wallet, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=a_pagar' },
-    { label: 'Na máquina', sub: `${resumoHoje.naFila} fila(s)`, icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
+    { label: 'DTF Têxtil', sub: `${todasTextil.length} fila(s)`, icone: Layers, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=textil' },
+    { label: 'DTF UV', sub: `${todasUv.length} fila(s)`, icone: Sparkles, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=uv' },
     { label: 'Equipe', sub: `${equipe.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
     { label: 'Relatório', sub: 'ver ou baixar PDF / CSV', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
 
-  const numerosDeHoje = [
-    { label: 'Criados hoje', valor: resumoHoje.criados, sub: moeda(resumoHoje.valorCriado), icone: Package, cor: 'from-pink-500 to-purple-600', to: '/pedidos' },
-    { label: 'Pagos hoje', valor: resumoHoje.pagos, sub: 'baixa do dia', icone: Wallet, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
-    { label: 'Na fila agora', valor: resumoHoje.naFila, sub: 'ainda na máquina', icone: Printer, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=em_andamento' },
-    { label: 'Concluídos hoje', valor: resumoHoje.concluidos, sub: 'saíram da máquina', icone: CheckCircle2, cor: 'from-indigo-500 to-violet-600', to: '/pedidos?filtro=concluida' },
-    { label: 'Entregues hoje', valor: resumoHoje.entregues, sub: 'cliente recebeu', icone: PackageCheck, cor: 'from-teal-500 to-emerald-600', to: '/pedidos?filtro=entregue' },
-    {
-      label: 'Parados 3+ dias',
-      valor: resumoHoje.parados,
-      sub: resumoHoje.parados ? 'precisa de atenção' : 'tudo em dia',
-      icone: TriangleAlert,
-      cor: resumoHoje.parados ? 'from-amber-500 to-orange-600' : 'from-slate-400 to-slate-500',
-      to: '/pedidos?filtro=em_andamento',
-    },
-  ]
+  const valorSelectEpoca = useMemo(() => {
+    if (periodo === 'personalizado') {
+      const mesMatch = mesesDisponiveis.find((m) => m.de === inicioPersonalizado && m.ate === fimPersonalizado)
+      if (mesMatch) return `mes:${mesMatch.id}`
+    }
+    return periodo
+  }, [fimPersonalizado, inicioPersonalizado, mesesDisponiveis, periodo])
+
+  const selecionarEpoca = (valor: string) => {
+    if (valor.startsWith('mes:')) {
+      const idMes = valor.slice(4)
+      const m = mesesDisponiveis.find((item) => item.id === idMes)
+      if (!m) return
+      if (m.id === mesAtual) {
+        setPeriodo('mes')
+      } else {
+        setInicioPersonalizado(m.de)
+        setFimPersonalizado(m.ate)
+        setPeriodo('personalizado')
+      }
+      return
+    }
+    setPeriodo(valor as PeriodoPainel)
+  }
+
+  const textoPeriodoAtivo = inicio === fim ? dataBR(inicio) : `${dataBR(inicio)} — ${dataBR(fim)}`
 
   return (
     <>
@@ -246,104 +231,67 @@ export default function Painel() {
         }
       />
 
-      {/* ------------------------------- resumo de hoje ------------------------------- */}
-      <Cartao hover={false} className="mb-3">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-extrabold text-slate-800 dark:text-slate-100">Resumo de hoje</h2>
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{dataBR(hoje)}</span>
+      {/* Filtro de época discreto e limpo (começa sempre no Diário / Hoje) */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 sm:text-sm dark:text-slate-300">
+          <CalendarClock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
+          <span>Resumo por filtro:</span>
+          <span className="font-extrabold text-slate-900 dark:text-white">{textoPeriodoAtivo}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {numerosDeHoje.map(({ label, valor, sub, icone: Icone, cor, to }) => (
-            <button
-              key={label}
-              onClick={() => navegar(to)}
-              className="flex items-center gap-2 rounded-xl border border-slate-100 p-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-soft dark:border-slate-800"
-            >
-              <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white', cor)}>
-                <Icone className="h-4 w-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {label}
-                </span>
-                <span className="block text-lg font-black leading-tight text-slate-800 dark:text-slate-100">{valor}</span>
-                <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">{sub}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </Cartao>
 
-      {/* --------------------------- atalhos grandes do dia --------------------------- */}
-      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-        {acoesGrandes.map(({ label, sub, icone: Icone, cor, to }) => (
-          <button
-            key={label}
-            onClick={() => navegar(to)}
-            className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 text-left shadow-soft transition active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-hover dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft"
+        <div className="flex flex-wrap items-center gap-1.5">
+          {([
+            { id: 'hoje', label: 'Hoje (Diário)' },
+            { id: 'ontem', label: 'Ontem' },
+            { id: 'mes', label: 'Este mês' },
+          ] as const).map((op) => {
+            const ativo = periodo === op.id
+            return (
+              <button
+                key={op.id}
+                type="button"
+                onClick={() => setPeriodo(op.id)}
+                className={cn(
+                  'rounded-xl border px-3 py-1.5 text-xs font-extrabold transition active:scale-95',
+                  ativo
+                    ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                )}
+              >
+                {op.label}
+              </button>
+            )
+          })}
+
+          <Selecao
+            aria-label="Filtrar época"
+            value={valorSelectEpoca}
+            onChange={(e) => selecionarEpoca(e.target.value)}
+            className="min-h-[38px] w-auto min-w-[155px] py-1.5 text-xs font-extrabold sm:text-xs"
           >
-            <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm sm:h-10 sm:w-10', cor)}>
-              <Icone className="h-6 w-6 sm:h-5 sm:w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-base font-extrabold text-slate-800 sm:text-sm dark:text-slate-100">{label}</span>
-              <span className="block truncate text-xs font-semibold text-slate-500 sm:text-[11px] dark:text-slate-400">{sub}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <Abas<PeriodoPainel>
-        ativa={periodo}
-        onChange={setPeriodo}
-        abas={[
-          { id: 'hoje', label: 'Hoje' },
-          { id: 'ontem', label: 'Ontem' },
-          { id: '7', label: '7 dias' },
-          { id: 'mes', label: 'Este mês' },
-          { id: 'mes-passado', label: 'Mês passado' },
-          { id: '30', label: 'Últimos 30 dias' },
-          { id: '90', label: 'Últimos 90 dias' },
-          { id: 'tudo', label: 'Todo o período' },
-          { id: 'personalizado', label: 'Escolher datas' },
-        ]}
-      />
-
-      {mesesDisponiveis.length > 1 ? (
-        <div className="mb-3">
-          <span className="mb-1.5 block text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Escolher mês direto:
-          </span>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-            {mesesDisponiveis.map((m) => {
-              const ativo = inicio === m.de && fim === m.ate
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    if (m.id === mesAtual) {
-                      setPeriodo('mes')
-                    } else {
-                      setInicioPersonalizado(m.de)
-                      setFimPersonalizado(m.ate)
-                      setPeriodo('personalizado')
-                    }
-                  }}
-                  className={cn(
-                    'inline-flex min-h-[46px] items-center justify-center rounded-2xl border px-3.5 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[38px] sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs',
-                    ativo
-                      ? 'border-purple-500 bg-purple-100 text-purple-800 shadow-sm dark:border-purple-500 dark:bg-purple-950/70 dark:text-purple-100'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-                  )}
-                >
-                  {m.label}
-                </button>
-              )
-            })}
-          </div>
+            <optgroup label="Períodos rápidos">
+              <option value="hoje">Hoje (Diário)</option>
+              <option value="ontem">Ontem</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="mes">Este mês</option>
+              <option value="mes-passado">Mês passado</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
+              <option value="tudo">Todo o período</option>
+              <option value="personalizado">Escolher datas...</option>
+            </optgroup>
+            {mesesDisponiveis.length > 0 ? (
+              <optgroup label="Meses">
+                {mesesDisponiveis.map((m) => (
+                  <option key={m.id} value={`mes:${m.id}`}>
+                    Mês de {m.label}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+          </Selecao>
         </div>
-      ) : null}
+      </div>
 
       {periodo === 'personalizado' ? (
         <Cartao hover={false} className="mb-3">
@@ -366,13 +314,21 @@ export default function Painel() {
         </Cartao>
       ) : null}
 
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Resumo principal em destaque logo no topo e com cartões maiores */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <CartaoResumo
           titulo="Pedidos pagos"
           valor={pagos.length}
           icone={Package}
           gradiente="from-pink-500 to-purple-600"
-          sub={`${pedidosPeriodo.length} pedidos no período`}
+          sub={`${filasTextilPeriodo.length} Têxtil • ${filasUvPeriodo.length} UV`}
+        />
+        <CartaoResumo
+          titulo="Metragem total"
+          valor={`${numeroBR(metragemPeriodo)} m`}
+          icone={Ruler}
+          gradiente="from-sky-500 to-blue-600"
+          sub="metros impressos no período"
         />
         <CartaoResumo
           titulo="Faturamento"
@@ -387,13 +343,6 @@ export default function Painel() {
           icone={Percent}
           gradiente="from-amber-500 to-orange-600"
           sub={`${numeroBR(comissao.percentualMedio, 2)}% médio no período`}
-        />
-        <CartaoResumo
-          titulo="A receber (total)"
-          valor={moeda(aReceberTodos)}
-          icone={Wallet}
-          gradiente="from-violet-500 to-indigo-600"
-          sub="pedidos pendentes ou parciais"
         />
       </div>
 
@@ -415,11 +364,11 @@ export default function Painel() {
           ) : (
             <div className="space-y-3">
               {ranking.map((linha, i) => (
-                <div key={linha.chave} className="rounded-xl border border-slate-100 p-3 dark:border-slate-800">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                <div key={linha.chave} className="rounded-2xl border border-slate-100 p-3.5 sm:p-4 dark:border-slate-800">
+                  <div className="mb-2 flex flex-wrap items-center gap-2.5">
                     <span
                       className={cn(
-                        'flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black text-white',
+                        'flex h-8 w-8 items-center justify-center rounded-xl text-sm font-black text-white',
                         i === 0
                           ? 'bg-gradient-to-br from-amber-400 to-orange-500'
                           : 'bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600',
@@ -427,28 +376,28 @@ export default function Painel() {
                     >
                       {i + 1}
                     </span>
-                    <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                    <span className="text-base font-extrabold text-slate-800 sm:text-lg dark:text-slate-100">
                       {linha.vendedor?.nome ?? 'Sem vendedor'}
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="text-xs font-semibold text-slate-500 sm:text-sm dark:text-slate-400">
                       {linha.pedidos} pedido(s) • {numeroBR(linha.metragem)} m
                     </span>
                     <span className="ml-auto text-right">
-                      <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400">
+                      <span className="block text-base font-black text-emerald-600 sm:text-lg dark:text-emerald-400">
                         {moeda(linha.faturamento)}
                       </span>
-                      <span className="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      <span className="block text-xs font-bold text-amber-600 sm:text-sm dark:text-amber-400">
                         comissão {moeda(linha.resultado.total)} ({numeroBR(linha.resultado.percentualMedio, 2)}%)
                       </span>
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600"
                       style={{ width: `${Math.max(4, (linha.faturamento / maiorFaturamento) * 100)}%` }}
                     />
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <div className="mt-2.5 flex flex-wrap gap-2">
                     <Botao
                       tamanho="sm"
                       variante="secundario"
@@ -468,7 +417,7 @@ export default function Painel() {
 
         <div className="space-y-4">
           <Cartao hover={false}>
-            <h2 className="mb-3 text-base font-extrabold text-slate-800 dark:text-slate-100">O que precisa de atenção</h2>
+            <h2 className="mb-3 text-base font-extrabold text-slate-800 dark:text-slate-100">Catálogo de filas</h2>
             <div className="grid gap-2">
               {atalhos.map(({ label, valor, icone: Icone, to, cor }) => (
                 <button
@@ -489,30 +438,6 @@ export default function Painel() {
                 </button>
               ))}
             </div>
-          </Cartao>
-
-          <Cartao hover={false}>
-            <h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800 dark:text-slate-100">
-              <Percent className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Comissão por faixa (período)
-            </h2>
-            <div className="space-y-2">
-              {[...comissao.porFaixa, comissao.semMetragem]
-                .filter((l) => l.pedidos > 0)
-                .map((l) => (
-                  <div
-                    key={l.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm dark:border-slate-800"
-                  >
-                    <span className="text-slate-600 dark:text-slate-300">
-                      {l.rotulo} <b className="text-purple-600 dark:text-purple-400">{percentualBR(l.percentual)}</b>
-                    </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100">{moeda(l.comissao)}</span>
-                  </div>
-                ))}
-              {!comissao.porFaixa.some((l) => l.pedidos > 0) && comissao.semMetragem.pedidos === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum pedido pago no período.</p>
-              ) : null}
-            </div>
             <Botao
               variante="secundario"
               icone={Settings}
@@ -523,6 +448,25 @@ export default function Painel() {
             </Botao>
           </Cartao>
         </div>
+      </div>
+
+      {/* --------------------------- atalhos grandes do dia --------------------------- */}
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        {acoesGrandes.map(({ label, sub, icone: Icone, cor, to }) => (
+          <button
+            key={label}
+            onClick={() => navegar(to)}
+            className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 text-left shadow-soft transition active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-hover dark:border-slate-800 dark:bg-slate-900 dark:shadow-dark-soft"
+          >
+            <span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm sm:h-10 sm:w-10', cor)}>
+              <Icone className="h-6 w-6 sm:h-5 sm:w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-base font-extrabold text-slate-800 sm:text-sm dark:text-slate-100">{label}</span>
+              <span className="block truncate text-xs font-semibold text-slate-500 sm:text-[11px] dark:text-slate-400">{sub}</span>
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* --------------------------- equipe em formato de tabela --------------------------- */}
