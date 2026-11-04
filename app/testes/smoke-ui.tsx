@@ -372,6 +372,9 @@ async function main() {
   // ---------- relatório: uma tela só, sem tela de impressões ----------
   dom.window.location.hash = '#/relatorio'
   await espera(900)
+  // o relatório começa no filtro diário ("Hoje (Diário)"); ao clicar em "Este mês" confere as concluídas do mês
+  clicar(raiz, 'Este mês')
+  await espera(400)
   const textoRel = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
   const relatorioOk = textoRel.includes('Resumo por vendedor') && textoRel.includes('Comissão por faixa')
   if (!relatorioOk) falhas++
@@ -488,14 +491,17 @@ async function main() {
   if (!avisoExemplo) falhas++
   console.log(`  ${avisoExemplo ? '✅' : '❌'} dados de exemplo avisam que "não são reais" e trazem o atalho para apagar`)
 
-  // ---------- painel do chefe: resumo de hoje, atalhos grandes, checklist e tabela ----------
-  const resumoHojeOk =
-    painel.includes('Resumo de hoje') &&
-    painel.includes('Na fila agora') &&
-    painel.includes('Parados 3+ dias') &&
-    painel.includes('Entregues hoje')
-  if (!resumoHojeOk) falhas++
-  console.log(`  ${resumoHojeOk ? '✅' : '❌'} painel abre com o “Resumo de hoje” (fila, entregas, parados)`)
+  // ---------- painel do chefe: resumo por filtro no topo (sem bloco redundante "Resumo de hoje") ----------
+  const resumoHojeRemovidoOk =
+    !painel.includes('Resumo de hoje') &&
+    painel.includes('Resumo por filtro:') &&
+    painel.includes('Hoje (Diário)') &&
+    painel.includes('Pedidos pagos') &&
+    painel.includes('Faturamento')
+  if (!resumoHojeRemovidoOk) falhas++
+  console.log(
+    `  ${resumoHojeRemovidoOk ? '✅' : '❌'} painel remove o “Resumo de hoje” e destaca primeiro o resumo por filtro (começando no diário)`,
+  )
 
   const atalhosGrandesOk = ['Novo pedido', 'A receber', 'Na máquina', 'Equipe', 'Relatório'].every((t) =>
     painel.includes(t),

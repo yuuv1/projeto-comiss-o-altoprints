@@ -75,12 +75,13 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
   const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
   const [campo, setCampo] = useState<CampoData>('pedido')
-  const [inicio, setInicio] = useState(primeiroDiaDoMes)
+  const [inicio, setInicio] = useState(hojeISO)
   const [fim, setFim] = useState(hojeISO)
   const [vendedorId, setVendedorId] = useState('todos')
   const [excluidos, setExcluidos] = useState<string[]>([])
   const [buscaPedido, setBuscaPedido] = useState('')
   const [limiteLista, setLimiteLista] = useState(500)
+  const [mostrarDatasPersonalizadas, setMostrarDatasPersonalizadas] = useState(false)
 
   /**
    * Filas que entram na conta: SÓ as concluídas (as que já saíram da máquina).
@@ -279,6 +280,42 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const ehDiaUnico = inicio === fim
   const periodoTexto = ehDiaUnico ? dataBR(inicio) : `${dataBR(inicio)} — ${dataBR(fim)}`
 
+  const valorSelectEpocaRelatorio = useMemo(() => {
+    const atalhoAtivo = atalhos.find((a) => a.de === inicio && a.ate === fim)
+    if (atalhoAtivo) return `atalho:${atalhoAtivo.id}`
+    const mesAtivo = mesesDisponiveis.find(
+      (m) => m.de === inicio && (m.ate === fim || (m.id === hojeISO().slice(0, 7) && fim === hojeISO())),
+    )
+    if (mesAtivo) return `mes:${mesAtivo.id}`
+    return 'personalizado'
+  }, [atalhos, fim, inicio, mesesDisponiveis])
+
+  const selecionarEpocaRelatorio = (valor: string) => {
+    if (valor === 'personalizado') {
+      setMostrarDatasPersonalizadas(true)
+      return
+    }
+    if (valor.startsWith('atalho:')) {
+      const id = valor.slice(7)
+      const a = atalhos.find((item) => item.id === id)
+      if (a) {
+        setInicio(a.de)
+        setFim(a.ate)
+        setLimiteLista(500)
+      }
+      return
+    }
+    if (valor.startsWith('mes:')) {
+      const id = valor.slice(4)
+      const m = mesesDisponiveis.find((item) => item.id === id)
+      if (m) {
+        setInicio(m.de)
+        setFim(m.ate > hojeISO() ? hojeISO() : m.ate)
+        setLimiteLista(500)
+      }
+    }
+  }
+
   return (
     <>
       {/* ------------------------------ tela ------------------------------ */}
@@ -310,231 +347,171 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
           />
         )}
 
-        <Cartao className="mb-3" hover={false}>
-          {/* Atalhos rápidos de período com botões grandes para facilitar visualização e toque no celular */}
-          <div className="mb-4">
-            <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-              Período rápido
-            </span>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-              {atalhos.map((a) => {
-                const ativo = inicio === a.de && fim === a.ate
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => {
-                      setInicio(a.de)
-                      setFim(a.ate)
-                      setLimiteLista(500)
-                    }}
-                    className={cn(
-                      'inline-flex min-h-[48px] items-center justify-center rounded-2xl border px-3.5 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[40px] sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-xs',
-                      ativo
-                        ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-purple-200 hover:bg-white hover:text-purple-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-                    )}
-                  >
-                    {a.label}
-                  </button>
-                )
-              })}
+        {/* Filtro discreto e limpo (começa sempre no Diário / Hoje) */}
+        <div className="mb-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/95">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 sm:text-sm dark:text-slate-300">
+              <CalendarClock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
+              <span>{LABEL_CAMPO[campo]}:</span>
+              <span className="font-extrabold text-slate-900 dark:text-white">{periodoTexto}</span>
             </div>
-          </div>
 
-          {/* Atalhos de meses com botões grandes e contagem de filas */}
-          {mesesDisponiveis.length > 1 ? (
-            <div className="mb-4">
-              <span className="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                Ir direto para o mês
-              </span>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-                {mesesDisponiveis.map((m) => {
-                  const ativo = inicio === m.de && (fim === m.ate || (m.id === hojeISO().slice(0, 7) && fim === hojeISO()))
+            <div className="flex flex-wrap items-center gap-1.5">
+              {atalhos
+                .filter((a) => ['hoje', 'ontem', 'mes', 'tudo'].includes(a.id))
+                .map((a) => {
+                  const ativo = inicio === a.de && fim === a.ate
                   return (
                     <button
-                      key={m.id}
+                      key={a.id}
                       type="button"
                       onClick={() => {
-                        setInicio(m.de)
-                        setFim(m.ate > hojeISO() ? hojeISO() : m.ate)
+                        setInicio(a.de)
+                        setFim(a.ate)
                         setLimiteLista(500)
                       }}
                       className={cn(
-                        'inline-flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[40px] sm:justify-center sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs',
+                        'rounded-xl border px-2.5 py-1.5 text-xs font-extrabold transition active:scale-95',
                         ativo
-                          ? 'border-purple-500 bg-purple-100 text-purple-800 shadow-sm dark:border-purple-500 dark:bg-purple-950/70 dark:text-purple-100'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200',
+                          ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
                       )}
                     >
-                      <span>{m.label}</span>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-black',
-                          ativo
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                        )}
-                      >
-                        {m.qtd}
-                      </span>
+                      {a.id === 'hoje' ? 'Hoje (Diário)' : a.label}
                     </button>
                   )
                 })}
-              </div>
-            </div>
-          ) : null}
 
-          {/* Seletores de dia único ou intervalo personalizado */}
-          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
-            <Campo label="Dia único" className="col-span-2 sm:col-span-1">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  title="Dia anterior"
-                  onClick={() => {
-                    const d = somarDiasISO(inicio, -1)
-                    setInicio(d)
-                    setFim(d)
-                  }}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 sm:h-10 sm:w-9 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <ChevronLeft className="h-5 w-5 sm:h-4 sm:w-4" />
-                </button>
-                <Entrada
-                  type="date"
-                  value={ehDiaUnico ? inicio : ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setInicio(e.target.value)
-                      setFim(e.target.value)
-                      setLimiteLista(500)
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  title="Próximo dia"
-                  onClick={() => {
-                    const d = somarDiasISO(fim, 1)
-                    setInicio(d)
-                    setFim(d)
-                  }}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 sm:h-10 sm:w-9 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <ChevronRight className="h-5 w-5 sm:h-4 sm:w-4" />
-                </button>
-              </div>
-            </Campo>
-
-            <Campo label="Início (De)">
-              <Entrada
-                type="date"
-                value={inicio}
-                onChange={(e) => {
-                  setInicio(e.target.value)
-                  setLimiteLista(500)
-                }}
-              />
-            </Campo>
-            <Campo label="Fim (Até)">
-              <Entrada
-                type="date"
-                value={fim}
-                onChange={(e) => {
-                  setFim(e.target.value)
-                  setLimiteLista(500)
-                }}
-              />
-            </Campo>
-            <Campo label="Filtrar por">
-              <Selecao value={campo} onChange={(e) => setCampo(e.target.value as CampoData)}>
-                <option value="pagamento">Data do pagamento</option>
-                <option value="pedido">Data do pedido</option>
-                <option value="envio">Data do envio</option>
+              <Selecao
+                aria-label="Filtrar época do relatório"
+                value={valorSelectEpocaRelatorio}
+                onChange={(e) => selecionarEpocaRelatorio(e.target.value)}
+                className="min-h-[38px] w-auto min-w-[155px] py-1.5 text-xs font-extrabold sm:text-xs"
+              >
+                <optgroup label="Períodos rápidos">
+                  {atalhos.map((a) => (
+                    <option key={a.id} value={`atalho:${a.id}`}>
+                      {a.id === 'hoje' ? 'Hoje (Diário)' : a.label}
+                    </option>
+                  ))}
+                  <option value="personalizado">Escolher datas...</option>
+                </optgroup>
+                {mesesDisponiveis.length > 0 ? (
+                  <optgroup label="Meses disponíveis">
+                    {mesesDisponiveis.map((m) => (
+                      <option key={m.id} value={`mes:${m.id}`}>
+                        Mês de {m.label} ({m.qtd} filas)
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </Selecao>
-            </Campo>
-            <Campo label="Funcionário">
-              <Selecao value={vendedorIdAtivo} onChange={(e) => setVendedorId(e.target.value)}>
-                <option value="todos">Todos do período ({vendedoresNoPeriodo.length})</option>
+
+              <Selecao
+                aria-label="Filtrar funcionária do período"
+                value={vendedorIdAtivo}
+                onChange={(e) => setVendedorId(e.target.value)}
+                className="min-h-[38px] w-auto min-w-[145px] py-1.5 text-xs font-extrabold sm:text-xs"
+              >
+                <option value="todos">Todas funcionárias ({vendedoresNoPeriodo.length})</option>
                 {vendedoresNoPeriodo.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.nome}
+                    {v.nome} ({pedidosDoPeriodo.filter((p) => p.vendedor_id === v.id).length})
                   </option>
                 ))}
                 {temSemVendedorNoPeriodo ? <option value="sem-vendedor">Sem funcionário</option> : null}
               </Selecao>
-            </Campo>
-          </div>
 
-          {/* Botões grandes para filtrar por funcionária do respectivo mês com 1 toque no celular */}
-          <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                <Users className="h-4 w-4 text-purple-600" /> Funcionárias que trabalharam neste período
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
-                <CalendarClock className="h-4 w-4 shrink-0 text-purple-600" />
-                {LABEL_CAMPO[campo]}: {periodoTexto}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
               <button
                 type="button"
-                onClick={() => setVendedorId('todos')}
+                onClick={() => setMostrarDatasPersonalizadas((v) => !v)}
                 className={cn(
-                  'inline-flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-4 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[40px] sm:justify-center sm:rounded-full sm:px-3.5 sm:py-1.5 sm:text-xs',
-                  vendedorIdAtivo === 'todos'
-                    ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                  'rounded-xl border px-2.5 py-1.5 text-xs font-bold transition',
+                  mostrarDatasPersonalizadas
+                    ? 'border-purple-400 bg-purple-50 text-purple-700 dark:border-purple-500 dark:bg-purple-950/60 dark:text-purple-200'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
                 )}
               >
-                <span>Todos</span>
-                <span
-                  className={cn(
-                    'rounded-full px-2 py-0.5 text-xs font-black',
-                    vendedorIdAtivo === 'todos'
-                      ? 'bg-white/25 text-white'
-                      : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                  )}
-                >
-                  {pedidosDoPeriodo.length}
-                </span>
+                {mostrarDatasPersonalizadas ? 'Ocultar datas' : 'Datas'}
               </button>
-              {vendedoresNoPeriodo.map((v) => {
-                const qtdVendedor = pedidosDoPeriodo.filter((p) => p.vendedor_id === v.id).length
-                const ativo = vendedorIdAtivo === v.id
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setVendedorId(ativo ? 'todos' : v.id)}
-                    className={cn(
-                      'inline-flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border px-4 py-2.5 text-sm font-extrabold transition active:scale-[0.98] sm:min-h-[40px] sm:justify-center sm:rounded-full sm:px-3.5 sm:py-1.5 sm:text-xs',
-                      ativo
-                        ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-                    )}
-                  >
-                    <span className="truncate">{v.nome}</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-xs font-black',
-                        ativo
-                          ? 'bg-white/25 text-white'
-                          : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-                      )}
-                    >
-                      {qtdVendedor}
-                    </span>
-                  </button>
-                )
-              })}
             </div>
           </div>
-        </Cartao>
 
-        <div className="mb-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          {mostrarDatasPersonalizadas ? (
+            <div className="mt-3 grid grid-cols-2 gap-2.5 border-t border-slate-100 pt-3 lg:grid-cols-4 dark:border-slate-800">
+              <Campo label="Dia único" className="col-span-2 sm:col-span-1">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    title="Dia anterior"
+                    onClick={() => {
+                      const d = somarDiasISO(inicio, -1)
+                      setInicio(d)
+                      setFim(d)
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <Entrada
+                    type="date"
+                    value={ehDiaUnico ? inicio : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setInicio(e.target.value)
+                        setFim(e.target.value)
+                        setLimiteLista(500)
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    title="Próximo dia"
+                    onClick={() => {
+                      const d = somarDiasISO(fim, 1)
+                      setInicio(d)
+                      setFim(d)
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </Campo>
+
+              <Campo label="Início (De)">
+                <Entrada
+                  type="date"
+                  value={inicio}
+                  onChange={(e) => {
+                    setInicio(e.target.value)
+                    setLimiteLista(500)
+                  }}
+                />
+              </Campo>
+              <Campo label="Fim (Até)">
+                <Entrada
+                  type="date"
+                  value={fim}
+                  onChange={(e) => {
+                    setFim(e.target.value)
+                    setLimiteLista(500)
+                  }}
+                />
+              </Campo>
+              <Campo label="Filtrar por">
+                <Selecao value={campo} onChange={(e) => setCampo(e.target.value as CampoData)}>
+                  <option value="pagamento">Data do pagamento</option>
+                  <option value="pedido">Data do pedido</option>
+                  <option value="envio">Data do envio</option>
+                </Selecao>
+              </Campo>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Resumo principal em destaque logo no topo e com cartões maiores */}
+        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <CartaoResumo
             titulo="Filas concluídas"
             valor={totais.pedidos}
@@ -578,8 +555,8 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
             </div>
           </div>
 
-          {/* Visão mobile em cartões (sem precisar rolar tabela nem baixar PDF) */}
-          <div className="space-y-2.5 md:hidden">
+          {/* Visão mobile em cartões maiores (sem precisar rolar tabela nem baixar PDF) */}
+          <div className="space-y-3 md:hidden">
             {resumoVendedores.map((linha) => {
               const chaveFiltro = linha.chave === '__sem_vendedor__' ? 'sem-vendedor' : linha.chave
               const selecionado = vendedorIdAtivo === chaveFiltro
@@ -587,7 +564,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 <div
                   key={linha.chave}
                   className={cn(
-                    'rounded-2xl border p-3 transition',
+                    'rounded-2xl border p-3.5 transition',
                     selecionado
                       ? 'border-purple-300 bg-purple-50/40 dark:border-purple-700 dark:bg-purple-950/30'
                       : 'border-slate-100 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/60',
@@ -595,7 +572,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-base font-extrabold text-slate-800 dark:text-slate-100">
+                      <p className="truncate text-lg font-extrabold text-slate-800 dark:text-slate-100">
                         {linha.vendedor?.nome ?? 'Sem vendedor'}
                       </p>
                       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -613,20 +590,20 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                     </Botao>
                   </div>
 
-                  <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                  <div className="mt-3 grid grid-cols-2 gap-2.5 rounded-xl bg-white p-3 dark:bg-slate-900">
                     <div>
-                      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-400">
                         Faturamento
                       </span>
-                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
                         {moeda(linha.faturamento)}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-400">
                         Comissão ({numeroBR(linha.percentualMedio, 2)}%)
                       </span>
-                      <span className="text-sm font-black text-amber-600 dark:text-amber-400">
+                      <span className="text-base font-black text-amber-600 dark:text-amber-400">
                         {moeda(linha.comissao)}
                       </span>
                     </div>
@@ -635,11 +612,11 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               )
             })}
             {resumoVendedores.length > 1 ? (
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-100/80 px-3.5 py-2.5 text-xs font-extrabold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3 text-sm font-extrabold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                 <span>TOTAL ({totais.pedidos} pedidos • {numeroBR(totais.metragem)} m)</span>
                 <span className="text-right">
-                  <span className="block text-emerald-700 dark:text-emerald-400">{moeda(totais.faturamento)}</span>
-                  <span className="block text-amber-700 dark:text-amber-400">Comissão: {moeda(totais.comissao)}</span>
+                  <span className="block text-base font-black text-emerald-700 dark:text-emerald-400">{moeda(totais.faturamento)}</span>
+                  <span className="block text-xs font-extrabold text-amber-700 dark:text-amber-400">Comissão: {moeda(totais.comissao)}</span>
                 </span>
               </div>
             ) : null}
