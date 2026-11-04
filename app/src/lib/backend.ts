@@ -4,6 +4,7 @@ import { migrarFaixas } from './comissao'
 import { clienteNuvem, clienteNuvemObrigatorio } from './supabase'
 import {
   CONFIG_PADRAO,
+  FAIXAS_VALOR_PADRAO,
   type Arquivo,
   type Cliente,
   type Configuracoes,
@@ -127,6 +128,16 @@ const comConfigAtual = (c: Configuracoes): Configuracoes => {
     ...c,
     faixas_comissao: faixas,
     comissao_sem_metragem: migrou && Number(c.comissao_sem_metragem) === 3 ? 0 : c.comissao_sem_metragem,
+    // regra em vigor: comissão pelo valor do metro (a partir de 01/11/2026)
+    faixas_comissao_valor: c.faixas_comissao_valor?.length
+      ? c.faixas_comissao_valor
+      : FAIXAS_VALOR_PADRAO,
+    comissao_por_valor_desde:
+      c.comissao_por_valor_desde === undefined ? CONFIG_PADRAO.comissao_por_valor_desde : c.comissao_por_valor_desde,
+    comissao_sem_valor_metro:
+      c.comissao_sem_valor_metro === undefined
+        ? CONFIG_PADRAO.comissao_sem_valor_metro
+        : c.comissao_sem_valor_metro,
   }
 }
 

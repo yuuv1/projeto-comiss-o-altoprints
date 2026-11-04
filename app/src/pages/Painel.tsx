@@ -17,16 +17,12 @@ import {
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Botao, Campo, Cartao, CartaoResumo, Entrada, Selecao, TituloPagina, cn } from '../components/ui'
-import { calcularComissao, comissaoPorVendedor } from '../lib/comissao'
+import { calcularComissao, comissaoPorVendedor, regrasDaConfig } from '../lib/comissao'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, numeroBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
-import {
-  FAIXAS_PADRAO,
-  filasDaComissao,
-  type Pedido,
-} from '../lib/types'
+import { filasDaComissao, type Pedido } from '../lib/types'
 
 const primeiroDiaDoMes = () => {
   const d = new Date()
@@ -48,8 +44,8 @@ export default function Painel() {
   const { usuario } = useAuth()
   const navegar = useNavigate()
 
-  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
-  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
+  // regras de comissão (valor do metro a partir da vigência; metragem no histórico)
+  const regras = useMemo(() => regrasDaConfig(db.configuracoes), [db.configuracoes])
 
   const [periodo, setPeriodo] = useState<PeriodoPainel>('hoje')
   const [inicioPersonalizado, setInicioPersonalizado] = useState(primeiroDiaDoMes)
@@ -89,7 +85,7 @@ export default function Painel() {
   const pagos = filasDaComissao(pedidosPeriodo)
   const faturamento = pagos.reduce((s, p) => s + Number(p.valor || 0), 0)
   const metragemPeriodo = pagos.reduce((s, p) => s + Number(p.metragem || 0), 0)
-  const comissao = calcularComissao(pagos, faixas, semMetragem)
+  const comissao = calcularComissao(pagos, regras)
 
   const filasTextilPeriodo = pagos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
   const filasUvPeriodo = pagos.filter((p) => p.tipo_dtf === 'uv')
@@ -149,22 +145,22 @@ export default function Painel() {
           conta,
           pedidos: noPeriodo.length,
           faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
-          comissao: calcularComissao(concluidos, faixas, semMetragem).total,
+          comissao: calcularComissao(concluidos, regras).total,
           ultima: ultima ?? null,
         }
       })
       .sort((a, b) => b.faturamento - a.faturamento || a.conta.nome.localeCompare(b.conta.nome))
-  }, [db.pedidos, db.vendedores, faixas, hoje, mesAtual, pedidosPeriodo, semMetragem])
+  }, [db.pedidos, db.vendedores, hoje, mesAtual, pedidosPeriodo, regras])
 
   const ranking = useMemo(
     () =>
-      comissaoPorVendedor(pagos, faixas, semMetragem)
+      comissaoPorVendedor(pagos, regras)
         .map((l) => ({
           ...l,
           vendedor: vendedorPorId(l.chave),
         }))
         .sort((a, b) => b.faturamento - a.faturamento),
-    [faixas, pagos, semMetragem, vendedorPorId],
+    [pagos, regras, vendedorPorId],
   )
 
   const maiorFaturamento = Math.max(1, ...ranking.map((r) => r.faturamento))

@@ -28,13 +28,20 @@ import {
   Vazio,
   cn,
 } from '../components/ui'
-import { calcularComissao, comissaoDoPedido, comissaoPorVendedor, faixaDoPedido } from '../lib/comissao'
+import {
+  calcularComissao,
+  comissaoDoPedido,
+  comissaoPorVendedor,
+  regraDoPedido,
+  regrasDaConfig,
+  valorDoMetroPedido,
+} from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { imprimirDocumento } from '../lib/tema'
-import { FAIXAS_PADRAO, filasDaComissao, rotuloTipoDtf, type Pedido, type Vendedor } from '../lib/types'
+import { filasDaComissao, rotuloTipoDtf, type Pedido, type Vendedor } from '../lib/types'
 
 type CampoData = 'pagamento' | 'pedido' | 'envio'
 
@@ -67,8 +74,8 @@ const somarDiasISO = (iso: string, dias: number) => {
  */
 export default function RelatorioResumo({ embutido = false }: { embutido?: boolean } = {}) {
   const { db, nomeVendedor, avisar } = useStore()
-  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
-  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
+  // regras de comissão: valor do metro (a partir da vigência) + tabela antiga no histórico
+  const regras = useMemo(() => regrasDaConfig(db.configuracoes), [db.configuracoes])
   const [campo, setCampo] = useState<CampoData>('pedido')
   const [inicio, setInicio] = useState(hojeISO)
   const [fim, setFim] = useState(hojeISO)
@@ -209,7 +216,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
   const visiveisTela = useMemo(() => visiveisBusca.slice(0, limiteLista), [limiteLista, visiveisBusca])
 
   const resumoVendedores = useMemo(() => {
-    return comissaoPorVendedor(visiveis, faixas, semMetragem)
+    return comissaoPorVendedor(visiveis, regras)
       .map((linha) => ({
         ...linha,
         vendedor: db.vendedores.find((v) => v.id === linha.chave) as Vendedor | undefined,
@@ -217,9 +224,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         percentualMedio: linha.resultado.percentualMedio,
       }))
       .sort((a, b) => b.faturamento - a.faturamento)
-  }, [db.vendedores, faixas, semMetragem, visiveis])
+  }, [db.vendedores, regras, visiveis])
 
-  const resultado = useMemo(() => calcularComissao(visiveis, faixas, semMetragem), [faixas, semMetragem, visiveis])
+  const resultado = useMemo(() => calcularComissao(visiveis, regras), [regras, visiveis])
 
   const totais = useMemo(
     () => ({
@@ -254,9 +261,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
         nomeVendedor(p.vendedor_id),
         numeroBR(p.metragem),
         numeroBR(p.valor),
-        numeroBR(comissaoDoPedido(p, faixas, semMetragem)),
+        numeroBR(comissaoDoPedido(p, regras)),
         dataBR(p.data_pedido || p.created_at),
-        percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual),
+        percentualBR(regraDoPedido(p, regras).percentual),
         p.numero,
         p.descricao,
         p.forma_pagamento,
@@ -748,8 +755,9 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
               {/* Lista mobile em cartões compactos (leitura fácil na tela do celular) */}
               <div className="space-y-2 md:hidden">
                 {visiveisTela.map((p) => {
-                  const pct = faixaDoPedido(p.metragem, faixas, semMetragem).percentual
-                  const valorComissao = comissaoDoPedido(p, faixas, semMetragem)
+                  const regra = regraDoPedido(p, regras)
+                  const pct = regra.percentual
+                  const valorComissao = comissaoDoPedido(p, regras)
                   const ehUv = p.tipo_dtf === 'uv'
                   return (
                     <div
@@ -821,6 +829,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                       <th className="border border-slate-200 px-3 py-2">Vendedor</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Metragem</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Valor</th>
+                      <th className="border border-slate-200 px-3 py-2 text-right">R$/metro</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">Comissão</th>
                       <th className="border border-slate-200 px-3 py-2">Data</th>
                       <th className="border border-slate-200 px-3 py-2 text-right">% com.</th>
@@ -847,14 +856,17 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
                           {moeda(p.valor)}
                         </td>
+                        <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
+                          {valorDoMetroPedido(p) === null ? '—' : moeda(valorDoMetroPedido(p))}
+                        </td>
                         <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
-                          {moeda(comissaoDoPedido(p, faixas, semMetragem))}
+                          {moeda(comissaoDoPedido(p, regras))}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 whitespace-nowrap">
                           {dataBR(p.data_pedido || p.created_at)}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
-                          {percentualBR(faixaDoPedido(p.metragem, faixas, semMetragem).percentual)}
+                          {percentualBR(regraDoPedido(p, regras).percentual)}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 text-center">
                           <button
@@ -968,7 +980,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                 <td>{nomeVendedor(p.vendedor_id)}</td>
                 <td className="num">{p.metragem ? `${numeroBR(p.metragem)} m` : '—'}</td>
                 <td className="num">{moeda(p.valor)}</td>
-                <td className="num">{moeda(comissaoDoPedido(p, faixas, semMetragem))}</td>
+                <td className="num">{moeda(comissaoDoPedido(p, regras))}</td>
                 <td>{dataBR(p.data_pedido || p.created_at)}</td>
               </tr>
             ))}

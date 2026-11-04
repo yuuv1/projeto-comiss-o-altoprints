@@ -17,8 +17,8 @@ import { useStore } from '../lib/store'
 import { useAuth } from '../lib/auth'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, moeda, numeroBR } from '../lib/format'
-import { calcularComissao } from '../lib/comissao'
-import { FAIXAS_PADRAO, filasDaComissao, type Vendedor } from '../lib/types'
+import { calcularComissao, regrasDaConfig } from '../lib/comissao'
+import { filasDaComissao, type Vendedor } from '../lib/types'
 import {
   BarraAcoes,
   Botao,
@@ -45,8 +45,7 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
   const { usuario, criarOutroProprietario, redefinirSenha, alternarAtivo, excluirUsuario } = useAuth()
   const { confirmar, dialog } = useConfirmacao()
 
-  const faixas = db.configuracoes.faixas_comissao?.length ? db.configuracoes.faixas_comissao : FAIXAS_PADRAO
-  const semMetragem = db.configuracoes.comissao_sem_metragem ?? 0
+  const regras = regrasDaConfig(db.configuracoes)
   const mesAtual = new Date().toISOString().slice(0, 7)
   // mesmo critério do relatório: vale a data do pagamento; sem ela, a do pedido
   const mesDaVenda = (p: { data_pagamento?: string | null; data_pedido?: string | null }) =>
@@ -83,12 +82,12 @@ export default function Equipe({ embutido = false }: { embutido?: boolean } = {}
           total: pedidos.length,
           pedidos: noMes.length,
           faturamento: concluidos.reduce((s, p) => s + Number(p.valor || 0), 0),
-          comissao: calcularComissao(concluidos, faixas, semMetragem).total,
+          comissao: calcularComissao(concluidos, regras).total,
           ultima: ultima ?? null,
         }
       })
       .sort((a, b) => b.faturamento - a.faturamento || a.vendedor.nome.localeCompare(b.vendedor.nome))
-  }, [db.pedidos, db.vendedores, faixas, idsAtivos, mesAtual, semMetragem])
+  }, [db.pedidos, db.vendedores, idsAtivos, mesAtual, regras])
 
   const funcionarios = useMemo(
     () =>

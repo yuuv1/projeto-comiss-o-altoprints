@@ -31,7 +31,7 @@ import {
   useConfirmacao,
 } from '../components/ui'
 import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
-import { calcularComissao } from '../lib/comissao'
+import { regraDoPedido, regrasDaConfig } from '../lib/comissao'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, percentualBR } from '../lib/format'
 import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
@@ -180,15 +180,22 @@ export default function PedidoForm() {
   const valorAuto = calcularValor(metrosNum, valorEspecial, faixasPreco)
   const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
   const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
-  const faixasComissao = db.configuracoes.faixas_comissao ?? []
-  const percentualComissao = useMemo(() => {
-    const exemplo = calcularComissao(
-      [{ metragem: metrosNum, valor: valorFinal } as Pedido],
-      faixasComissao,
-      db.configuracoes.comissao_sem_metragem ?? 0,
-    )
-    return exemplo.percentualMedio
-  }, [db.configuracoes.comissao_sem_metragem, faixasComissao, metrosNum, valorFinal])
+  const regrasComissao = regrasDaConfig(db.configuracoes)
+  /** mesma regra que o relatório usa: valor do metro (vigente) ou metragem (histórico) */
+  const percentualComissao = useMemo(
+    () =>
+      regraDoPedido(
+        {
+          metragem: metrosNum,
+          valor: valorFinal,
+          data_pagamento: form.data_pagamento || null,
+          data_pedido: form.data_pedido,
+          created_at: form.created_at,
+        },
+        regrasComissao,
+      ).percentual,
+    [form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
+  )
 
   const arquivosDoPedido = useMemo(
     () => db.arquivos.filter((a) => a.pedido_id === existente?.id),
