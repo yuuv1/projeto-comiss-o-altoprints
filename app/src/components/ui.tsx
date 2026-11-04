@@ -203,18 +203,24 @@ export function Campo({
 }
 
 const baseCampo =
-  'w-full min-h-[46px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 sm:min-h-0 sm:px-3 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
+  'w-full min-h-[46px] rounded-xl border border-slate-200 bg-white py-2.5 text-base font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-slate-50 sm:min-h-0 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-purple-500 dark:focus:ring-purple-500/20 dark:disabled:bg-slate-900'
 
-export const Entrada = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => (
-  <input {...props} className={cn(baseCampo, className)} />
-)
+export const Entrada = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => {
+  const temPaddingEsquerdo = Boolean(className && /\bpl-/.test(className))
+  return (
+    <input
+      {...props}
+      className={cn(baseCampo, temPaddingEsquerdo ? 'pr-3.5 sm:pr-3' : 'px-3.5 sm:px-3', className)}
+    />
+  )
+}
 
 export const AreaTexto = ({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea {...props} className={cn(baseCampo, 'min-h-[76px] resize-y', className)} />
+  <textarea {...props} className={cn(baseCampo, 'min-h-[76px] resize-y px-3.5 sm:px-3', className)} />
 )
 
 export const Selecao = ({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select {...props} className={cn(baseCampo, 'cursor-pointer pr-8', className)}>
+  <select {...props} className={cn(baseCampo, 'cursor-pointer pl-3.5 pr-8 sm:pl-3', className)}>
     {children}
   </select>
 )
