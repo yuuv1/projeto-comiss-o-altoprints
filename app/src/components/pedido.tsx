@@ -1,7 +1,7 @@
 import { CalendarDays, MapPin, Printer, Star, Store, Truck, User } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../lib/format'
+import { dataBR, dataHoraBR, hojeISO, moeda, metros, metrosPorTipo } from '../lib/format'
 import { useStore } from '../lib/store'
 import { isPedidoCompleto, passoFeito, rotuloTipoDtf, type PassoFila, type Pedido } from '../lib/types'
 import { EtiquetaEntrega, EtiquetaEstagio } from './StatusBadges'
@@ -64,7 +64,7 @@ export function PedidoCartao({
           )}
         </div>
         <p className="mt-0.5 break-words text-xs text-slate-500">
-          {pedido.descricao ? pedido.descricao : 'Sem descrição'} • {metros(pedido.metragem)}
+          {pedido.descricao ? pedido.descricao : 'Sem descrição'} • {metrosPorTipo(pedido.metragem, pedido.tipo_dtf)}
           {mostrarVendedor ? ` • ${nomeVendedor(pedido.vendedor_id)}` : ''}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400">

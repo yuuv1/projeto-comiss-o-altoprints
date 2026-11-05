@@ -39,7 +39,7 @@ import {
 } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
-import { dataBR, hojeISO, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, metrosPorTipo, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { imprimirDocumento } from '../lib/tema'
 import { filasDaComissao, rotuloTipoDtf, type Pedido, type Vendedor } from '../lib/types'
@@ -793,7 +793,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                             </p>
                           ) : null}
                           <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            {nomeVendedor(p.vendedor_id)} • {p.metragem ? `${numeroBR(p.metragem)} m` : 'Sem metragem'} •{' '}
+                            {nomeVendedor(p.vendedor_id)} • {metrosPorTipo(p.metragem, p.tipo_dtf)} •{' '}
                             {dataBR(p.data_pedido || p.created_at)}
                           </p>
                         </div>
@@ -852,7 +852,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         </td>
                         <td className="border border-slate-200 px-3 py-2">{nomeVendedor(p.vendedor_id)}</td>
                         <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
-                          {p.metragem ? `${numeroBR(p.metragem)} m` : '—'}
+                          {metrosPorTipo(p.metragem, p.tipo_dtf)}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
                           {moeda(p.valor)}
@@ -992,7 +992,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   {p.descricao ? <div style={{ fontSize: '11px' }}>{p.descricao}</div> : null}
                 </td>
                 <td>{nomeVendedor(p.vendedor_id)}</td>
-                <td className="num">{p.metragem ? `${numeroBR(p.metragem)} m` : '—'}</td>
+                <td className="num">{metrosPorTipo(p.metragem, p.tipo_dtf)}</td>
                 <td className="num">{moeda(p.valor)}</td>
                 <td className="num">{moeda(comissaoDoPedido(p, regras))}</td>
                 <td>{dataBR(p.data_pedido || p.created_at)}</td>

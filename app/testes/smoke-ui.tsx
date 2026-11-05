@@ -616,7 +616,27 @@ async function main() {
   console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela por valor do metro (e a antiga recolhida)`)
   if (!tabelaOk) console.log('     TEXTO:', textoComissoes.slice(0, 400))
 
+  // comissão do DTF UV é fixa e editável
+  const uvComissaoOk = textoComissoes.includes('Comissão do DTF UV')
+  if (!uvComissaoOk) falhas++
+  console.log(`  ${uvComissaoOk ? '✅' : '❌'} comissões mostram a comissão fixa do DTF UV (editável)`)
+
+  // a aba Preços tem a tabela do UV (vendido em centímetros)
+  await clicar(raiz, 'Preços')
+  await espera(400)
+  const textoPrecos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const precoUvOk =
+    textoPrecos.includes('Tabela de preço do DTF UV') &&
+    textoPrecos.includes('Centímetros (cm)') &&
+    textoPrecos.includes('159,90') &&
+    textoPrecos.includes('149,90')
+  if (!precoUvOk) falhas++
+  console.log(`  ${precoUvOk ? '✅' : '❌'} preços do DTF UV (159,90 até 10 m e 149,90 acima) com padrão em cm`)
+  if (!precoUvOk) console.log('     TEXTO:', textoPrecos.slice(0, 400))
+
   // a tabela antiga, por metragem, continua acessível (histórico)
+  await clicar(raiz, 'Comissões')
+  await espera(400)
   await clicar(raiz, 'Mostrar tabela antiga')
   await espera(400)
   const textoAntiga = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
