@@ -35,6 +35,7 @@ import {
   regraDoPedido,
   regrasDaConfig,
   valorDoMetroPedido,
+  valorMetroParaFaixa,
 } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
@@ -856,8 +857,21 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
                           {moeda(p.valor)}
                         </td>
-                        <td className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500">
-                          {valorDoMetroPedido(p) === null ? '—' : moeda(valorDoMetroPedido(p))}
+                        <td
+                          className="border border-slate-200 px-3 py-2 text-right tabular-nums text-slate-500"
+                          title={
+                            valorDoMetroPedido(p) === null
+                              ? undefined
+                              : `valor real do metro: ${moeda(valorDoMetroPedido(p))}`
+                          }
+                        >
+                          {valorMetroParaFaixa(p, regras) === null ? '—' : moeda(valorMetroParaFaixa(p, regras))}
+                          {valorMetroParaFaixa(p, regras) !== null &&
+                          Number(valorMetroParaFaixa(p, regras)) !== Number(valorDoMetroPedido(p)) ? (
+                            <span className="block text-[10px] font-normal text-slate-400">
+                              real {moeda(valorDoMetroPedido(p))}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 text-right font-semibold tabular-nums text-amber-600">
                           {moeda(comissaoDoPedido(p, regras))}

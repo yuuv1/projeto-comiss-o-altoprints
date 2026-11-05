@@ -203,6 +203,10 @@ export default function Configuracoes() {
       : String(db.configuracoes.comissao_sem_valor_metro).replace('.', ','),
   )
   const [desde, setDesde] = useState<string>(db.configuracoes.comissao_por_valor_desde ?? '2026-11-01')
+  /** quanto o valor do metro pode estar fora da faixa e ainda contar como ela (R$) */
+  const [tolerancia, setTolerancia] = useState<string>(
+    String(db.configuracoes.comissao_tolerancia_metro ?? 1).replace('.', ','),
+  )
   const problemasValor = useMemo(() => validarFaixasValor(faixasValor), [faixasValor])
 
   /** tabela ANTIGA (por metragem) — vale só para os pedidos anteriores à vigência */
@@ -236,9 +240,10 @@ export default function Configuracoes() {
           comissao_sem_valor_metro: semValorMetro.trim()
             ? Number(String(semValorMetro).replace(',', '.')) || 0
             : null,
+          comissao_tolerancia_metro: Number(String(tolerancia || '0').replace(',', '.')) || 0,
         }),
       ),
-    [desde, faixas, faixasValor, pagosDoMes, semMetragem, semValorMetro],
+    [desde, faixas, faixasValor, pagosDoMes, semMetragem, semValorMetro, tolerancia],
   )
 
   const atualizarFaixa = (id: string, patch: Partial<FaixaComissao>) =>
@@ -296,6 +301,7 @@ export default function Configuracoes() {
         comissao_sem_valor_metro: semValorMetro.trim()
           ? Number(String(semValorMetro).replace(',', '.')) || 0
           : null,
+        comissao_tolerancia_metro: Number(String(tolerancia || '0').replace(',', '.')) || 0,
         faixas_comissao: normalizarFaixas(faixas),
         comissao_sem_metragem: Number(String(semMetragem).replace(',', '.')) || 0,
       })
@@ -378,7 +384,8 @@ export default function Configuracoes() {
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
             <b>Como funciona agora:</b> entram no relatório <b>todas as filas concluídas</b> do período. A comissão é
             definida pelo <b>valor do metro</b> do pedido (valor ÷ metragem): o percentual da faixa em que esse valor
-            cai é aplicado sobre o valor da fila. Pedido com valor especial do cliente também entra pela faixa certa.
+            cai é aplicado sobre o valor da fila. Pedido com valor especial do cliente também entra pela faixa certa, e
+            quando o valor do metro fica a poucos centavos de uma faixa (ex.: R$ 59,08/m) ele entra naquela faixa.
             A tabela por metragem deixou de valer em <b>{dataBR(desde || '2026-11-01')}</b> e só continua sendo usada
             nos pedidos anteriores a essa data.
           </div>
@@ -507,6 +514,19 @@ export default function Configuracoes() {
                 <Entrada type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
               </Campo>
               <Campo
+                label="Encaixar na faixa mais próxima (R$)"
+                className="w-full sm:w-64"
+                dica="Diferença aceita para o valor do metro contar como a faixa vizinha. Com R$ 1,00, um pedido a R$ 59,08/m entra como R$ 59,90/m (3%) e um a R$ 39,86/m como R$ 39,90/m (2%). Use 0 para régua exata."
+              >
+                <Entrada
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="1,00"
+                  value={tolerancia}
+                  onChange={(e) => setTolerancia(e.target.value.replace(/[^0-9.,]/g, ''))}
+                />
+              </Campo>
+              <Campo
                 label="Sem valor do metro (%)"
                 className="w-full sm:w-56"
                 dica="Pedido sem metragem (ou sem valor) não tem como entrar numa faixa. Em branco = usa o percentual da menor faixa."
@@ -527,6 +547,7 @@ export default function Configuracoes() {
                   setRascunhoPercentualValor({})
                   setSemValorMetro('')
                   setDesde('2026-11-01')
+                  setTolerancia('1')
                 }}
               >
                 Restaurar padrão

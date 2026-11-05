@@ -31,6 +31,12 @@ export interface RegrasComissao {
   semValorMetro: number | null
   /** primeiro dia em que vale a regra do valor do metro (null = nunca) */
   desde: string | null
+  /**
+   * Quanto o valor do metro pode estar "fora" de uma faixa e ainda contar como
+   * aquela faixa (em R$). Ex.: com R$ 1,00, um pedido a R$ 59,08/m entra como
+   * R$ 59,90/m (3%) e um a R$ 39,86/m entra como R$ 39,90/m (2%).
+   */
+  toleranciaMetro: number
 }
 
 export interface LinhaComissao {
@@ -66,6 +72,7 @@ export const REGRAS_PADRAO: RegrasComissao = {
   semMetragem: 0,
   semValorMetro: 1.5,
   desde: '2026-11-01',
+  toleranciaMetro: 1,
 }
 
 /** Monta as regras a partir das configurações salvas */
@@ -80,6 +87,7 @@ export const regrasDaConfig = (c?: Partial<Configuracoes> | null): RegrasComissa
       ? 1.5
       : Number(c.comissao_sem_valor_metro),
   desde: c?.comissao_por_valor_desde === undefined ? '2026-11-01' : c.comissao_por_valor_desde,
+  toleranciaMetro: Math.max(0, Number(c?.comissao_tolerancia_metro ?? 1) || 0),
 })
 
 /** Normaliza qualquer entrada para as regras completas */
@@ -123,10 +131,53 @@ export function usaRegraPorValor(
  * Menor percentual da tabela — é o piso usado quando o pedido não tem valor do
  * metro ou ficou abaixo da primeira faixa (ex.: abaixo de R$ 39,90 o metro).
  */
+/** Valor do metro já encaixado na faixa mais próxima (usado no relatório) */
+export const valorMetroParaFaixa = (
+  pedido: Pick<Pedido, 'metragem' | 'valor'>,
+  entrada: EntradaRegras = REGRAS_PADRAO,
+): number | null => {
+  const regras = normalizarRegras(entrada)
+  return ajustarValorDoMetro(valorDoMetroPedido(pedido), regras.faixasValor, regras.toleranciaMetro)
+}
+
 export const percentualMinimo = (faixas: FaixaComissaoValor[] = FAIXAS_VALOR_PADRAO): number => {
   const lista = faixas.length ? faixas : FAIXAS_VALOR_PADRAO
   const valores = lista.map((f) => Number(f.percentual)).filter((n) => !Number.isNaN(n))
   return valores.length ? Math.min(...valores) : 0
+}
+
+/**
+ * Encaixa o valor do metro no valor de faixa **mais próximo**, quando a diferença
+ * for de até `tolerancia` reais. É o que faz um pedido a R$ 59,08/m contar como
+ * R$ 59,90/m (3%) e um a R$ 39,86/m contar como R$ 39,90/m (2%), em vez de cair
+ * na faixa de baixo por causa de centavos.
+ *
+ * Só os inícios de faixa (R$ 39,90, R$ 44,90, …) servem de referência — um valor
+ * no meio de uma faixa fica onde está.
+ */
+export function ajustarValorDoMetro(
+  valorMetro: number | null | undefined,
+  faixas: FaixaComissaoValor[] = FAIXAS_VALOR_PADRAO,
+  tolerancia = 1,
+): number | null {
+  const v = Number(valorMetro)
+  if (valorMetro === null || valorMetro === undefined || Number.isNaN(v) || v <= 0) return null
+  const lista = faixas.length ? faixas : FAIXAS_VALOR_PADRAO
+  if (!(tolerancia > 0)) return v
+
+  const referencias = [...new Set(lista.map((f) => Number(f.de)).filter((n) => n > 0))]
+  let melhor: number | null = null
+  let melhorDistancia = Infinity
+  for (const referencia of referencias) {
+    const distancia = Math.abs(v - referencia)
+    if (distancia > tolerancia + 1e-9) continue
+    // empate: fica com a referência maior (o arredondamento tradicional para cima)
+    if (distancia < melhorDistancia - 1e-9 || (Math.abs(distancia - melhorDistancia) < 1e-9 && referencia > (melhor ?? 0))) {
+      melhor = referencia
+      melhorDistancia = distancia
+    }
+  }
+  return melhor ?? v
 }
 
 /** Faixa de valor do metro em que o pedido cai */
@@ -134,9 +185,10 @@ export function faixaDoValor(
   valorMetro: number | null | undefined,
   faixas: FaixaComissaoValor[] = FAIXAS_VALOR_PADRAO,
   semValorMetro: number | null = null,
+  tolerancia = 1,
 ) {
   const lista = [...(faixas.length ? faixas : FAIXAS_VALOR_PADRAO)].sort((a, b) => a.de - b.de)
-  const v = Number(valorMetro)
+  const v = Number(ajustarValorDoMetro(valorMetro, lista, tolerancia))
   const piso = (rotulo: string, id: string): { percentual: number; rotulo: string; id: string } => ({
     percentual:
       semValorMetro === null || semValorMetro === undefined
@@ -205,7 +257,7 @@ export function regraDoPedido(
   const valorMetro = valorDoMetroPedido(pedido)
 
   if (usaRegraPorValor(pedido, regras)) {
-    const faixa = faixaDoValor(valorMetro, regras.faixasValor, regras.semValorMetro)
+    const faixa = faixaDoValor(valorMetro, regras.faixasValor, regras.semValorMetro, regras.toleranciaMetro)
     if (valorMetro === null) return { ...faixa, modelo: 'sem_metragem', valorMetro }
     return { ...faixa, modelo: 'valor', valorMetro }
   }

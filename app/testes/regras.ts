@@ -12,8 +12,10 @@ import {
   normalizarFaixasValor,
   regraDoPedido,
   regrasDaConfig,
+  ajustarValorDoMetro,
   rotuloFaixaValor,
   usaRegraPorValor,
+  valorMetroParaFaixa,
   validarFaixas,
   validarFaixasValor,
   valorDoMetroPedido,
@@ -450,17 +452,51 @@ igual('histórico: 10 m (R$ 549,00) a 3%', comissaoDoPedido(pedidoAntigo(10, 549
 
 /* --- regra nova: percentual pela faixa do valor do metro --- */
 igual('valor do metro: R$ 59,90 -> 3%', faixaDoValor(59.9).percentual, 3)
-igual('valor do metro: R$ 59,89 -> 2,75%', faixaDoValor(59.89).percentual, 2.75)
-igual('valor do metro: R$ 54,90 -> 2,75%', faixaDoValor(54.9).percentual, 2.75)
-igual('valor do metro: R$ 54,89 -> 2,5%', faixaDoValor(54.89).percentual, 2.5)
-igual('valor do metro: R$ 49,90 -> 2,5%', faixaDoValor(49.9).percentual, 2.5)
-igual('valor do metro: R$ 49,89 -> 2,25%', faixaDoValor(49.89).percentual, 2.25)
-igual('valor do metro: R$ 44,90 -> 2,25%', faixaDoValor(44.9).percentual, 2.25)
-igual('valor do metro: R$ 44,89 -> 2%', faixaDoValor(44.89).percentual, 2)
-igual('valor do metro: R$ 39,90 -> 2%', faixaDoValor(39.9).percentual, 2)
-igual('valor do metro: abaixo de R$ 39,90 -> 1,5% (piso)', faixaDoValor(39.89).percentual, 1.5)
+// na régua EXATA (tolerância 0): o valor de corte ainda é da faixa de baixo
+const exato = (v: number) => faixaDoValor(v, FAIXAS_VALOR_PADRAO, null, 0).percentual
+igual('régua exata: R$ 59,89 -> 2,75%', exato(59.89), 2.75)
+igual('régua exata: R$ 54,90 -> 2,75%', exato(54.9), 2.75)
+igual('régua exata: R$ 54,89 -> 2,5%', exato(54.89), 2.5)
+igual('régua exata: R$ 49,90 -> 2,5%', exato(49.9), 2.5)
+igual('régua exata: R$ 49,89 -> 2,25%', exato(49.89), 2.25)
+igual('régua exata: R$ 44,90 -> 2,25%', exato(44.9), 2.25)
+igual('régua exata: R$ 44,89 -> 2%', exato(44.89), 2)
+igual('régua exata: R$ 39,90 -> 2%', exato(39.9), 2)
+igual('régua exata: abaixo de R$ 39,90 -> 1,5% (piso)', exato(39.89), 1.5)
+// com o encaixe ligado (padrão do sistema): quem está a centavos sobe para a faixa de cima
+igual('encaixe: R$ 59,89 -> 3% (é a faixa mais próxima)', faixaDoValor(59.89).percentual, 3)
+igual('encaixe: R$ 54,89 -> 2,75%', faixaDoValor(54.89).percentual, 2.75)
+igual('encaixe: R$ 44,89 -> 2,25%', faixaDoValor(44.89).percentual, 2.25)
+igual('encaixe: R$ 39,89 -> 2%', faixaDoValor(39.89).percentual, 2)
 igual('valor do metro: muito abaixo da tabela -> 1,5%', faixaDoValor(10).percentual, 1.5)
 igual('valor do metro: acima de R$ 59,90 -> 3% (teto)', faixaDoValor(142.33).percentual, 3)
+
+/* --- encaixe na faixa mais próxima (tolerância de R$ 1,00) --- */
+igual('encaixe: R$ 59,08 -> conta como R$ 59,90', ajustarValorDoMetro(59.08), 59.9)
+igual('encaixe: R$ 59,08/m cai em 3%', faixaDoValor(59.08).percentual, 3)
+igual('encaixe: R$ 59,86/m cai em 3%', faixaDoValor(59.86).percentual, 3)
+igual('encaixe: R$ 39,86/m cai em 2% (faixa de R$ 39,90)', faixaDoValor(39.86).percentual, 2)
+igual('encaixe: R$ 60,06/m cai em 3%', faixaDoValor(60.06).percentual, 3)
+igual('encaixe: R$ 60,50/m (meio da faixa) fica em 3%', faixaDoValor(60.5).percentual, 3)
+igual('encaixe: R$ 44,10 -> conta como R$ 44,90 (2,25%)', faixaDoValor(44.1).percentual, 2.25)
+igual('encaixe: R$ 45,80 (não é perto de nenhum início) fica em 2,25%', faixaDoValor(45.8).percentual, 2.25)
+igual('encaixe: R$ 38,50 fica fora da tolerância e cai no piso de 1,5%', faixaDoValor(38.5).percentual, 1.5)
+igual('encaixe: R$ 41,50 -> mais perto de R$ 39,90 que de R$ 44,90 (2%)', faixaDoValor(41.5).percentual, 2)
+igual('encaixe desligado (tolerância 0) mantém a régua exata', faixaDoValor(59.08, FAIXAS_VALOR_PADRAO, null, 0).percentual, 2.75)
+igual('encaixe com tolerância de R$ 0,10 não pega R$ 59,08', faixaDoValor(59.08, FAIXAS_VALOR_PADRAO, null, 0.1).percentual, 2.75)
+igual('encaixe não muda quem está no meio da faixa', ajustarValorDoMetro(57.5), 57.5)
+igual('encaixe ignora valor vazio', ajustarValorDoMetro(null), null)
+igual(
+  'comissão do pedido de R$ 59,08/m já entra a 3%',
+  Number(comissaoDoPedido(pedidoNovo(1.45, 85.67), regrasOficiais).toFixed(2)),
+  Number((85.67 * 0.03).toFixed(2)),
+)
+igual(
+  'comissão do pedido de R$ 39,86/m entra a 2% (e não no piso)',
+  Number(comissaoDoPedido(pedidoNovo(22.58, 900), regrasOficiais).toFixed(2)),
+  18,
+)
+igual('valor do metro mostrado no relatório já vem encaixado', valorMetroParaFaixa({ metragem: 1.45, valor: 85.67 }, regrasOficiais), 59.9)
 igual('valor do metro: sem valor -> 1,5%', faixaDoValor(null).percentual, 1.5)
 igual('valor do metro: pedido de 3 m por R$ 427,00 = R$ 142,33/m', Number(valorDoMetroPedido({ metragem: 3, valor: 427 })!.toFixed(2)), 142.33)
 igual('valor do metro: pedido sem metragem não tem valor do metro', valorDoMetroPedido({ metragem: null, valor: 400 }), null)

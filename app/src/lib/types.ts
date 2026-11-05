@@ -387,6 +387,12 @@ export interface Configuracoes {
    * para descobrir o valor do metro (padrão: o da menor faixa, 1,5%).
    */
   comissao_sem_valor_metro?: number | null
+  /**
+   * Tolerância (em R$) para encaixar o valor do metro na faixa mais próxima.
+   * Com R$ 1,00 um pedido a R$ 59,08/m conta como R$ 59,90/m (3%) e um a
+   * R$ 39,86/m conta como R$ 39,90/m (2%). 0 = régua exata.
+   */
+  comissao_tolerancia_metro?: number
   /** o que o vendedor pode fazer com os próprios pedidos */
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
@@ -410,6 +416,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   faixas_comissao_valor: FAIXAS_VALOR_PADRAO,
   comissao_por_valor_desde: '2026-11-01',
   comissao_sem_valor_metro: 1.5,
+  comissao_tolerancia_metro: 1,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
   modo_exemplo: false,

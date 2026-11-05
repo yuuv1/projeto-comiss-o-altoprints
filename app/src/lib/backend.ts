@@ -138,6 +138,10 @@ const comConfigAtual = (c: Configuracoes): Configuracoes => {
       c.comissao_sem_valor_metro === undefined
         ? CONFIG_PADRAO.comissao_sem_valor_metro
         : c.comissao_sem_valor_metro,
+    comissao_tolerancia_metro:
+      c.comissao_tolerancia_metro === undefined
+        ? CONFIG_PADRAO.comissao_tolerancia_metro
+        : c.comissao_tolerancia_metro,
   }
 }
 
