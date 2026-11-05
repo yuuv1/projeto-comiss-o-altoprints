@@ -113,6 +113,27 @@ faixa e quanto sai de comissão — antes mesmo de salvar — e um botão **"Usa
 para restaurar os valores acima. A tabela antiga continua acessível no mesmo lugar
 (botão **"Mostrar tabela antiga"**), para consulta e ajuste do histórico.
 
+### DTF UV: centímetros, preço próprio e comissão fixa
+
+O **DTF UV** é vendido em **centímetros** (só as big techs compram metros), então o pedido
+aceita as duas unidades no campo de metragem (botões **m / cm**, já vem em cm quando o tipo é UV).
+O valor é sempre gravado em metros por dentro, e as telas mostram em cm quando o tipo é UV
+(ex.: 0,35 m aparece como **35 cm**).
+
+Tabela de preço do UV (Configurações → Preços → **Tabela de preço do DTF UV**):
+
+| Metragem | Valor do metro |
+| --- | --- |
+| até 10 m | R$ 159,90 |
+| 10 m ou mais | R$ 149,90 |
+
+O cliente com **valor especial do metro** continua usando o valor dele também no UV
+(ex.: 3 m a R$ 99,90 = R$ 299,70), e o vendedor pode digitar o valor **manualmente** quando precisar.
+
+A comissão do UV é **fixa em 3%** (não passa pela tabela do valor do metro) e vale para todos os
+pedidos UV, de qualquer mês. O proprietário pode mudar o percentual em
+**Configurações → Comissões → Comissão do DTF UV** (em branco = o UV volta a usar a tabela).
+
 Em **Configurações → Meu acesso** (ou no cartão do topo) o proprietário troca o próprio
 usuário, o nome e a senha.
 

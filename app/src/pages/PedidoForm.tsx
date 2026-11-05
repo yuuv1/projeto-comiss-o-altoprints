@@ -34,7 +34,15 @@ import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '..
 import { regraDoPedido, regrasDaConfig } from '../lib/comissao'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, percentualBR } from '../lib/format'
-import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
+import {
+  calcularValor,
+  deMetros,
+  faixaRotulo,
+  faixasDoTipo,
+  paraMetros,
+  precoMetro,
+  type UnidadeMetragem,
+} from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { useStore } from '../lib/store'
@@ -130,6 +138,8 @@ export default function PedidoForm() {
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(() => ({ ...pedidoVazio() }))
   const [tipoDtfEscolhido, setTipoDtfEscolhido] = useState<TipoDtf | ''>('')
   const [metragemTxt, setMetragemTxt] = useState('')
+  /** metros ou centímetros (o UV é comprado em centímetros) */
+  const [unidade, setUnidade] = useState<UnidadeMetragem>('m')
   const [valorTxt, setValorTxt] = useState('')
   const [arquivosNovos, setArquivosNovos] = useState<File[]>([])
   const [salvando, setSalvando] = useState(false)
@@ -153,7 +163,9 @@ export default function PedidoForm() {
       const { id: _id, ...resto } = existente
       setForm(resto)
       setTipoDtfEscolhido(existente.tipo_dtf === 'uv' ? 'uv' : 'textil')
-      setMetragemTxt(existente.metragem ? String(existente.metragem) : '')
+      // pedido já gravado está em metros; o campo abre em metros também
+      setUnidade('m')
+      setMetragemTxt(existente.metragem ? String(existente.metragem).replace('.', ',') : '')
       setValorTxt(String(existente.valor ?? ''))
     } else if (novo) {
       setForm({
@@ -162,10 +174,11 @@ export default function PedidoForm() {
         vendedor_id: params.get('vendedor') ?? ultimoFuncionario(),
       })
       setTipoDtfEscolhido('')
+      setUnidade(db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm')
       setMetragemTxt('')
       setValorTxt('')
     }
-  }, [existente, novo, params])
+  }, [db.configuracoes.uv_unidade_padrao, existente, novo, params])
 
   const set = (patch: Partial<Omit<Pedido, 'id'>>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -174,12 +187,15 @@ export default function PedidoForm() {
     [db.clientes, form.cliente_nome],
   )
   const valorEspecial = clienteVinculado?.valor_especial_metro ?? null
-  const metrosNum = Number(String(metragemTxt).replace(',', '.')) || 0
-  /** tabela de preços do proprietário (Configurações → Preços) */
-  const faixasPreco = db.configuracoes.faixas_preco
+  /** o que foi digitado (metros ou centímetros) e o mesmo valor em metros */
+  const quantidadeDigitada = Number(String(metragemTxt).replace(',', '.')) || 0
+  const metrosNum = paraMetros(quantidadeDigitada, unidade)
+  /** tabela de preços do tipo escolhido (DTF UV tem a dele: 159,90 até 10 m, 149,90 acima) */
+  const faixasPreco = faixasDoTipo(tipoDtfEscolhido === 'uv' ? 'uv' : 'textil', db.configuracoes)
   const valorAuto = calcularValor(metrosNum, valorEspecial, faixasPreco)
   const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
   const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
+  const ehUv = tipoDtfEscolhido === 'uv'
   const regrasComissao = regrasDaConfig(db.configuracoes)
   /** mesma regra que o relatório usa: valor do metro (vigente) ou metragem (histórico) */
   const percentualComissao = useMemo(
@@ -188,13 +204,14 @@ export default function PedidoForm() {
         {
           metragem: metrosNum,
           valor: valorFinal,
+          tipo_dtf: ehUv ? 'uv' : 'textil',
           data_pagamento: form.data_pagamento || null,
           data_pedido: form.data_pedido,
           created_at: form.created_at,
         },
         regrasComissao,
       ).percentual,
-    [form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
+    [ehUv, form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
   )
 
   const arquivosDoPedido = useMemo(
@@ -454,6 +471,8 @@ export default function PedidoForm() {
                         onClick={() => {
                           setTipoDtfEscolhido(tipo)
                           set({ tipo_dtf: tipo })
+                          // UV é vendido em centímetros: já abre nessa unidade
+                          setUnidade(tipo === 'uv' ? (db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm') : 'm')
                         }}
                         className={cn(
                           'min-h-[46px] rounded-xl border px-3 py-2.5 text-sm font-extrabold transition active:scale-[0.98]',
@@ -478,23 +497,67 @@ export default function PedidoForm() {
               </Campo>
 
               <Campo
-                label="Metragem (metros)"
+                label={unidade === 'cm' ? 'Metragem (centímetros)' : 'Metragem (metros)'}
                 dica={
                   metrosNum > 0
-                    ? `Faixa: ${
-                        precoAtual === valorEspecial
-                          ? 'valor especial do cliente'
-                          : faixaRotulo(metrosNum, faixasPreco)
-                      } (${moeda(precoAtual)}/m)`
-                    : `Tabela do proprietário: ${(faixasPreco ?? []).map((f) => `${f.rotulo} ${moeda(f.valor)}`).join(' • ')}`
+                    ? `${
+                        valorEspecial && valorEspecial > 0
+                          ? `valor especial do cliente (${moeda(valorEspecial)}/m)`
+                          : `faixa ${faixaRotulo(metrosNum, faixasPreco)} — ${moeda(precoAtual)}/m`
+                      } • ${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`
+                    : `${
+                        ehUv ? 'Tabela DTF UV' : 'Tabela do proprietário'
+                      }: ${(faixasPreco ?? []).map((f) => `${f.rotulo} ${moeda(f.valor)}`).join(' • ')}`
                 }
               >
-                <Entrada
-                  value={metragemTxt}
-                  onChange={(e) => setMetragemTxt(e.target.value.replace(/[^\d.,]/g, ''))}
-                  placeholder="0,00"
-                  inputMode="decimal"
-                />
+                <div className="flex gap-2">
+                  <Entrada
+                    className="flex-1"
+                    value={metragemTxt}
+                    onChange={(e) => {
+                      const texto = e.target.value.replace(/[^\d.,]/g, '')
+                      // quem troca a unidade com o campo preenchido vê o valor convertido
+                      setMetragemTxt(texto)
+                    }}
+                    placeholder={unidade === 'cm' ? 'Ex.: 145' : 'Ex.: 1,45'}
+                    inputMode="decimal"
+                  />
+                  <div className="flex shrink-0 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                    {(['m', 'cm'] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        onClick={() => {
+                          if (u === unidade) return
+                          const atual = Number(String(metragemTxt).replace(',', '.')) || 0
+                          const emMetros = paraMetros(atual, unidade)
+                          setUnidade(u)
+                          setMetragemTxt(
+                            emMetros > 0
+                              ? u === 'cm'
+                                ? String(Math.round(emMetros * 100))
+                                : String(emMetros).replace('.', ',')
+                              : '',
+                          )
+                        }}
+                        className={cn(
+                          'px-3 text-xs font-black uppercase transition',
+                          unidade === u
+                            ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
+                            : 'bg-white text-slate-500 hover:text-purple-700 dark:bg-slate-800 dark:text-slate-300',
+                        )}
+                        title={u === 'm' ? 'Digitar em metros' : 'Digitar em centímetros'}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {unidade === 'cm' && quantidadeDigitada > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-purple-600 dark:text-purple-400">
+                    {quantidadeDigitada.toLocaleString('pt-BR')} cm = {metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m
+                  </p>
+                ) : null}
               </Campo>
 
               <Campo label="Valor do pedido">
@@ -534,7 +597,7 @@ export default function PedidoForm() {
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {form.valor_modo === 'auto'
-                    ? `${metrosNum || 0} m × ${moeda(precoAtual)} = ${moeda(valorAuto)}`
+                    ? `${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m × ${moeda(precoAtual)} = ${moeda(valorAuto)}`
                     : 'Valor digitado manualmente pelo vendedor.'}
                 </p>
               </Campo>
