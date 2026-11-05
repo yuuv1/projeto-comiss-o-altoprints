@@ -94,9 +94,13 @@ Tabela oficial (toda editável pelo proprietário):
 | R$ 39,90 a R$ 44,89 | 2% |
 | abaixo de R$ 39,90 | 1,5% |
 
-> Cada faixa vale de `de` até **antes** de `ate` — ou seja, R$ 59,89 o metro ainda é 2,75%.
-> Pedido com **valor especial do cliente** também entra pela faixa certa, porque o cálculo
-> olha o valor do metro que foi realmente cobrado.
+> Cada faixa vale de `de` até **antes** de `ate`. Pedido com **valor especial do cliente**
+> também entra pela faixa certa, porque o cálculo olha o valor do metro que foi realmente cobrado.
+
+**Encaixe na faixa mais próxima:** quando o valor do metro fica a poucos centavos de uma faixa,
+o pedido entra naquela faixa em vez de cair na de baixo. Com a tolerância padrão de **R$ 1,00**,
+um pedido a R$ 59,08/m conta como R$ 59,90/m (3%) e um a R$ 39,86/m conta como R$ 39,90/m (2%).
+A tolerância é editável em **Configurações → Comissões** (0 = régua exata).
 
 Pedidos **anteriores a 01/11/2026** continuam com a tabela antiga, por metragem
 (1–5 m 4% · 5–10 m 3,5% · 10–20 m 3% · 20–50 m 2,5% · 50–100 m 2% · acima de 100 m 1,5%),
