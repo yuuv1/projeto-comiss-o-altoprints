@@ -113,33 +113,26 @@ faixa e quanto sai de comissão — antes mesmo de salvar — e um botão **"Usa
 para restaurar os valores acima. A tabela antiga continua acessível no mesmo lugar
 (botão **"Mostrar tabela antiga"**), para consulta e ajuste do histórico.
 
-### Um único tipo de DTF (têxtil)
+### DTF UV: centímetros, preço próprio e comissão fixa
 
-O sistema tem **um só tipo de fila: DTF Têxtil**. O DTF UV foi retirado na versão 1.9.0 —
-os pedidos antigos marcados como UV continuam no histórico e passam a contar como têxtil,
-sem perder valor, metragem, datas nem comissão.
+O **DTF UV** é vendido em **centímetros** (só as big techs compram metros), então o pedido
+aceita as duas unidades no campo de metragem (botões **m / cm**, já vem em cm quando o tipo é UV).
+O valor é sempre gravado em metros por dentro, e as telas mostram em cm quando o tipo é UV
+(ex.: 0,35 m aparece como **35 cm**).
 
-A metragem aceita as duas unidades no mesmo campo (botões **m / cm**): digitar **45 cm**
-equivale a **0,45 m** e o pedido é sempre gravado em metros.
+Tabela de preço do UV (Configurações → Preços → **Tabela de preço do DTF UV**):
 
-### Arquivos de arte grandes (exportação inteira)
+| Metragem | Valor do metro |
+| --- | --- |
+| até 10 m | R$ 159,90 |
+| 10 m ou mais | R$ 149,90 |
 
-- O envio **não divide e não reduz** o arquivo: sobe a arte original, do tamanho que for, com
-  nova tentativa automática se a conexão oscilar.
-- O download sai **inteiro** (nunca em partes): o site grava direto no disco em fluxo quando o
-  navegador permite e, quando não permite, entrega o link direto — arquivos de vários GB baixam
-  sem estourar a memória.
-- O formato é escolhido **na hora de baixar**: **Original**, **PNG** ou **JPG** (mesma resolução).
-- Dá para marcar vários arquivos e baixar todos em sequência, com barra de progresso.
-- A lista usa **prévia leve** (miniatura reduzida no próprio navegador) para não travar; ao abrir
-  uma arte existe o botão **“Ver qualidade real”** para inspecionar a imagem nativa.
+O cliente com **valor especial do metro** continua usando o valor dele também no UV
+(ex.: 3 m a R$ 99,90 = R$ 299,70), e o vendedor pode digitar o valor **manualmente** quando precisar.
 
-### Largura da fila e desempenho
-
-A tela de Pedidos tem o seletor **Largura da fila** (Compacta · Média · Larga), salvo no aparelho:
-ele muda só a grade de cartões, que se recalcula pelo tamanho da janela — nada de largura fixa,
-então a tela não “pula” nem estoura ao trocar. O modo Compacto/Confortável também não mexe mais
-nos cantos arredondados (era o que quebrava o alinhamento dos cartões).
+A comissão do UV é **fixa em 3%** (não passa pela tabela do valor do metro) e vale para todos os
+pedidos UV, de qualquer mês. O proprietário pode mudar o percentual em
+**Configurações → Comissões → Comissão do DTF UV** (em branco = o UV volta a usar a tabela).
 
 Em **Configurações → Meu acesso** (ou no cartão do topo) o proprietário troca o próprio
 usuário, o nome e a senha.

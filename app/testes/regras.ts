@@ -21,7 +21,14 @@ import {
   valorDoMetroPedido,
 } from '../src/lib/comissao'
 import { buscarTudo, LIMITE_BUSCA, normalizarBusca } from '../src/lib/busca'
-import { calcularValor, precoMetro, proximoNumero } from '../src/lib/pricing'
+import {
+  calcularValor,
+  faixasDoTipo,
+  paraMetros,
+  deMetros,
+  precoMetro,
+  proximoNumero,
+} from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import {
   conferirChave,
@@ -45,12 +52,12 @@ import {
 import { gerarDadosDemo, TAMANHO_DEMO } from '../src/lib/seed'
 import { ehErroDeEspaco, espacoNoLocalStorage, MENSAGEM_SEM_ESPACO } from '../src/lib/armazenamento'
 import { prepararBackup } from '../src/lib/backup'
-import { arquivoEhImagemExportavel, nomeComFormato } from '../src/lib/exportar'
 import { prepararMesclaRelatorioCSV } from '../src/lib/relatorio-backup'
 import {
   combinaFiltro,
   CONFIG_PADRAO,
   FAIXAS_PADRAO,
+  FAIXAS_PRECO_UV_PADRAO,
   FAIXAS_VALOR_PADRAO,
   normalizarPedido,
   filasDaComissao,
@@ -649,10 +656,70 @@ igual(
   ['JESSICA', 'RAISSA', 'ANDREIA'],
 )
 
-/* ------------------ metragem em metros ou centímetros ------------------ */
-igual('45 cm viram 0,45 m (conversão usada no formulário)', 45 / 100, 0.45)
-igual('145 cm viram 1,45 m', 145 / 100, 1.45)
-igual('0,45 m viram 45 cm', 0.45 * 100, 45)
+/* ------------------- DTF UV: centímetros e comissão fixa ------------------- */
+
+/* preços do UV: 159,90 até 10 m e 149,90 de 10 m em diante */
+igual('tabela UV: 45 cm custam 71,96 (159,90/m)', calcularValor(0.45, null, FAIXAS_PRECO_UV_PADRAO), 71.96)
+igual('tabela UV: 1 m custa 159,90', calcularValor(1, null, FAIXAS_PRECO_UV_PADRAO), 159.9)
+igual('tabela UV: 9,99 m custam 159,90/m', precoMetro(9.99, FAIXAS_PRECO_UV_PADRAO), 159.9)
+igual('tabela UV: 10 m exatos já custam 149,90/m', precoMetro(10, FAIXAS_PRECO_UV_PADRAO), 149.9)
+igual('tabela UV: 25 m custam 149,90/m', calcularValor(25, null, FAIXAS_PRECO_UV_PADRAO), 3747.5)
+igual(
+  'tabela UV: cliente especial continua com o valor dele (3 m a 99,90 = 299,70)',
+  calcularValor(3, 99.9, FAIXAS_PRECO_UV_PADRAO),
+  299.7,
+)
+igual('tabela do tipo: UV usa a tabela UV', faixasDoTipo('uv', CONFIG_PADRAO)[0].valor, 159.9)
+igual('tabela do tipo: têxtil usa a tabela têxtil', faixasDoTipo('textil', CONFIG_PADRAO)[0].valor, 59.9)
+
+/* centímetros → metros (o pedido é sempre gravado em metros) */
+igual('145 cm viram 1,45 m', paraMetros(145, 'cm'), 1.45)
+igual('1,45 m continua 1,45 m', paraMetros('1,45', 'm'), 1.45)
+igual('45 cm viram 0,45 m', paraMetros('45', 'cm'), 0.45)
+igual('1,45 m viram 145 cm (para mostrar no campo)', deMetros(1.45, 'cm'), 145)
+igual('0,45 m viram 45 cm', deMetros(0.45, 'cm'), 45)
+igual('converter ida e volta não perde valor', paraMetros(deMetros(2.37, 'cm'), 'cm'), 2.37)
+
+/* comissão fixa do DTF UV (3%) em todos os pedidos, de qualquer mês */
+const pedidoUv = (metragem: number, valor: number, data = '2026-11-04'): Pedido => ({
+  ...base,
+  tipo_dtf: 'uv',
+  metragem,
+  valor,
+  data_pedido: data,
+  data_pagamento: data,
+})
+igual('UV: 3% sobre o valor', Number(comissaoDoPedido(pedidoUv(0.45, 71.96), regrasOficiais).toFixed(2)), 2.16)
+igual('UV: 10 m a 149,90 (R$ 1.499,00) -> 3%', comissaoDoPedido(pedidoUv(10, 1499), regrasOficiais), 44.97)
+igual('UV de outubro também é 3% (vale para todo o histórico)', regraDoPedido(pedidoUv(5, 800, '2026-09-10'), regrasOficiais).percentual, 3)
+igual('UV nunca cai na tabela do valor do metro', regraDoPedido(pedidoUv(0.45, 71.96), regrasOficiais).modelo, 'uv')
+igual(
+  'UV com cliente especial também é 3% (percentual não depende do valor do metro)',
+  regraDoPedido(pedidoUv(3, 299.7), regrasOficiais).percentual,
+  3,
+)
+igual(
+  'o proprietário pode mudar a comissão do UV (ex.: 2,5%)',
+  comissaoDoPedido(pedidoUv(10, 1000), { ...regrasOficiais, comissaoUv: 2.5 }),
+  25,
+)
+igual(
+  'comissão do UV em branco (null) faz o UV voltar para a tabela do valor do metro',
+  regraDoPedido(pedidoUv(10, 1499), { ...regrasOficiais, comissaoUv: null }).modelo,
+  'valor',
+)
+igual(
+  'textil continua na tabela do valor do metro',
+  regraDoPedido(pedidoNovo(2, 119.8), regrasOficiais).modelo,
+  'valor',
+)
+const mistoUv = calcularComissao([pedidoNovo(2, 119.8), pedidoUv(0.45, 71.96)], regrasOficiais)
+igual('mistura têxtil + UV: 3,594 + 2,159 = 5,75', Number(mistoUv.total.toFixed(2)), 5.75)
+igual(
+  'a linha do DTF UV aparece separada no resumo',
+  mistoUv.porFaixa.filter((l) => l.modelo === 'uv').map((l) => l.rotulo),
+  ['DTF UV (fixo)'],
+)
 
 /* --------------------- telas liberadas por acesso ---------------------- */
 const vendedorTeste = {
@@ -928,25 +995,6 @@ try {
   falhas.push('código inválido deveria ser recusado')
 } catch (e) {
   igual('código inválido é recusado com explicação', (e as Error).message.includes('ALT1'), true)
-}
-
-/* ------------------- exportação de arquivos grandes ------------------- */
-{
-  const arte = {
-    id: 'a1',
-    pedido_id: 'p1',
-    nome: 'arte final.png',
-    tipo: 'image/png',
-    tamanho: 900 * 1024 * 1024,
-    url: 'https://exemplo/arte.png',
-    created_at: new Date().toISOString(),
-  }
-  igual('exportar como JPG troca só a extensão (nada de dividir)', nomeComFormato(arte, 'jpg'), 'arte final.jpg')
-  igual('exportar como PNG mantém o nome', nomeComFormato(arte, 'png'), 'arte final.png')
-  igual('formato original preserva o nome enviado', nomeComFormato(arte, 'original'), 'arte final.png')
-  igual('PDF não é convertido em imagem', nomeComFormato({ ...arte, nome: 'laudo.pdf', tipo: 'application/pdf' }, 'jpg'), 'laudo.pdf')
-  igual('imagem é exportável', arquivoEhImagemExportavel(arte), true)
-  igual('PDF não entra na prévia de imagem', arquivoEhImagemExportavel({ ...arte, nome: 'x.pdf', tipo: 'application/pdf' }), false)
 }
 
 /* ------------------------------- senha -------------------------------- */

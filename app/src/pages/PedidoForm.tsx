@@ -1,7 +1,8 @@
 import {
   ArrowLeft,
   Calculator,
-  Layers,
+  Download,
+  FileText,
   Image as ImageIcon,
   Package,
   Paperclip,
@@ -29,11 +30,19 @@ import {
   cn,
   useConfirmacao,
 } from '../components/ui'
-import { tamanhoLegivel } from '../lib/files'
+import { arquivoEhImagem, baixarArquivo, tamanhoLegivel, urlDoArquivo } from '../lib/files'
 import { regraDoPedido, regrasDaConfig } from '../lib/comissao'
 import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, percentualBR } from '../lib/format'
-import { calcularValor, faixaRotulo, precoMetro } from '../lib/pricing'
+import {
+  calcularValor,
+  deMetros,
+  faixaRotulo,
+  faixasDoTipo,
+  paraMetros,
+  precoMetro,
+  type UnidadeMetragem,
+} from '../lib/pricing'
 import { useAuth } from '../lib/auth'
 import { guardarUltimoFuncionario, ultimoFuncionario } from '../lib/funcionario'
 import { useStore } from '../lib/store'
@@ -41,34 +50,71 @@ import {
   ESTADOS,
   FORMAS_PAGAMENTO,
   LABEL_ENTREGA,
+  LABEL_TIPO_DTF,
   pedidoVazio,
+  rotuloTipoDtf,
+  TIPOS_DTF,
   type Arquivo,
   type Pedido,
+  type TipoDtf,
 } from '../lib/types'
 import { EtiquetaEntrega } from '../components/StatusBadges'
-import { ArtesDoPedido } from '../components/Artes'
-
-/* --------------------------- metragem (m / cm) --------------------------- */
-
-/**
- * A metragem pode ser digitada em metros ou em centímetros (45 cm = 0,45 m).
- * O pedido guarda sempre em metros; a unidade é só a forma de digitar.
- */
-type UnidadeMetragem = 'm' | 'cm'
-
-const arredonda2 = (v: number) => Math.round((Number(v) + 1e-9) * 100) / 100
-
-export const paraMetros = (quantidade: number | string | null | undefined, unidade: UnidadeMetragem) => {
-  const n = Number(String(quantidade ?? '').replace(',', '.')) || 0
-  return arredonda2(unidade === 'cm' ? n / 100 : n)
-}
-
-export const deMetros = (metros: number | null | undefined, unidade: UnidadeMetragem) => {
-  const m = Number(metros) || 0
-  return unidade === 'cm' ? Number((m * 100).toFixed(0)) : Number(m.toFixed(2))
-}
 
 /* ------------------------------ arquivos ------------------------------ */
+
+function LinhaArquivo({
+  arquivo,
+  onExcluir,
+}: {
+  arquivo: Arquivo
+  onExcluir: (a: Arquivo) => void
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    let criado: string | null = null
+    urlDoArquivo(arquivo).then((u) => {
+      if (!vivo) return
+      if (u?.startsWith('blob:')) criado = u
+      setUrl(u)
+    })
+    return () => {
+      vivo = false
+      if (criado) URL.revokeObjectURL(criado)
+    }
+  }, [arquivo])
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+        {arquivoEhImagem(arquivo) && url ? (
+          <img src={url} alt={arquivo.nome} className="h-full w-full object-cover" />
+        ) : (
+          <FileText className="h-5 w-5 text-purple-500" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-700">{arquivo.nome}</p>
+        <p className="text-[11px] text-slate-400">
+          {tamanhoLegivel(arquivo.tamanho)} • {dataBR(arquivo.created_at)}
+        </p>
+      </div>
+      <Botao tamanho="sm" variante="secundario" icone={Download} onClick={() => baixarArquivo(arquivo)}>
+        Baixar
+      </Botao>
+      <Botao
+        tamanho="sm"
+        variante="ghost"
+        className="text-rose-500 hover:bg-rose-50"
+        icone={Trash2}
+        onClick={() => onExcluir(arquivo)}
+      >
+        Excluir
+      </Botao>
+    </div>
+  )
+}
 
 /* -------------------------------- página ------------------------------- */
 
@@ -90,8 +136,7 @@ export default function PedidoForm() {
   const podeExcluir = ehProprietario
 
   const [form, setForm] = useState<Omit<Pedido, 'id'>>(() => ({ ...pedidoVazio() }))
-  /** o sistema tem um único tipo (DTF Têxtil) — o DTF UV saiu na v1.9.0 */
-  const tipoDtfEscolhido = 'textil' as const
+  const [tipoDtfEscolhido, setTipoDtfEscolhido] = useState<TipoDtf | ''>('')
   const [metragemTxt, setMetragemTxt] = useState('')
   /** metros ou centímetros (o UV é comprado em centímetros) */
   const [unidade, setUnidade] = useState<UnidadeMetragem>('m')
@@ -117,6 +162,7 @@ export default function PedidoForm() {
     if (existente) {
       const { id: _id, ...resto } = existente
       setForm(resto)
+      setTipoDtfEscolhido(existente.tipo_dtf === 'uv' ? 'uv' : 'textil')
       // pedido já gravado está em metros; o campo abre em metros também
       setUnidade('m')
       setMetragemTxt(existente.metragem ? String(existente.metragem).replace('.', ',') : '')
@@ -127,11 +173,12 @@ export default function PedidoForm() {
         // já vem com o nome de quem usou o sistema pela última vez neste aparelho
         vendedor_id: params.get('vendedor') ?? ultimoFuncionario(),
       })
-      setUnidade('m')
+      setTipoDtfEscolhido('')
+      setUnidade(db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm')
       setMetragemTxt('')
       setValorTxt('')
     }
-  }, [existente, novo, params])
+  }, [db.configuracoes.uv_unidade_padrao, existente, novo, params])
 
   const set = (patch: Partial<Omit<Pedido, 'id'>>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -144,10 +191,11 @@ export default function PedidoForm() {
   const quantidadeDigitada = Number(String(metragemTxt).replace(',', '.')) || 0
   const metrosNum = paraMetros(quantidadeDigitada, unidade)
   /** tabela de preços do tipo escolhido (DTF UV tem a dele: 159,90 até 10 m, 149,90 acima) */
-  const faixasPreco = db.configuracoes.faixas_preco
+  const faixasPreco = faixasDoTipo(tipoDtfEscolhido === 'uv' ? 'uv' : 'textil', db.configuracoes)
   const valorAuto = calcularValor(metrosNum, valorEspecial, faixasPreco)
   const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
   const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
+  const ehUv = tipoDtfEscolhido === 'uv'
   const regrasComissao = regrasDaConfig(db.configuracoes)
   /** mesma regra que o relatório usa: valor do metro (vigente) ou metragem (histórico) */
   const percentualComissao = useMemo(
@@ -156,13 +204,14 @@ export default function PedidoForm() {
         {
           metragem: metrosNum,
           valor: valorFinal,
+          tipo_dtf: ehUv ? 'uv' : 'textil',
           data_pagamento: form.data_pagamento || null,
           data_pedido: form.data_pedido,
           created_at: form.created_at,
         },
         regrasComissao,
       ).percentual,
-    [form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
+    [ehUv, form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
   )
 
   const arquivosDoPedido = useMemo(
@@ -184,13 +233,17 @@ export default function PedidoForm() {
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!tipoDtfEscolhido) {
+      avisar('Escolha o tipo de DTF (DTF Têxtil ou DTF UV).', 'erro')
+      return
+    }
     setSalvando(true)
     try {
       const dataRegistro = paraInputDate(form.data_pedido) || hojeISO()
       await salvarPedido(
         {
           ...form,
-          tipo_dtf: 'textil',
+          tipo_dtf: tipoDtfEscolhido,
           estagio: 'concluido',
           pago: true,
           data_pagamento: form.data_pagamento || dataRegistro,
@@ -402,10 +455,38 @@ export default function PedidoForm() {
                 />
               </Campo>
 
-              <div className="flex items-center gap-2 rounded-xl border border-pink-100 bg-pink-50/70 px-3 py-2 text-xs font-semibold text-pink-800 sm:col-span-2 dark:border-pink-900 dark:bg-pink-950/30 dark:text-pink-200">
-                <Layers className="h-4 w-4 shrink-0" />
-                Tipo desta fila: <b>DTF Têxtil</b> — o sistema tem um único tipo.
-              </div>
+              <Campo
+                label="Tipo de DTF"
+                obrigatorio
+                dica="Obrigatório — selecione se esta fila é DTF Têxtil ou DTF UV."
+                className="sm:col-span-2"
+              >
+                <div className="grid grid-cols-2 gap-2.5">
+                  {TIPOS_DTF.map((tipo) => {
+                    const ativo = tipoDtfEscolhido === tipo
+                    return (
+                      <button
+                        type="button"
+                        key={tipo}
+                        onClick={() => {
+                          setTipoDtfEscolhido(tipo)
+                          set({ tipo_dtf: tipo })
+                          // UV é vendido em centímetros: já abre nessa unidade
+                          setUnidade(tipo === 'uv' ? (db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm') : 'm')
+                        }}
+                        className={cn(
+                          'min-h-[46px] rounded-xl border px-3 py-2.5 text-sm font-extrabold transition active:scale-[0.98]',
+                          ativo
+                            ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-purple-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                        )}
+                      >
+                        {LABEL_TIPO_DTF[tipo]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Campo>
 
               <Campo label="Descrição" className="sm:col-span-2">
                 <AreaTexto
@@ -424,7 +505,9 @@ export default function PedidoForm() {
                           ? `valor especial do cliente (${moeda(valorEspecial)}/m)`
                           : `faixa ${faixaRotulo(metrosNum, faixasPreco)} — ${moeda(precoAtual)}/m`
                       } • ${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`
-                    : `Tabela do proprietário: ${(faixasPreco ?? []).map((f) => `${f.rotulo} ${moeda(f.valor)}`).join(' • ')}`
+                    : `${
+                        ehUv ? 'Tabela DTF UV' : 'Tabela do proprietário'
+                      }: ${(faixasPreco ?? []).map((f) => `${f.rotulo} ${moeda(f.valor)}`).join(' • ')}`
                 }
               >
                 <div className="flex gap-2">
@@ -594,11 +677,6 @@ export default function PedidoForm() {
               </div>
             </div>
 
-            <p className="mb-3 rounded-xl border border-sky-100 bg-sky-50/70 px-2.5 py-2 text-[11px] font-semibold text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
-              Pode enviar arquivos grandes (vários GB) e de alta qualidade: nada é dividido ou reduzido. A lista mostra uma
-              prévia leve — para ver a arte nativa, abra a prévia e ligue “ver qualidade real”.
-            </p>
-
             {arquivosNovos.length ? (
               <div className="mb-3 space-y-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
@@ -628,24 +706,28 @@ export default function PedidoForm() {
               </div>
             ) : null}
 
-            {existente ? (
-              <ArtesDoPedido
-                arquivos={arquivosDoPedido}
-                avisar={avisar}
-                onExcluir={async (arq) => {
-                  const ok = await confirmar({
-                    titulo: 'Excluir este arquivo?',
-                    mensagem: arq.nome,
-                    textoBotao: 'Excluir arquivo',
-                  })
-                  if (ok) await excluirArquivoDoPedido(arq)
-                }}
-              />
-            ) : (
+            {existente && arquivosDoPedido.length ? (
+              <div className="space-y-2">
+                {arquivosDoPedido.map((a) => (
+                  <LinhaArquivo
+                    key={a.id}
+                    arquivo={a}
+                    onExcluir={async (arq) => {
+                      const ok = await confirmar({
+                        titulo: 'Excluir este arquivo?',
+                        mensagem: arq.nome,
+                        textoBotao: 'Excluir arquivo',
+                      })
+                      if (ok) await excluirArquivoDoPedido(arq)
+                    }}
+                  />
+                ))}
+              </div>
+            ) : !arquivosNovos.length ? (
               <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-400">
-                Os arquivos aparecem aqui depois de gravar o pedido.
+                Nenhum arquivo enviado. Aceita imagens e PDF.
               </p>
-            )}
+            ) : null}
           </Cartao>
 
         </div>
@@ -664,6 +746,12 @@ export default function PedidoForm() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Vendedor</span>
                 <span className="font-semibold text-slate-800">{nomeVendedor(form.vendedor_id)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Tipo de DTF</span>
+                <span className="font-semibold text-slate-800">
+                  {tipoDtfEscolhido ? rotuloTipoDtf(tipoDtfEscolhido) : 'Selecione acima'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Metragem</span>

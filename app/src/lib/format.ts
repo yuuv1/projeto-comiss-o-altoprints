@@ -14,6 +14,21 @@ export const metros = (v: number | null | undefined) =>
     ? '—'
     : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`
 
+/**
+ * Metragem do jeito que o cliente compra: o DTF UV é vendido em centímetros,
+ * então um pedido de 0,45 m aparece como "45 cm". Os outros tipos seguem em metros.
+ */
+export const metrosPorTipo = (
+  v: number | null | undefined,
+  tipo?: string | null,
+  unidadeCm = true,
+) => {
+  const m = Number(v) || 0
+  if (m <= 0) return '—'
+  if (tipo === 'uv' && unidadeCm)
+    return `${(m * 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} cm`
+  return metros(m)
+}
 
 export const numeroBR = (v: number | null | undefined, dec = 2) =>
   (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec })

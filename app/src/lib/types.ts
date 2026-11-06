@@ -48,20 +48,16 @@ export const LABEL_ENTREGA: Record<TipoEntrega, string> = {
   correios: 'Correios',
 }
 
-/**
- * O DTF UV saiu do sistema (v1.9.0): agora existe só o DTF principal (têxtil).
- * Pedidos antigos marcados como UV continuam no histórico e são tratados como
- * têxtil — nada é apagado.
- */
-export const TIPOS_DTF = ['textil'] as const
+export const TIPOS_DTF = ['textil', 'uv'] as const
 export type TipoDtf = (typeof TIPOS_DTF)[number]
 
 export const LABEL_TIPO_DTF: Record<TipoDtf, string> = {
   textil: 'DTF Têxtil',
+  uv: 'DTF UV',
 }
 
-/** @deprecated o UV não existe mais; fica só para não quebrar dados antigos */
-export const rotuloTipoDtf = (_tipo?: string | null): string => LABEL_TIPO_DTF.textil
+export const rotuloTipoDtf = (tipo?: string | null): string =>
+  tipo === 'uv' ? LABEL_TIPO_DTF.uv : LABEL_TIPO_DTF.textil
 
 export const ESTADOS = [
   'AC','AL','AP','AM','BA','DF','CE','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
@@ -199,6 +195,16 @@ export const FAIXAS_PRECO_PADRAO: FaixaPreco[] = [
   { id: 'preco-1', de: 1, ate: 5, valor: 59.9, rotulo: '1 a 5 m' },
   { id: 'preco-2', de: 5, ate: 20, valor: 54.9, rotulo: '5 a 20 m' },
   { id: 'preco-3', de: 20, ate: null, valor: 44.9, rotulo: '20 m ou mais' },
+]
+
+/**
+ * Tabela de preço do metro do **DTF UV** (Configurações → Preços → DTF UV).
+ * O UV é vendido em centímetros, então o pedido pode ser lançado em metros ou
+ * em centímetros — o sistema converte tudo para metros no cálculo.
+ */
+export const FAIXAS_PRECO_UV_PADRAO: FaixaPreco[] = [
+  { id: 'preco-uv-1', de: 0, ate: 10, valor: 159.9, rotulo: 'até 10 m' },
+  { id: 'preco-uv-2', de: 10, ate: null, valor: 149.9, rotulo: '10 m ou mais' },
 ]
 
 /** Faixa de metragem que define o percentual de comissão do pedido */
@@ -392,6 +398,12 @@ export interface Configuracoes {
    */
   comissao_sem_valor_metro?: number | null
   /**
+   * Comissão do **DTF UV**: percentual fixo (3% por padrão), aplicado sobre o
+   * valor de todos os pedidos UV. Editável pelo proprietário em
+   * Configurações → Comissões.
+   */
+  comissao_uv?: number | null
+  /**
    * Tolerância (em R$) para encaixar o valor do metro na faixa mais próxima.
    * Com R$ 1,00 um pedido a R$ 59,08/m conta como R$ 59,90/m (3%) e um a
    * R$ 39,86/m conta como R$ 39,90/m (2%). 0 = régua exata.
@@ -401,6 +413,10 @@ export interface Configuracoes {
   permissao_vendedor: PermissaoVendedor
   /** preço do metro por faixa (valor automático da fila) */
   faixas_preco: FaixaPreco[]
+  /** preço do metro do DTF UV (vendido em centímetros) */
+  faixas_preco_uv?: FaixaPreco[]
+  /** unidade em que o UV é digitado por padrão: metros ou centímetros */
+  uv_unidade_padrao?: 'm' | 'cm'
   /**
    * `true` enquanto o banco estiver com os DADOS DE EXEMPLO (fictícios), que só
    * entram quando o proprietário pede em Configurações → Dados. Serve para o
@@ -421,8 +437,11 @@ export const CONFIG_PADRAO: Configuracoes = {
   comissao_por_valor_desde: '2026-11-01',
   comissao_sem_valor_metro: 1.5,
   comissao_tolerancia_metro: 1,
+  comissao_uv: 3,
   permissao_vendedor: 'sem_excluir',
   faixas_preco: FAIXAS_PRECO_PADRAO,
+  faixas_preco_uv: FAIXAS_PRECO_UV_PADRAO,
+  uv_unidade_padrao: 'cm',
   modo_exemplo: false,
 }
 
@@ -441,8 +460,7 @@ export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown
   const estagioValido = estagioAntigo === 'em_andamento' || estagioAntigo === 'concluido'
   const statusProducao = typeof bruto.status_producao === 'string' ? bruto.status_producao : ''
 
-  // o DTF UV saiu do sistema: pedidos antigos ficam registrados como têxtil
-  p.tipo_dtf = 'textil'
+  p.tipo_dtf = bruto.tipo_dtf === 'uv' ? 'uv' : 'textil'
 
   // Consultamos o backup bruto antes dos valores padrão: pedidoVazio() já
   // preenche estagio/pago/entregue e mascararia os campos das versões antigas.
@@ -579,11 +597,12 @@ export const passoFeito = (p: Pedido, passo: PassoFila) =>
 /* Filtros da tela Pedidos                                             */
 /* ------------------------------------------------------------------ */
 
-export type FiltroFila = 'todas' | 'textil' | 'entregue' | 'em_andamento' | 'a_pagar' | 'concluida'
+export type FiltroFila = 'todas' | 'textil' | 'uv' | 'entregue' | 'em_andamento' | 'a_pagar' | 'concluida'
 
 export const FILTROS_FILA: { id: FiltroFila; label: string; ajuda: string }[] = [
   { id: 'todas', label: 'Todas', ajuda: 'Todas as filas catalogadas.' },
   { id: 'textil', label: 'DTF Têxtil', ajuda: 'Filas de DTF Têxtil.' },
+  { id: 'uv', label: 'DTF UV', ajuda: 'Filas de DTF UV.' },
   { id: 'entregue', label: 'Entregues', ajuda: 'Filas que o cliente já recebeu.' },
 ]
 
@@ -591,6 +610,8 @@ export const combinaFiltro = (p: Pedido, filtro: FiltroFila) => {
   switch (filtro) {
     case 'textil':
       return (p.tipo_dtf || 'textil') === 'textil'
+    case 'uv':
+      return p.tipo_dtf === 'uv'
     case 'em_andamento':
       return p.estagio !== 'concluido'
     case 'a_pagar':
