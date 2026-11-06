@@ -481,10 +481,15 @@
 
 :root {
   --espaco: 0.75;
-  --raio: 0.72;
 }
 
 html.confortavel {
   --espaco: 1;
+}
+
+/* o raio não muda com a densidade: mudar as duas coisas juntas quebrava a
+   largura dos cartões e da grade de filas */
+:root,
+html.confortavel {
   --raio: 1;
 }

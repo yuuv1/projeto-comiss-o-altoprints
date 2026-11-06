@@ -4,7 +4,6 @@ import { migrarFaixas } from './comissao'
 import { clienteNuvem, clienteNuvemObrigatorio } from './supabase'
 import {
   CONFIG_PADRAO,
-  FAIXAS_PRECO_UV_PADRAO,
   FAIXAS_VALOR_PADRAO,
   type Arquivo,
   type Cliente,
@@ -143,10 +142,6 @@ const comConfigAtual = (c: Configuracoes): Configuracoes => {
       c.comissao_tolerancia_metro === undefined
         ? CONFIG_PADRAO.comissao_tolerancia_metro
         : c.comissao_tolerancia_metro,
-    comissao_uv: c.comissao_uv === undefined ? CONFIG_PADRAO.comissao_uv : c.comissao_uv,
-    // tabela de preço do DTF UV e unidade padrão (o UV é vendido em centímetros)
-    faixas_preco_uv: c.faixas_preco_uv?.length ? c.faixas_preco_uv : FAIXAS_PRECO_UV_PADRAO,
-    uv_unidade_padrao: c.uv_unidade_padrao === 'm' ? 'm' : 'cm',
   }
 }
 

@@ -51,7 +51,6 @@ import { nuvemObrigatoria } from '../lib/supabase'
 import {
   FAIXAS_PADRAO,
   FAIXAS_PRECO_PADRAO,
-  FAIXAS_PRECO_UV_PADRAO,
   FAIXAS_VALOR_PADRAO,
   type FaixaComissao,
   type FaixaComissaoValor,
@@ -204,12 +203,6 @@ export default function Configuracoes() {
       : String(db.configuracoes.comissao_sem_valor_metro).replace('.', ','),
   )
   const [desde, setDesde] = useState<string>(db.configuracoes.comissao_por_valor_desde ?? '2026-11-01')
-  /** comissão fixa do DTF UV (%) — em branco = UV volta a usar a tabela do valor do metro */
-  const [comissaoUv, setComissaoUv] = useState<string>(
-    db.configuracoes.comissao_uv === null || db.configuracoes.comissao_uv === undefined
-      ? ''
-      : String(db.configuracoes.comissao_uv).replace('.', ','),
-  )
   /** quanto o valor do metro pode estar fora da faixa e ainda contar como ela (R$) */
   const [tolerancia, setTolerancia] = useState<string>(
     String(db.configuracoes.comissao_tolerancia_metro ?? 1).replace('.', ','),
@@ -248,10 +241,9 @@ export default function Configuracoes() {
             ? Number(String(semValorMetro).replace(',', '.')) || 0
             : null,
           comissao_tolerancia_metro: Number(String(tolerancia || '0').replace(',', '.')) || 0,
-          comissao_uv: comissaoUv.trim() ? Number(String(comissaoUv).replace(',', '.')) || 0 : null,
         }),
       ),
-    [comissaoUv, desde, faixas, faixasValor, pagosDoMes, semMetragem, semValorMetro, tolerancia],
+    [desde, faixas, faixasValor, pagosDoMes, semMetragem, semValorMetro, tolerancia],
   )
 
   const atualizarFaixa = (id: string, patch: Partial<FaixaComissao>) =>
@@ -264,19 +256,9 @@ export default function Configuracoes() {
   const [precos, setPrecos] = useState<FaixaPreco[]>(
     db.configuracoes.faixas_preco?.length ? db.configuracoes.faixas_preco : FAIXAS_PRECO_PADRAO,
   )
-  /** tabela de preço do DTF UV (vendido em centímetros) */
-  const [precosUv, setPrecosUv] = useState<FaixaPreco[]>(
-    db.configuracoes.faixas_preco_uv?.length ? db.configuracoes.faixas_preco_uv : FAIXAS_PRECO_UV_PADRAO,
-  )
-  const [unidadeUv, setUnidadeUv] = useState<'m' | 'cm'>(
-    db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm',
-  )
 
   const atualizarPreco = (id: string, patch: Partial<FaixaPreco>) =>
     setPrecos((lista) => lista.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
-
-  const atualizarPrecoUv = (id: string, patch: Partial<FaixaPreco>) =>
-    setPrecosUv((lista) => lista.map((faixa) => (faixa.id === id ? { ...faixa, ...patch } : faixa)))
 
   const validarTabelaPreco = (precos: FaixaPreco[], nome: string) => {
     const ordenadas = [...precos].sort((a, b) => a.de - b.de)
@@ -296,10 +278,9 @@ export default function Configuracoes() {
   }
 
   const problemasPreco = useMemo(() => validarTabelaPreco(precos, 'DTF Têxtil'), [precos])
-  const problemasPrecoUv = useMemo(() => validarTabelaPreco(precosUv, 'DTF UV'), [precosUv])
 
   const salvarPrecos = async () => {
-    const erros = [...problemasPreco, ...problemasPrecoUv]
+    const erros = problemasPreco
     if (erros.length) return avisar(erros[0], 'erro')
     setSalvando(true)
     try {
@@ -307,10 +288,6 @@ export default function Configuracoes() {
         faixas_preco: [...precos]
           .sort((a, b) => a.de - b.de)
           .map((f) => ({ ...f, rotulo: rotuloFaixa(f.de, f.ate) })),
-        faixas_preco_uv: [...precosUv]
-          .sort((a, b) => a.de - b.de)
-          .map((f) => ({ ...f, rotulo: rotuloFaixa(f.de, f.ate) })),
-        uv_unidade_padrao: unidadeUv,
       })
       avisar('Tabelas de preço salvas!')
     } finally {
@@ -329,7 +306,6 @@ export default function Configuracoes() {
           ? Number(String(semValorMetro).replace(',', '.')) || 0
           : null,
         comissao_tolerancia_metro: Number(String(tolerancia || '0').replace(',', '.')) || 0,
-        comissao_uv: comissaoUv.trim() ? Number(String(comissaoUv).replace(',', '.')) || 0 : null,
         faixas_comissao: normalizarFaixas(faixas),
         comissao_sem_metragem: Number(String(semMetragem).replace(',', '.')) || 0,
       })
@@ -413,8 +389,7 @@ export default function Configuracoes() {
             <b>Como funciona agora:</b> entram no relatório <b>todas as filas concluídas</b> do período. A comissão é
             definida pelo <b>valor do metro</b> do pedido (valor ÷ metragem): o percentual da faixa em que esse valor
             cai é aplicado sobre o valor da fila. Pedido com valor especial do cliente também entra pela faixa certa, e
-            quando o valor do metro fica a poucos centavos de uma faixa (ex.: R$ 59,08/m) ele entra naquela faixa. O
-            <b> DTF UV</b> não usa a tabela: tem comissão fixa própria (3% por padrão), editável abaixo.
+            quando o valor do metro fica a poucos centavos de uma faixa (ex.: R$ 59,08/m) ele entra naquela faixa.
             A tabela por metragem deixou de valer em <b>{dataBR(desde || '2026-11-01')}</b> e só continua sendo usada
             nos pedidos anteriores a essa data.
           </div>
@@ -543,19 +518,6 @@ export default function Configuracoes() {
                 <Entrada type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
               </Campo>
               <Campo
-                label="Comissão do DTF UV (%)"
-                className="w-full sm:w-48"
-                dica="Fixa para todos os pedidos UV (3% por padrão). Em branco = o UV volta a usar a tabela do valor do metro."
-              >
-                <Entrada
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="3"
-                  value={comissaoUv}
-                  onChange={(e) => setComissaoUv(e.target.value.replace(/[^0-9.,]/g, ''))}
-                />
-              </Campo>
-              <Campo
                 label="Encaixar na faixa mais próxima (R$)"
                 className="w-full sm:w-64"
                 dica="Diferença aceita para o valor do metro contar como a faixa vizinha. Com R$ 1,00, um pedido a R$ 59,08/m entra como R$ 59,90/m (3%) e um a R$ 39,86/m como R$ 39,90/m (2%). Use 0 para régua exata."
@@ -590,7 +552,6 @@ export default function Configuracoes() {
                   setSemValorMetro('')
                   setDesde('2026-11-01')
                   setTolerancia('1')
-                  setComissaoUv('3')
                 }}
               >
                 Restaurar padrão
@@ -925,138 +886,6 @@ export default function Configuracoes() {
             </div>
           </Cartao>
 
-          <Cartao hover={false}>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">
-                  Tabela de preço do DTF UV
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Vendido em centímetros: o pedido pode ser lançado em metros ou em centímetros, o cálculo é o mesmo.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Botao
-                  tamanho="sm"
-                  variante="secundario"
-                  icone={Plus}
-                  onClick={() =>
-                    setPrecosUv((lista) => {
-                      const ordenadas = [...lista].sort((a, b) => a.de - b.de)
-                      const ultima = ordenadas[ordenadas.length - 1]
-                      const de = ultima ? (ultima.ate ?? ultima.de) + 10 : 0
-                      return [...lista, { id: `preco-uv-${Date.now()}`, de, ate: de + 10, valor: 149.9, rotulo: rotuloFaixa(de, de + 10) }]
-                    })
-                  }
-                >
-                  Adicionar faixa
-                </Botao>
-                <Botao
-                  tamanho="sm"
-                  variante="secundario"
-                  icone={RefreshCw}
-                  onClick={() => setPrecosUv(FAIXAS_PRECO_UV_PADRAO.map((f) => ({ ...f })))}
-                >
-                  Restaurar padrão
-                </Botao>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {[...precosUv]
-                .sort((a, b) => a.de - b.de)
-                .map((f) => (
-                  <div
-                    key={f.id}
-                    className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <Campo label="De (m)" className="w-24">
-                      <Entrada
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={f.de}
-                        onChange={(e) => atualizarPrecoUv(f.id, { de: Number(e.target.value) })}
-                      />
-                    </Campo>
-                    <Campo label="Até (m)" className="w-24">
-                      <Entrada
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={f.ate ?? ''}
-                        placeholder="sem limite"
-                        onChange={(e) =>
-                          atualizarPrecoUv(f.id, { ate: e.target.value === '' ? null : Number(e.target.value) })
-                        }
-                      />
-                    </Campo>
-                    <Campo label="Valor do metro (R$)" className="w-36">
-                      <Entrada
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={f.valor}
-                        onChange={(e) => atualizarPrecoUv(f.id, { valor: Number(e.target.value) })}
-                      />
-                    </Campo>
-                    <div className="flex-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      {rotuloFaixa(f.de, f.ate)} → {moeda(f.valor)} por metro
-                      <span className="ml-2 text-slate-400 dark:text-slate-500">
-                        ex.: 45 cm = {moeda(f.valor * 0.45)}
-                      </span>
-                    </div>
-                    <Botao
-                      tamanho="sm"
-                      variante="ghost"
-                      className="text-rose-500 hover:bg-rose-50"
-                      icone={Trash2}
-                      onClick={() => setPrecosUv((lista) => lista.filter((x) => x.id !== f.id))}
-                    >
-                      Remover
-                    </Botao>
-                  </div>
-                ))}
-            </div>
-
-            <Campo
-              label="Como o pedido UV abre por padrão"
-              className="mt-3 w-full sm:w-72"
-              dica="O campo de metragem já vem nesta unidade quando o tipo escolhido é DTF UV (dá para alternar no pedido)."
-            >
-              <Selecao value={unidadeUv} onChange={(e) => setUnidadeUv(e.target.value === 'm' ? 'm' : 'cm')}>
-                <option value="cm">Centímetros (cm)</option>
-                <option value="m">Metros (m)</option>
-              </Selecao>
-            </Campo>
-
-            <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-              <b>Conferência:</b> 45 cm caem na faixa de {faixaDePreco(0.45, precosUv)?.rotulo || '—'} (
-              {moeda(faixaDePreco(0.45, precosUv)?.valor ?? 0)}/m) • 1 m em{' '}
-              {faixaDePreco(1, precosUv)?.rotulo || '—'} ({moeda(faixaDePreco(1, precosUv)?.valor ?? 0)}/m) • 12 m em{' '}
-              {faixaDePreco(12, precosUv)?.rotulo || '—'} ({moeda(faixaDePreco(12, precosUv)?.valor ?? 0)}/m)
-            </div>
-
-            {problemasPrecoUv.length ? (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-                {problemasPrecoUv.map((p) => (
-                  <p key={p} className="flex items-start gap-1.5">
-                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {p}
-                  </p>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                <Check className="h-3.5 w-3.5" /> Tabela do UV válida
-              </p>
-            )}
-
-            <div className="mt-3 flex justify-end">
-              <Botao icone={Save} onClick={salvarPrecos} carregando={salvando}>
-                Salvar tabelas de preço
-              </Botao>
-            </div>
-          </Cartao>
         </div>
       ) : null}
 
