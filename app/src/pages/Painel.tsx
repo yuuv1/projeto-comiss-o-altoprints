@@ -88,8 +88,10 @@ export default function Painel() {
   const comissao = calcularComissao(pagos, regras)
 
   const filasTextilPeriodo = pagos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const filasUvPeriodo = pagos.filter((p) => p.tipo_dtf === 'uv')
 
   const todasTextil = db.pedidos.filter((p) => (p.tipo_dtf || 'textil') === 'textil')
+  const todasUv = db.pedidos.filter((p) => p.tipo_dtf === 'uv')
   const concluidas = db.pedidos.filter((p) => p.estagio === 'concluido')
   const entregues = db.pedidos.filter((p) => p.entregue)
 
@@ -167,6 +169,7 @@ export default function Painel() {
   const atalhos = [
     { label: 'Concluídas', valor: concluidas.length, icone: CheckCircle2, to: '/pedidos', cor: 'from-emerald-500 to-green-600' },
     { label: 'DTF Têxtil', valor: todasTextil.length, icone: Layers, to: '/pedidos?filtro=textil', cor: 'from-pink-500 to-purple-600' },
+    { label: 'DTF UV', valor: todasUv.length, icone: Sparkles, to: '/pedidos?filtro=uv', cor: 'from-indigo-500 to-blue-600' },
     { label: 'Entregues', valor: entregues.length, icone: PackageCheck, to: '/pedidos?filtro=entregue', cor: 'from-violet-500 to-indigo-600' },
   ]
 
@@ -174,6 +177,7 @@ export default function Painel() {
   const acoesGrandes = [
     { label: 'Novo pedido', sub: 'registrar uma fila', icone: Plus, cor: 'from-pink-500 to-purple-600', to: '/pedido/novo' },
     { label: 'DTF Têxtil', sub: `${todasTextil.length} fila(s)`, icone: Layers, cor: 'from-violet-500 to-indigo-600', to: '/pedidos?filtro=textil' },
+    { label: 'DTF UV', sub: `${todasUv.length} fila(s)`, icone: Sparkles, cor: 'from-sky-500 to-blue-600', to: '/pedidos?filtro=uv' },
     { label: 'Equipe', sub: `${equipe.length} funcionário(s)`, icone: Users, cor: 'from-amber-500 to-orange-600', to: '/configuracoes?aba=equipe' },
     { label: 'Relatório', sub: 'ver ou baixar PDF / CSV', icone: BarChart3, cor: 'from-emerald-500 to-green-600', to: '/relatorio' },
   ]
@@ -313,7 +317,7 @@ export default function Painel() {
           valor={pagos.length}
           icone={Package}
           gradiente="from-pink-500 to-purple-600"
-          sub={`${filasTextilPeriodo.length} DTF Têxtil`}
+          sub={`${filasTextilPeriodo.length} Têxtil • ${filasUvPeriodo.length} UV`}
         />
         <CartaoResumo
           titulo="Metragem total"

@@ -17,7 +17,7 @@ import {
 } from './types'
 
 /** Modelo de cálculo usado num pedido */
-export type ModeloComissao = 'valor' | 'metragem'
+export type ModeloComissao = 'valor' | 'metragem' | 'uv'
 
 /** Tudo o que o cálculo precisa saber (vem das Configurações) */
 export interface RegrasComissao {
@@ -37,6 +37,12 @@ export interface RegrasComissao {
    * R$ 59,90/m (3%) e um a R$ 39,86/m entra como R$ 39,90/m (2%).
    */
   toleranciaMetro: number
+  /**
+   * Comissão do **DTF UV**: percentual fixo (3% por padrão) sobre o valor de
+   * todo pedido UV — não passa pela tabela do valor do metro. `null` = desligado
+   * (o UV volta a usar a tabela).
+   */
+  comissaoUv: number | null
 }
 
 export interface LinhaComissao {
@@ -73,6 +79,7 @@ export const REGRAS_PADRAO: RegrasComissao = {
   semValorMetro: 1.5,
   desde: '2026-11-01',
   toleranciaMetro: 1,
+  comissaoUv: 3,
 }
 
 /** Monta as regras a partir das configurações salvas */
@@ -88,6 +95,12 @@ export const regrasDaConfig = (c?: Partial<Configuracoes> | null): RegrasComissa
       : Number(c.comissao_sem_valor_metro),
   desde: c?.comissao_por_valor_desde === undefined ? '2026-11-01' : c.comissao_por_valor_desde,
   toleranciaMetro: Math.max(0, Number(c?.comissao_tolerancia_metro ?? 1) || 0),
+  comissaoUv:
+    c?.comissao_uv === undefined
+      ? 3
+      : c.comissao_uv === null || c.comissao_uv === ('' as unknown as number)
+        ? null
+        : Number(c.comissao_uv),
 })
 
 /** Normaliza qualquer entrada para as regras completas */
@@ -249,12 +262,25 @@ export function faixaDoPedido(
  *  • pedidos anteriores           → tabela antiga, por metragem
  */
 export function regraDoPedido(
-  pedido: Pick<Pedido, 'metragem' | 'valor' | 'data_pagamento' | 'data_pedido' | 'created_at'>,
+  pedido: Pick<Pedido, 'metragem' | 'valor' | 'data_pagamento' | 'data_pedido' | 'created_at'> &
+    Partial<Pick<Pedido, 'tipo_dtf'>>,
   entrada: EntradaRegras,
   percentualSemMetragem = 0,
 ): { percentual: number; rotulo: string; id: string; modelo: ModeloComissao | 'sem_metragem'; valorMetro: number | null } {
   const regras = normalizarRegras(entrada, percentualSemMetragem)
   const valorMetro = valorDoMetroPedido(pedido)
+
+  // DTF UV: comissão fixa (3% por padrão), sobre o valor do pedido
+  const tipo = (pedido as Pick<Pedido, 'tipo_dtf'>).tipo_dtf
+  if (tipo === 'uv' && regras.comissaoUv !== null && regras.comissaoUv !== undefined) {
+    return {
+      percentual: Number(regras.comissaoUv),
+      rotulo: `DTF UV ${Number(regras.comissaoUv).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`,
+      id: '__uv__',
+      modelo: 'uv',
+      valorMetro,
+    }
+  }
 
   if (usaRegraPorValor(pedido, regras)) {
     const faixa = faixaDoValor(valorMetro, regras.faixasValor, regras.semValorMetro, regras.toleranciaMetro)
@@ -308,6 +334,10 @@ export function calcularComissao(
   }
 
   const semMetragem = linhaVazia('__sem_metragem__', 'Sem metragem', Number(percentualSemMetragem) || 0, 'sem_metragem')
+  const linhaUv =
+    regras.comissaoUv === null || regras.comissaoUv === undefined
+      ? null
+      : linhaVazia('__uv__', 'DTF UV (fixo)', Number(regras.comissaoUv), 'uv')
 
   let pedidosPorValor = 0
   let pedidosPorMetragem = 0
@@ -317,7 +347,14 @@ export function calcularComissao(
     const valor = Number(p.valor) || 0
 
     let linha: LinhaComissao
-    if (regra.modelo === 'valor') {
+    if (regra.modelo === 'uv') {
+      pedidosPorValor += 1
+      if (!linhaUv) {
+        linha = semMetragem
+      } else {
+        linha = linhaUv
+      }
+    } else if (regra.modelo === 'valor') {
       pedidosPorValor += 1
       linha = mapa.get(chave('valor', regra.id)) ?? linhaVazia(regra.id, regra.rotulo, regra.percentual, 'valor')
       if (!mapa.has(chave('valor', regra.id))) mapa.set(chave('valor', regra.id), linha)
@@ -340,7 +377,10 @@ export function calcularComissao(
     linha.comissao += valor * (Number(regra.percentual) / 100)
   }
 
-  const comPedidos = [...mapa.values()].filter((l) => l.pedidos > 0)
+  const comPedidos = [
+    ...mapa.values(),
+    ...(linhaUv && linhaUv.pedidos > 0 ? [linhaUv] : []),
+  ].filter((l) => l.pedidos > 0)
   const porFaixa = comPedidos.length
     ? comPedidos
     : regras.faixasValor.map((f) => linhaVazia(f.id, f.rotulo, Number(f.percentual), 'valor'))

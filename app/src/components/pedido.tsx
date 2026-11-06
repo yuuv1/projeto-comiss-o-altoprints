@@ -1,7 +1,7 @@
 import { CalendarDays, MapPin, Printer, Star, Store, Truck, User } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { dataBR, dataHoraBR, hojeISO, moeda, metros } from '../lib/format'
+import { dataBR, dataHoraBR, hojeISO, moeda, metros, metrosPorTipo } from '../lib/format'
 import { useStore } from '../lib/store'
 import { isPedidoCompleto, passoFeito, rotuloTipoDtf, type PassoFila, type Pedido } from '../lib/types'
 import { EtiquetaEntrega, EtiquetaEstagio } from './StatusBadges'
@@ -29,6 +29,7 @@ export function PedidoCartao({
 }) {
   const { nomeVendedor } = useStore()
   const pronto = isPedidoCompleto(pedido)
+  const ehUv = pedido.tipo_dtf === 'uv'
 
   return (
     <div
@@ -42,7 +43,13 @@ export function PedidoCartao({
           <span className="shrink-0 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 px-2 py-0.5 text-xs font-black text-white">
             #{pedido.numero}
           </span>
-          <Etiqueta className="border-pink-200 bg-pink-50 text-pink-700">
+          <Etiqueta
+            className={
+              ehUv
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                : 'border-pink-200 bg-pink-50 text-pink-700'
+            }
+          >
             {rotuloTipoDtf(pedido.tipo_dtf)}
           </Etiqueta>
           <span className="min-w-0 max-w-full break-words text-base font-extrabold text-slate-800">{pedido.cliente_nome}</span>
@@ -57,7 +64,7 @@ export function PedidoCartao({
           )}
         </div>
         <p className="mt-0.5 break-words text-xs text-slate-500">
-          {pedido.descricao ? pedido.descricao : 'Sem descrição'} • {metros(pedido.metragem)}
+          {pedido.descricao ? pedido.descricao : 'Sem descrição'} • {metrosPorTipo(pedido.metragem, pedido.tipo_dtf)}
           {mostrarVendedor ? ` • ${nomeVendedor(pedido.vendedor_id)}` : ''}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400">

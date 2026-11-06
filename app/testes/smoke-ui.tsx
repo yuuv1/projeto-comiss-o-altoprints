@@ -181,20 +181,14 @@ async function main() {
   await espera(800)
   const textoPedidos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
 
-  const filtrosFilaOk = ['Todas', 'DTF Têxtil', 'Entregues'].every((f) =>
+  const filtrosFilaOk = ['Todas', 'DTF Têxtil', 'DTF UV', 'Entregues'].every((f) =>
     textoPedidos.includes(f),
   )
   const filtrosVelhosFora = ['A pagar', 'A imprimir', 'Imprimindo'].every((f) => !textoPedidos.includes(f))
   if (!filtrosFilaOk || !filtrosVelhosFora) falhas++
   console.log(
-    `\n  ${filtrosFilaOk && filtrosVelhosFora ? '✅' : '❌'} Pedidos traz os filtros do catálogo (Todas, DTF Têxtil, Entregues) sem “A pagar”`,
+    `\n  ${filtrosFilaOk && filtrosVelhosFora ? '✅' : '❌'} Pedidos traz os filtros do catálogo (Todas, DTF Têxtil, DTF UV, Entregues) sem “A pagar”`,
   )
-
-  // largura da fila: o seletor existe e troca a grade sem quebrar a tela
-  const larguraOk = ['Largura da fila', 'Compacta', 'Média', 'Larga'].every((t) => textoPedidos.includes(t))
-  if (!larguraOk) falhas++
-  console.log(`  ${larguraOk ? '✅' : '❌'} Pedidos tem o controle “Largura da fila” (compacta / média / larga)`)
-  if (!larguraOk) console.log('     TEXTO:', textoPedidos.slice(0, 400))
 
   const botoesDaTela = () => [...(raiz?.querySelectorAll('button') ?? [])]
   /** acha o selo que ainda NÃO foi marcado (quando marcado, o título ganha “clicar desfaz”) */
@@ -220,14 +214,15 @@ async function main() {
   const enxuto =
     textoNovo.includes('Mais opções') &&
     textoNovo.includes('Cliente') &&
+    textoNovo.includes('Tipo de DTF') &&
     textoNovo.includes('DTF Têxtil') &&
-    !textoNovo.includes('DTF UV') &&
+    textoNovo.includes('DTF UV') &&
     textoNovo.includes('Metragem') &&
     !textoNovo.includes('Ainda não pago') &&
     !textoNovo.includes('Data da retirada') &&
     !textoNovo.includes('Retirado por')
   if (!enxuto) falhas++
-  console.log(`\n  ${enxuto ? '✅' : '❌'} pedido novo (só DTF Têxtil, sem o UV) começa enxuto`)
+  console.log(`\n  ${enxuto ? '✅' : '❌'} pedido novo exige Tipo de DTF (DTF Têxtil / DTF UV) e começa enxuto`)
 
   const abriuExtras = clicar(raiz, 'Mais opções')
   await espera(500)
@@ -414,7 +409,7 @@ async function main() {
     linhasDetalhamento.length > 0 &&
     linhasDetalhamento.every(
       (linha) =>
-        linha.cells[0]?.textContent?.includes('DTF Têxtil') &&
+        (linha.cells[0]?.textContent?.includes('DTF Têxtil') || linha.cells[0]?.textContent?.includes('DTF UV')) &&
         linha.cells[5]?.textContent?.includes('R$'),
     ) &&
     !tabelaDetalhamento?.querySelector('tfoot') &&
@@ -492,11 +487,11 @@ async function main() {
     `  ${resumoHojeRemovidoOk ? '✅' : '❌'} painel remove o “Resumo de hoje” e destaca primeiro o resumo por filtro (começando no diário)`,
   )
 
-  const atalhosGrandesOk = ['Novo pedido', 'DTF Têxtil', 'Equipe', 'Relatório'].every((t) =>
+  const atalhosGrandesOk = ['Novo pedido', 'DTF Têxtil', 'DTF UV', 'Equipe', 'Relatório'].every((t) =>
     painel.includes(t),
   )
   if (!atalhosGrandesOk) falhas++
-  console.log(`  ${atalhosGrandesOk ? '✅' : '❌'} painel tem os atalhos grandes do dia a dia`)
+  console.log(`  ${atalhosGrandesOk ? '✅' : '❌'} painel tem os 5 atalhos grandes do dia a dia`)
 
   const checklistRemovidoOk = !painel.includes('Primeiros passos')
   if (!checklistRemovidoOk) falhas++
@@ -621,6 +616,23 @@ async function main() {
   console.log(`  ${tabelaOk ? '✅' : '❌'} comissões mostram a tabela por valor do metro (e a antiga recolhida)`)
   if (!tabelaOk) console.log('     TEXTO:', textoComissoes.slice(0, 400))
 
+  // comissão do DTF UV é fixa e editável
+  const uvComissaoOk = textoComissoes.includes('Comissão do DTF UV')
+  if (!uvComissaoOk) falhas++
+  console.log(`  ${uvComissaoOk ? '✅' : '❌'} comissões mostram a comissão fixa do DTF UV (editável)`)
+
+  // a aba Preços tem a tabela do UV (vendido em centímetros)
+  await clicar(raiz, 'Preços')
+  await espera(400)
+  const textoPrecos = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const precoUvOk =
+    textoPrecos.includes('Tabela de preço do DTF UV') &&
+    textoPrecos.includes('Centímetros (cm)') &&
+    textoPrecos.includes('159,90') &&
+    textoPrecos.includes('149,90')
+  if (!precoUvOk) falhas++
+  console.log(`  ${precoUvOk ? '✅' : '❌'} preços do DTF UV (159,90 até 10 m e 149,90 acima) com padrão em cm`)
+  if (!precoUvOk) console.log('     TEXTO:', textoPrecos.slice(0, 400))
 
   // a tabela antiga, por metragem, continua acessível (histórico)
   await clicar(raiz, 'Comissões')

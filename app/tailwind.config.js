@@ -3,11 +3,11 @@ import temaPadrao from 'tailwindcss/defaultTheme'
 /**
  * Densidade da tela.
  *
- * O espaçamento (padding, margem, gap, alturas) sai multiplicado por
- * `--espaco` (definido em src/index.css). Os cantos arredondados NÃO são mais
- * escalados: quando o raio mudava junto, cartões, pílulas e a grade de filas
- * ficavam com largura diferente ao alternar Compacto/Confortável e a tela
- * "pulava". Agora só o respiro vertical/horizontal muda.
+ * Todo espaçamento (padding, margem, gap, alturas) e todo canto arredondado
+ * saem multiplicados por duas variáveis CSS definidas em src/index.css
+ * (`--espaco` e `--raio`). Elas nascem com o valor compacto e voltam a 1 no
+ * modo "Confortável" — assim uma única classe no <html> afina o sistema
+ * inteiro, sem classe por classe.
  */
 const semEscala = (valor) => valor === '0px' || valor === '1px' || valor === '0'
 
@@ -18,12 +18,20 @@ const escalaDeEspaco = Object.fromEntries(
   ]),
 )
 
+const escalaDeRaio = Object.fromEntries(
+  Object.entries(temaPadrao.borderRadius).map(([nome, valor]) => [
+    nome,
+    semEscala(valor) || valor === '9999px' ? valor : `calc(${valor} * var(--raio, 1))`,
+  ]),
+)
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     spacing: escalaDeEspaco,
+    borderRadius: escalaDeRaio,
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
