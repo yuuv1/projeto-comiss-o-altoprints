@@ -429,11 +429,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (pedidoId: ID, arquivos: File[]) => {
       if (!arquivos.length) return
       const registros: Arquivo[] = []
-      for (const f of arquivos) registros.push(await enviarArquivo(pedidoId, f))
+      for (let i = 0; i < arquivos.length; i += 1) {
+        const f = arquivos[i]
+        // arquivo grande demora: avisa o andamento arquivo por arquivo
+        if (arquivos.length > 1) {
+          avisar(`Enviando arquivo ${i + 1} de ${arquivos.length} (${f.name})...`, 'info')
+        }
+        registros.push(await enviarArquivo(pedidoId, f))
+      }
       await salvarVarios('arquivos', registros)
       setDb((atual) => ({ ...atual, arquivos: [...registros, ...atual.arquivos] }))
     },
-    [],
+    [avisar],
   )
 
   const salvarPedido = useCallback(
@@ -475,7 +482,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const dataPedidoISO = dados.data_pedido || agora
       const registro: Pedido = {
         ...dados,
-        tipo_dtf: dados.tipo_dtf === 'uv' ? 'uv' : 'textil',
+        tipo_dtf: 'textil',
         estagio: 'concluido',
         iniciado_em: dados.iniciado_em || dataPedidoISO,
         pago: true,

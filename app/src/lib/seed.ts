@@ -119,7 +119,7 @@ export function gerarDadosDemo(): DB {
       cliente_id: cliente.id,
       vendedor_id: cliente.vendedor_id,
       descricao: rnd() < 0.22 ? DESCRICOES[Math.floor(rnd() * DESCRICOES.length)] : '',
-      tipo_dtf: i % 5 === 0 ? 'uv' : 'textil',
+      tipo_dtf: 'textil',
       metragem,
       valor,
       valor_modo: 'auto',

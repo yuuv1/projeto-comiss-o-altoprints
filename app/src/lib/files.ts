@@ -89,7 +89,14 @@ export const novoId = () =>
  * Salva o arquivo e devolve o registro pronto para ir para a tabela `arquivos`.
  * Na nuvem sobe para o bucket e guarda a URL pública.
  */
-export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> {
+export interface OpcoesEnvio {
+  /** 0 a 100 — arquivos grandes demoram e o usuário precisa ver que está andando */
+  aoProgredir?: (porcentagem: number) => void
+}
+
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export async function enviarArquivo(pedidoId: ID, file: File, opcoes: OpcoesEnvio = {}): Promise<Arquivo> {
   const id = novoId()
   const base: Arquivo = {
     id,
@@ -104,14 +111,27 @@ export async function enviarArquivo(pedidoId: ID, file: File): Promise<Arquivo> 
   const sb = clienteNuvemObrigatorio()
   if (sb) {
     const caminho = `${pedidoId}/${id}--${file.name.replace(/[^\w.\-]+/g, '_')}`
-    const { error } = await sb.storage.from(BUCKET).upload(caminho, file, {
-      upsert: true,
-      contentType: file.type || undefined,
-    })
-    if (error) throw new Error(`Falha ao enviar o arquivo: ${error.message}`)
-    const { data } = sb.storage.from(BUCKET).getPublicUrl(caminho)
-    base.url = data?.publicUrl ?? caminho
-    return base
+    /*
+     * Arquivo grande não é dividido: sobe inteiro. Se a conexão cair no meio,
+     * tentamos de novo (3 vezes, esperando um pouco mais a cada tentativa) —
+     * é o suficiente para um pico de internet não perder uma arte de 1 GB.
+     */
+    let ultimoErro = ''
+    for (let tentativa = 1; tentativa <= 3; tentativa += 1) {
+      const { error } = await sb.storage.from(BUCKET).upload(caminho, file, {
+        upsert: true,
+        contentType: file.type || undefined,
+      })
+      if (!error) {
+        opcoes.aoProgredir?.(100)
+        const { data } = sb.storage.from(BUCKET).getPublicUrl(caminho)
+        base.url = data?.publicUrl ?? caminho
+        return base
+      }
+      ultimoErro = error.message
+      if (tentativa < 3) await espera(1200 * tentativa)
+    }
+    throw new Error(`Falha ao enviar o arquivo: ${ultimoErro}`)
   }
 
   try {

@@ -1,12 +1,31 @@
-import { CheckCircle2, ClipboardList, Filter, Layers, PackageCheck, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { CheckCircle2, ClipboardList, Filter, Layers, PackageCheck, Pencil, Plus, Rows2, Rows3, Square, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PedidoCartao, useAcoesPedido } from '../components/pedido'
 import { BarraBusca, Botao, CartaoResumo, Pilulas, TituloPagina, Vazio, cn } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { moeda, numeroBR } from '../lib/format'
+import { lsGravar, lsLer } from '../lib/local'
 import { useStore } from '../lib/store'
 import { combinaFiltro, FILTROS_FILA, rotuloTipoDtf, type FiltroFila, type PassoFila, type Pedido } from '../lib/types'
+
+/**
+ * Largura da fila — quanto cada cartão de pedido ocupa na tela.
+ *
+ * A escolha fica salva no aparelho e só muda a GRADE (colunas). O cartão em si
+ * é fluido, então nada de largura fixa: em telas estreitas a grade cai sozinha
+ * para uma coluna, sem estourar a página (era isso que "quebrava" quando a
+ * largura era trocada).
+ */
+type LarguraFila = 'compacta' | 'media' | 'larga'
+
+const CHAVE_LARGURA = 'altoprints:largura-fila'
+
+const LARGURAS: { id: LarguraFila; label: string; icone: typeof Square; min: string; ajuda: string }[] = [
+  { id: 'compacta', label: 'Compacta', icone: Rows2, min: '260px', ajuda: 'Mais filas por tela' },
+  { id: 'media', label: 'Média', icone: Square, min: '360px', ajuda: 'Equilíbrio entre leitura e quantidade' },
+  { id: 'larga', label: 'Larga', icone: Rows3, min: '520px', ajuda: 'Um cartão bem largo, fácil de ler' },
+]
 
 /**
  * Pedidos — catálogo de filas já feitas e pagas.
@@ -23,6 +42,38 @@ export default function Pedidos() {
     const pedido = parametros.get('filtro')
     return FILTROS_FILA.some((f) => f.id === pedido) ? (pedido as FiltroFila) : 'todas'
   })
+  const [larguraFila, setLarguraFila] = useState<LarguraFila>(() => {
+    const salvo = lsLer(CHAVE_LARGURA)
+    return LARGURAS.some((l) => l.id === salvo) ? (salvo as LarguraFila) : 'media'
+  })
+
+  const escolherLargura = (valor: LarguraFila) => {
+    setLarguraFila(valor)
+    lsGravar(CHAVE_LARGURA, valor)
+  }
+
+  // a grade se ajusta ao tamanho da janela: nada de coluna fixa sobrando na tela
+  const [larguraJanela, setLarguraJanela] = useState(() =>
+    typeof window === 'undefined' ? 1280 : window.innerWidth,
+  )
+  useEffect(() => {
+    let quadro = 0
+    const aoRedimensionar = () => {
+      cancelAnimationFrame(quadro)
+      quadro = requestAnimationFrame(() => setLarguraJanela(window.innerWidth))
+    }
+    window.addEventListener('resize', aoRedimensionar)
+    return () => {
+      cancelAnimationFrame(quadro)
+      window.removeEventListener('resize', aoRedimensionar)
+    }
+  }, [])
+
+  const colunasDaFila = useMemo(() => {
+    const min = Number.parseInt(LARGURAS.find((l) => l.id === larguraFila)?.min ?? '360px', 10)
+    const disponivel = Math.max(280, Math.min(larguraJanela, 1900) - 32)
+    return Math.max(1, Math.min(4, Math.floor(disponivel / min)))
+  }, [larguraFila, larguraJanela])
 
   /** tira o filtro de vendedor da barra de endereço (volta a ver todo mundo) */
   const limparVendedor = () => {
@@ -106,7 +157,7 @@ export default function Pedidos() {
       <TituloPagina
         icone={ClipboardList}
         titulo="Pedidos"
-        subtitulo="Catálogo de filas já feitas e pagas — separadas entre DTF Têxtil e DTF UV."
+        subtitulo="Catálogo de filas já feitas e pagas do DTF Têxtil."
         acoes={
           <Botao icone={Plus} onClick={() => navegar('/pedido/novo')}>
             Registrar fila
@@ -116,7 +167,7 @@ export default function Pedidos() {
 
       {!ehProprietario ? (
         <p className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
-          Você está usando o sistema <b>sem login</b>. Ao registrar uma fila, escolha o <b>seu nome</b> e o <b>tipo de DTF (Têxtil ou UV)</b> — eles ficam gravados no pedido e entram no relatório de comissão.
+          Você está usando o sistema <b>sem login</b>. Ao registrar uma fila, escolha o <b>seu nome</b> — ele fica gravado no pedido e entra no relatório de comissão.
         </p>
       ) : null}
 
@@ -133,7 +184,7 @@ export default function Pedidos() {
         </div>
       ) : null}
 
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
         <CartaoResumo
           titulo="Concluídas"
           valor={contagem.todas}
@@ -147,13 +198,6 @@ export default function Pedidos() {
           icone={Layers}
           gradiente="from-pink-500 to-purple-600"
           sub="filas de DTF Têxtil"
-        />
-        <CartaoResumo
-          titulo="DTF UV"
-          valor={contagem.uv}
-          icone={Sparkles}
-          gradiente="from-indigo-500 to-blue-600"
-          sub="filas de DTF UV"
         />
         <CartaoResumo
           titulo="Entregues"
@@ -178,6 +222,38 @@ export default function Pedidos() {
         placeholder="Buscar por cliente, nº da fila, descrição ou cidade..."
       />
 
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white/80 px-2.5 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+        <span className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Largura da fila
+        </span>
+        <div className="flex overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+          {LARGURAS.map((l) => {
+            const Icone = l.icone
+            const ativo = larguraFila === l.id
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => escolherLargura(l.id)}
+                title={l.ajuda}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold transition',
+                  ativo
+                    ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white'
+                    : 'bg-white text-slate-500 hover:text-purple-700 dark:bg-slate-800 dark:text-slate-300',
+                )}
+              >
+                <Icone className="h-3.5 w-3.5" />
+                {l.label}
+              </button>
+            )
+          })}
+        </div>
+        <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+          {colunasDaFila} {colunasDaFila === 1 ? 'fila por linha' : 'filas por linha'}
+        </span>
+      </div>
+
       <p className="mb-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
         {ajuda} {filtrados.length} fila{filtrados.length === 1 ? '' : 's'}
         {busca ? ' encontrada(s)' : ''} • {numeroBR(resumo.metragem)} m • {moeda(resumo.valor)}
@@ -197,7 +273,10 @@ export default function Pedidos() {
           }
         />
       ) : (
-        <div className={cn('space-y-3', 'animate-fade-in-up')}>
+        <div
+          className="grid animate-fade-in-up gap-3"
+          style={{ gridTemplateColumns: `repeat(${colunasDaFila}, minmax(0, 1fr))` }}
+        >
           {filtrados.map((p) => (
             <PedidoCartao
               key={p.id}

@@ -39,7 +39,7 @@ import {
 } from '../lib/comissao'
 import { baixarCSV } from '../lib/csv'
 import { vendedoresAtivosAtual, vendedoresDoPeriodo } from '../lib/equipe-inicial'
-import { dataBR, hojeISO, metrosPorTipo, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
+import { dataBR, hojeISO, metros, moeda, numeroBR, parseData, percentualBR } from '../lib/format'
 import { useStore } from '../lib/store'
 import { imprimirDocumento } from '../lib/tema'
 import { filasDaComissao, rotuloTipoDtf, type Pedido, type Vendedor } from '../lib/types'
@@ -759,7 +759,6 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   const regra = regraDoPedido(p, regras)
                   const pct = regra.percentual
                   const valorComissao = comissaoDoPedido(p, regras)
-                  const ehUv = p.tipo_dtf === 'uv'
                   return (
                     <div
                       key={p.id}
@@ -768,14 +767,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span
-                              className={cn(
-                                'rounded-md px-1.5 py-0.5 text-[11px] font-black text-white',
-                                ehUv
-                                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600'
-                                  : 'bg-gradient-to-r from-pink-500 to-purple-600',
-                              )}
-                            >
+                            <span className="rounded-md bg-gradient-to-r from-pink-500 to-purple-600 px-1.5 py-0.5 text-[11px] font-black text-white">
                               {rotuloTipoDtf(p.tipo_dtf)}
                             </span>
                             <span className="break-words text-sm font-extrabold text-slate-800 dark:text-slate-100">
@@ -793,7 +785,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                             </p>
                           ) : null}
                           <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            {nomeVendedor(p.vendedor_id)} • {metrosPorTipo(p.metragem, p.tipo_dtf)} •{' '}
+                            {nomeVendedor(p.vendedor_id)} • {metros(p.metragem)} •{' '}
                             {dataBR(p.data_pedido || p.created_at)}
                           </p>
                         </div>
@@ -852,7 +844,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                         </td>
                         <td className="border border-slate-200 px-3 py-2">{nomeVendedor(p.vendedor_id)}</td>
                         <td className="border border-slate-200 px-3 py-2 text-right tabular-nums">
-                          {metrosPorTipo(p.metragem, p.tipo_dtf)}
+                          {metros(p.metragem)}
                         </td>
                         <td className="border border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-emerald-600">
                           {moeda(p.valor)}
@@ -992,7 +984,7 @@ export default function RelatorioResumo({ embutido = false }: { embutido?: boole
                   {p.descricao ? <div style={{ fontSize: '11px' }}>{p.descricao}</div> : null}
                 </td>
                 <td>{nomeVendedor(p.vendedor_id)}</td>
-                <td className="num">{metrosPorTipo(p.metragem, p.tipo_dtf)}</td>
+                <td className="num">{metros(p.metragem)}</td>
                 <td className="num">{moeda(p.valor)}</td>
                 <td className="num">{moeda(comissaoDoPedido(p, regras))}</td>
                 <td>{dataBR(p.data_pedido || p.created_at)}</td>
