@@ -36,11 +36,13 @@ import { vendedoresAtivosAtual } from '../lib/equipe-inicial'
 import { dataBR, hojeISO, moeda, metros, numeroBR, paraInputDate, percentualBR } from '../lib/format'
 import {
   calcularValor,
+  calcularValorPorMetro,
   deMetros,
   faixaRotulo,
   faixasDoTipo,
   paraMetros,
   precoMetro,
+  valorPorMetro,
   type UnidadeMetragem,
 } from '../lib/pricing'
 import { useAuth } from '../lib/auth'
@@ -57,8 +59,31 @@ import {
   type Arquivo,
   type Pedido,
   type TipoDtf,
+  type ValorModo,
 } from '../lib/types'
 import { EtiquetaEntrega } from '../components/StatusBadges'
+
+/* --------------------------- modos de valor --------------------------- */
+
+/**
+ * Como o valor da fila é definido:
+ *  • Tabela      — pela tabela de preço do tipo de DTF (ou o valor especial do cliente)
+ *  • Metro manual — “valor de metragem manual”: o preço do metro desta fila
+ *  • Total manual — o valor total digitado à mão
+ */
+const MODOS_VALOR: { id: ValorModo; label: string; ajuda: string }[] = [
+  {
+    id: 'auto',
+    label: 'Tabela',
+    ajuda: 'Valor pela tabela de preço do tipo de DTF (ou pelo valor especial do cliente).',
+  },
+  {
+    id: 'metro',
+    label: 'Metro manual',
+    ajuda: 'Valor de metragem manual: você digita o preço do metro desta fila e o total sai da metragem.',
+  },
+  { id: 'manual', label: 'Total manual', ajuda: 'Você digita o valor total da fila.' },
+]
 
 /* ------------------------------ arquivos ------------------------------ */
 
@@ -141,6 +166,8 @@ export default function PedidoForm() {
   /** metros ou centímetros (o UV é comprado em centímetros) */
   const [unidade, setUnidade] = useState<UnidadeMetragem>('m')
   const [valorTxt, setValorTxt] = useState('')
+  /** preço do metro digitado à mão (quando a fila usa "Metro manual") */
+  const [valorMetroTxt, setValorMetroTxt] = useState('')
   const [arquivosNovos, setArquivosNovos] = useState<File[]>([])
   const [salvando, setSalvando] = useState(false)
   const [lendoComprovante, setLendoComprovante] = useState(false)
@@ -167,6 +194,7 @@ export default function PedidoForm() {
       setUnidade('m')
       setMetragemTxt(existente.metragem ? String(existente.metragem).replace('.', ',') : '')
       setValorTxt(String(existente.valor ?? ''))
+      setValorMetroTxt(existente.valor_metro_manual ? String(existente.valor_metro_manual).replace('.', ',') : '')
     } else if (novo) {
       setForm({
         ...pedidoVazio(),
@@ -177,6 +205,7 @@ export default function PedidoForm() {
       setUnidade(db.configuracoes.uv_unidade_padrao === 'm' ? 'm' : 'cm')
       setMetragemTxt('')
       setValorTxt('')
+      setValorMetroTxt('')
     }
   }, [db.configuracoes.uv_unidade_padrao, existente, novo, params])
 
@@ -193,8 +222,36 @@ export default function PedidoForm() {
   /** tabela de preços do tipo escolhido (DTF UV tem a dele: 159,90 até 10 m, 149,90 acima) */
   const faixasPreco = faixasDoTipo(tipoDtfEscolhido === 'uv' ? 'uv' : 'textil', db.configuracoes)
   const valorAuto = calcularValor(metrosNum, valorEspecial, faixasPreco)
-  const valorFinal = form.valor_modo === 'auto' ? valorAuto : Number(String(valorTxt).replace(',', '.')) || 0
-  const precoAtual = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
+  /** preço do metro digitado à mão nesta fila ("Metro manual") */
+  const valorMetroManual = Number(String(valorMetroTxt).replace(',', '.')) || 0
+  const valorFinal =
+    form.valor_modo === 'auto'
+      ? valorAuto
+      : form.valor_modo === 'metro'
+        ? calcularValorPorMetro(metrosNum, valorMetroManual)
+        : Number(String(valorTxt).replace(',', '.')) || 0
+  /** preço do metro que a tabela (ou o valor especial do cliente) manda */
+  const precoTabela = valorEspecial && valorEspecial > 0 ? valorEspecial : precoMetro(metrosNum, faixasPreco)
+  /**
+   * Valor do metro REALMENTE praticado nesta fila (é o que a comissão usa).
+   * Antes, a tela mostrava o preço da tabela — e quando o valor da fila era
+   * outro (valor especial, metro manual ou total digitado), a informação
+   * ficava errada (ex.: fila de R$ 59,90 aparecia com R$ 54,90/m).
+   */
+  const valorMetroPraticado = valorPorMetro({
+    metragem: metrosNum,
+    valor: valorFinal,
+    valor_metro_manual: form.valor_modo === 'metro' ? valorMetroManual : null,
+  })
+  /** de onde vem o valor mostrado (para a pessoa não se perder) */
+  const origemValor =
+    form.valor_modo === 'metro'
+      ? 'valor de metragem manual desta fila'
+      : form.valor_modo === 'manual'
+        ? 'valor total digitado à mão'
+        : valorEspecial && valorEspecial > 0
+          ? `valor especial do cliente (${moeda(valorEspecial)}/m)`
+          : `tabela do proprietário (${moeda(precoTabela)}/m)`
   const ehUv = tipoDtfEscolhido === 'uv'
   const regrasComissao = regrasDaConfig(db.configuracoes)
   /** mesma regra que o relatório usa: valor do metro (vigente) ou metragem (histórico) */
@@ -204,6 +261,7 @@ export default function PedidoForm() {
         {
           metragem: metrosNum,
           valor: valorFinal,
+          valor_metro_manual: form.valor_modo === 'metro' ? valorMetroManual : null,
           tipo_dtf: ehUv ? 'uv' : 'textil',
           data_pagamento: form.data_pagamento || null,
           data_pedido: form.data_pedido,
@@ -211,8 +269,32 @@ export default function PedidoForm() {
         },
         regrasComissao,
       ).percentual,
-    [ehUv, form.created_at, form.data_pagamento, form.data_pedido, metrosNum, regrasComissao, valorFinal],
+    [
+      ehUv,
+      form.created_at,
+      form.data_pagamento,
+      form.data_pedido,
+      form.valor_modo,
+      metrosNum,
+      regrasComissao,
+      valorFinal,
+      valorMetroManual,
+    ],
   )
+
+  /** Troca a forma de calcular o valor da fila */
+  const trocarModoValor = (modo: ValorModo) => {
+    if (modo === form.valor_modo) return
+    if (modo === 'metro') {
+      // já começa com o preço por metro que está valendo agora nesta fila
+      const atual = valorMetroManual > 0 ? valorMetroManual : valorMetroPraticado
+      setValorMetroTxt(atual > 0 ? String(atual).replace('.', ',') : '')
+      set({ valor_modo: 'metro' })
+      return
+    }
+    if (modo === 'manual' && !valorTxt && valorFinal > 0) setValorTxt(valorFinal.toFixed(2).replace('.', ','))
+    set({ valor_modo: modo })
+  }
 
   const arquivosDoPedido = useMemo(
     () => db.arquivos.filter((a) => a.pedido_id === existente?.id),
@@ -237,6 +319,16 @@ export default function PedidoForm() {
       avisar('Escolha o tipo de DTF (DTF Têxtil ou DTF UV).', 'erro')
       return
     }
+    if (form.valor_modo === 'metro') {
+      if (metrosNum <= 0) {
+        avisar('Informe a metragem da fila para usar o valor de metragem manual.', 'erro')
+        return
+      }
+      if (valorMetroManual <= 0) {
+        avisar('Informe o valor do metro desta fila.', 'erro')
+        return
+      }
+    }
     setSalvando(true)
     try {
       const dataRegistro = paraInputDate(form.data_pedido) || hojeISO()
@@ -249,6 +341,7 @@ export default function PedidoForm() {
           data_pagamento: form.data_pagamento || dataRegistro,
           metragem: metrosNum || null,
           valor: valorFinal,
+          valor_metro_manual: form.valor_modo === 'metro' ? valorMetroManual : null,
         },
         existente?.id,
         arquivosNovos,
@@ -503,7 +596,7 @@ export default function PedidoForm() {
                     ? `${
                         valorEspecial && valorEspecial > 0
                           ? `valor especial do cliente (${moeda(valorEspecial)}/m)`
-                          : `faixa ${faixaRotulo(metrosNum, faixasPreco)} — ${moeda(precoAtual)}/m`
+                          : `faixa ${faixaRotulo(metrosNum, faixasPreco)} — ${moeda(precoTabela)}/m`
                       } • ${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`
                     : `${
                         ehUv ? 'Tabela DTF UV' : 'Tabela do proprietário'
@@ -560,46 +653,88 @@ export default function PedidoForm() {
                 ) : null}
               </Campo>
 
-              <Campo label="Valor do pedido">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 select-none text-sm font-bold text-slate-400">
-                      R$
-                    </span>
-                    <Entrada
-                      className="pl-11 font-bold"
-                      style={{ paddingLeft: '2.65rem' }}
-                      value={form.valor_modo === 'auto' ? numeroBR(valorAuto) : valorTxt}
-                      onChange={(e) => {
-                        setValorTxt(e.target.value.replace(/[^\d.,]/g, ''))
-                        set({ valor_modo: 'manual' })
-                      }}
-                      readOnly={form.valor_modo === 'auto'}
-                      inputMode="decimal"
-                    />
+              <Campo
+                label="Valor do pedido"
+                dica={
+                  form.valor_modo === 'auto'
+                    ? 'Valor pela tabela do tipo de DTF (ou pelo valor especial do cliente).'
+                    : form.valor_modo === 'metro'
+                      ? 'Valor de metragem manual: o total sai da metragem × o preço do metro.'
+                      : 'Valor total digitado à mão.'
+                }
+              >
+                <div className="space-y-2">
+                  {/* escolha de como o valor da fila é calculado */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MODOS_VALOR.map((modo) => (
+                      <button
+                        key={modo.id}
+                        type="button"
+                        title={modo.ajuda}
+                        onClick={() => trocarModoValor(modo.id)}
+                        className={cn(
+                          'rounded-xl border px-2 py-2 text-xs font-bold transition active:scale-[0.98]',
+                          form.valor_modo === modo.id
+                            ? 'border-transparent bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-soft'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-purple-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                        )}
+                      >
+                        {modo.label}
+                      </button>
+                    ))}
                   </div>
-                  <Botao
-                    type="button"
-                    variante={form.valor_modo === 'auto' ? 'primario' : 'secundario'}
-                    icone={Calculator}
-                    onClick={() => {
-                      if (form.valor_modo === 'auto') {
-                        if (!valorTxt && valorAuto > 0) setValorTxt(valorAuto.toFixed(2).replace('.', ','))
-                        set({ valor_modo: 'manual' })
-                      } else {
-                        set({ valor_modo: 'auto' })
-                      }
-                    }}
-                    title="Alternar entre valor automático e manual"
-                  >
-                    {form.valor_modo === 'auto' ? 'Auto' : 'Manual'}
-                  </Botao>
+
+                  {/* preço do metro combinado só nesta fila */}
+                  {form.valor_modo === 'metro' ? (
+                    <div>
+                      <span className="mb-1 block text-xs font-semibold text-slate-500">
+                        Valor do metro (R$)
+                      </span>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 select-none text-sm font-bold text-slate-400">
+                          R$
+                        </span>
+                        <Entrada
+                          className="pl-11 font-bold"
+                          style={{ paddingLeft: '2.65rem' }}
+                          value={valorMetroTxt}
+                          onChange={(e) => setValorMetroTxt(e.target.value.replace(/[^\d.,]/g, ''))}
+                          placeholder="Ex.: 65,00"
+                          inputMode="decimal"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* total da fila */}
+                  <div>
+                    <span className="mb-1 block text-xs font-semibold text-slate-500">Total do pedido</span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 select-none text-sm font-bold text-slate-400">
+                        R$
+                      </span>
+                      <Entrada
+                        className="pl-11 font-bold"
+                        style={{ paddingLeft: '2.65rem' }}
+                        value={form.valor_modo === 'manual' ? valorTxt : numeroBR(valorFinal)}
+                        onChange={(e) => {
+                          setValorTxt(e.target.value.replace(/[^\d.,]/g, ''))
+                          set({ valor_modo: 'manual' })
+                        }}
+                        readOnly={form.valor_modo !== 'manual'}
+                        inputMode="decimal"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    {form.valor_modo === 'auto'
+                      ? `${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m × ${moeda(precoTabela)} = ${moeda(valorAuto)}`
+                      : form.valor_modo === 'metro'
+                        ? `${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m × ${moeda(valorMetroManual)} = ${moeda(valorFinal)} — comissão pela faixa deste valor do metro.`
+                        : 'Valor digitado manualmente pelo vendedor.'}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  {form.valor_modo === 'auto'
-                    ? `${metrosNum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m × ${moeda(precoAtual)} = ${moeda(valorAuto)}`
-                    : 'Valor digitado manualmente pelo vendedor.'}
-                </p>
               </Campo>
 
               <Campo label="Entregue ao cliente?" dica="Opcional — não entra no relatório." className="sm:col-span-2">
@@ -759,8 +894,12 @@ export default function PedidoForm() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Valor do metro</span>
-                <span className="font-semibold text-slate-800">{moeda(precoAtual)}</span>
+                <span className="font-semibold text-slate-800">
+                  {valorMetroPraticado > 0 ? moeda(valorMetroPraticado) : '—'}
+                </span>
               </div>
+              {/* de onde vem o valor do metro mostrado (o valor realmente cobrado) */}
+              <p className="-mt-1 text-right text-[11px] text-slate-400">{origemValor}</p>
               <div className="mt-2 flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
                 <span className="font-bold text-slate-600 dark:text-slate-300">Total</span>
                 <span className="text-xl font-black text-emerald-600">{moeda(valorFinal)}</span>

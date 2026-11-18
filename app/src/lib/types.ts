@@ -63,7 +63,14 @@ export const ESTADOS = [
   'AC','AL','AP','AM','BA','DF','CE','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
 ] as const
 
-export type ValorModo = 'auto' | 'manual'
+/**
+ * Como o valor da fila foi definido:
+ *  • `auto`   — pela tabela de preço do tipo de DTF (ou pelo valor especial do cliente)
+ *  • `metro`  — **valor de metragem manual**: o vendedor digita o preço do metro
+ *                desta fila e o total sai da metragem × esse preço
+ *  • `manual` — o vendedor digita o valor total da fila
+ */
+export type ValorModo = 'auto' | 'metro' | 'manual'
 
 export interface Pedido {
   id: ID
@@ -77,6 +84,13 @@ export interface Pedido {
   metragem: number | null
   valor: number
   valor_modo: ValorModo
+  /**
+   * Valor do metro digitado à mão nesta fila (só quando `valor_modo` = 'metro').
+   * O total é a metragem × este valor, e é este valor que a comissão usa para
+   * escolher a faixa (por isso ele fica guardado: o total sozinho perde o
+   * centavo do arredondamento).
+   */
+  valor_metro_manual: number | null
   /** em andamento (na máquina/fila) ou concluído (já saiu) */
   estagio: EstagioFila
   /** quando a pessoa clicou em "deu início na impressão" (null = ainda não começou) */
@@ -489,6 +503,11 @@ export const normalizarPedido = (bruto: Partial<Pedido> & Record<string, unknown
         ? bruto.status_pagamento === 'pago' || Boolean(p.data_pagamento)
         : true
 
+  // valor da fila: só os três modos de hoje (o resto é backup antigo)
+  p.valor_modo = bruto.valor_modo === 'metro' || bruto.valor_modo === 'manual' ? bruto.valor_modo : 'auto'
+  const metroManual = Number(bruto.valor_metro_manual)
+  p.valor_metro_manual = Number.isFinite(metroManual) && metroManual > 0 ? metroManual : null
+
   return p
 }
 
@@ -525,6 +544,7 @@ export const pedidoVazio = (): Omit<Pedido, 'id'> => {
     metragem: null,
     valor: 0,
     valor_modo: 'auto',
+    valor_metro_manual: null,
     estagio: 'concluido',
     iniciado_em: agora,
     entregue: false,

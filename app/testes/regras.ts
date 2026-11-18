@@ -23,11 +23,13 @@ import {
 import { buscarTudo, LIMITE_BUSCA, normalizarBusca } from '../src/lib/busca'
 import {
   calcularValor,
+  calcularValorPorMetro,
   faixasDoTipo,
   paraMetros,
   deMetros,
   precoMetro,
   proximoNumero,
+  valorPorMetro,
 } from '../src/lib/pricing'
 import { gerarHashSenha, senhaConfere } from '../src/lib/senha'
 import {
@@ -117,6 +119,30 @@ igual('preço do metro 10 m', precoMetro(10), 54.9)
 igual('preço do metro 30 m', precoMetro(30), 44.9)
 igual('próximo número', proximoNumero([1, 2, 7]), 8)
 igual('próximo número sem pedidos', proximoNumero([]), 1)
+
+/* ------------------ valor de metragem manual (preço especial) ------------------ */
+igual('metro manual: 1,09 m × R$ 65,00 = R$ 70,85', calcularValorPorMetro(1.09, 65), 70.85)
+igual('metro manual: 10 m × R$ 49,90 = R$ 499,00', calcularValorPorMetro(10, 49.9), 499)
+igual('metro manual: o meio centavo sobe (1,85 m × R$ 62,90)', calcularValorPorMetro(1.85, 62.9), 116.37)
+igual('metro manual: sem metragem não dá valor', calcularValorPorMetro(0, 65), 0)
+igual('metro manual: sem preço do metro não dá valor', calcularValorPorMetro(10, 0), 0)
+
+/*
+ * O valor do metro mostrado nas informações é o PRATICADO na fila (valor ÷
+ * metragem), nunca o preço da tabela: era o que fazia uma fila de R$ 59,90
+ * aparecer com R$ 54,90/m.
+ */
+igual('metro praticado: fila de 5 m por R$ 59,90 = R$ 11,98/m', valorPorMetro({ metragem: 5, valor: 59.9 }), 11.98)
+igual('metro praticado: fila de 1,85 m por R$ 110,82 = R$ 59,90/m', valorPorMetro({ metragem: 1.85, valor: 110.82 }), 59.9)
+igual('metro praticado: fila de 2 m por R$ 119,80 = R$ 59,90/m', valorPorMetro({ metragem: 2, valor: 119.8 }), 59.9)
+igual('metro praticado: com valor de metragem manual vale o digitado', valorPorMetro({ metragem: 1.09, valor: 70.85, valor_metro_manual: 65 }), 65)
+igual('metro praticado: sem metragem não há valor do metro', valorPorMetro({ metragem: null, valor: 100 }), 0)
+
+/* ------------------------------ DTF UV ------------------------------- */
+igual('UV: 1 m pela tabela do UV = R$ 159,90', calcularValor(1, null, faixasDoTipo('uv', CONFIG_PADRAO)), 159.9)
+igual('UV: 10 m pela tabela do UV = R$ 1.499,00', calcularValor(10, null, faixasDoTipo('uv', CONFIG_PADRAO)), 1499)
+igual('Têxtil: 1 m pela tabela = R$ 59,90', calcularValor(1, null, faixasDoTipo('textil', CONFIG_PADRAO)), 59.9)
+igual('Têxtil: 10 m pela tabela = R$ 549,00', calcularValor(10, null, faixasDoTipo('textil', CONFIG_PADRAO)), 549)
 
 /* ------------------------------- formato ------------------------------ */
 igual('moeda', moeda(1234.5), 'R$ 1.234,50')
@@ -522,6 +548,51 @@ igual('pedido novo de 20 m a R$ 44,90 -> 2,25%', Number(comissaoDoPedido(pedidoN
 igual('pedido novo com valor especial (142,33/m) -> 3%', Number(comissaoDoPedido(pedidoNovo(3, 427), regrasOficiais).toFixed(2)), 12.81)
 igual('pedido novo sem metragem -> 1,5% (piso)', Number(comissaoDoPedido(pedidoNovo(null, 500), regrasOficiais).toFixed(2)), 7.5)
 
+/* --- fila com valor de metragem manual (preço especial desta fila) --- */
+const pedidoMetroManual = (
+  metragem: number,
+  valor: number,
+  metro: number,
+  data = '2026-11-04',
+): Pedido => ({
+  ...base,
+  tipo_dtf: 'textil',
+  metragem,
+  valor,
+  valor_modo: 'metro',
+  valor_metro_manual: metro,
+  data_pedido: data,
+  data_pagamento: data,
+})
+
+igual('metro manual: o valor do metro é o digitado', valorDoMetroPedido({ metragem: 10, valor: 650, valor_metro_manual: 65 }), 65)
+igual('metro manual: R$ 65,00/m entra em 3%', Number(comissaoDoPedido(pedidoMetroManual(10, 650, 65), regrasOficiais).toFixed(2)), 19.5)
+igual('metro manual: R$ 50,00/m entra em 2,5%', Number(comissaoDoPedido(pedidoMetroManual(10, 500, 50), regrasOficiais).toFixed(2)), 12.5)
+igual('metro manual: R$ 40,00/m entra em 2%', Number(comissaoDoPedido(pedidoMetroManual(10, 400, 40), regrasOficiais).toFixed(2)), 8)
+igual(
+  'metro manual: a comissão é proporcional ao valor (10 m × R$ 65 + 5 m × R$ 50)',
+  Number(
+    calcularComissao([pedidoMetroManual(10, 650, 65), pedidoMetroManual(5, 250, 50)], regrasOficiais).total.toFixed(2),
+  ),
+  25.75,
+)
+igual(
+  'metro manual: a base da soma é o faturamento das filas',
+  Number(calcularComissao([pedidoMetroManual(10, 650, 65), pedidoMetroManual(5, 250, 50)], regrasOficiais).base.toFixed(2)),
+  900,
+)
+igual(
+  'metro manual: as duas filas entram pela faixa do valor do metro de cada uma',
+  calcularComissao([pedidoMetroManual(10, 650, 65), pedidoMetroManual(5, 250, 50)], regrasOficiais).porFaixa.map((l) => [
+    l.percentual,
+    l.pedidos,
+  ]),
+  [
+    [2.5, 1],
+    [3, 1],
+  ],
+)
+
 /* --- quem decide a regra é a data --- */
 const regrasTeste = regrasDaConfig(CONFIG_PADRAO)
 igual('pedido de outubro continua na regra por metragem', usaRegraPorValor(pedidoAntigo(10, 549), regrasTeste), false)
@@ -840,6 +911,18 @@ const pedidoAtualExplicito = normalizarPedido({
 igual('backup atual: marcação explícita de não entregue não é sobrescrita', pedidoAtualExplicito.entregue, false)
 igual('backup atual: marcação explícita de não pago não é sobrescrita', pedidoAtualExplicito.pago, false)
 
+/* --- valor de metragem manual ao ler o banco --- */
+const pedidoComMetroManual = normalizarPedido({
+  ...base,
+  valor_modo: 'metro',
+  valor_metro_manual: 65,
+} as never)
+igual('fila: o valor de metragem manual é guardado', pedidoComMetroManual.valor_metro_manual, 65)
+igual('fila: o modo “metro” é preservado', pedidoComMetroManual.valor_modo, 'metro')
+igual('fila: modo de valor desconhecido volta para “auto”', normalizarPedido({ ...base, valor_modo: 'xablau' } as never).valor_modo, 'auto')
+igual('fila: valor do metro inválido vira nulo', normalizarPedido({ ...base, valor_metro_manual: 'abc' } as never).valor_metro_manual, null)
+igual('fila: sem valor de metragem manual continua nulo', normalizarPedido({ ...base } as never).valor_metro_manual, null)
+
 const backupHistorico = prepararBackup(
   {
     versao: '1.2.0',
@@ -989,6 +1072,22 @@ const sqlSupabase = readFileSync('supabase/schema.sql', 'utf8')
 igual('SQL do Supabase inclui os campos atuais do fluxo', ['estagio', 'iniciado_em', 'entregue', 'pago'].every((campo) => sqlSupabase.includes(campo)), true)
 igual('SQL inclui as tabelas do sistema na publicação Realtime sem duplicar', sqlSupabase.includes('pg_publication_tables') && sqlSupabase.includes('alter publication supabase_realtime add table public.%I'), true)
 igual('SQL converte o status antigo em concluído durante a migração', /status_producao = 'dtf_pronto'/.test(sqlSupabase), true)
+igual(
+  'SQL do Supabase guarda o valor de metragem manual da fila',
+  sqlSupabase.includes('valor_metro_manual double precision') &&
+    /alter table public\.pedidos add column if not exists valor_metro_manual/.test(sqlSupabase),
+  true,
+)
+igual(
+  'backend: a coluna do valor de metragem manual é gravada no Supabase',
+  readFileSync('src/lib/backend.ts', 'utf8').includes("'valor_metro_manual'"),
+  true,
+)
+igual(
+  'loja: a fila automática usa a tabela de preço do tipo de DTF (UV tem a dele)',
+  /calcularValor\(dados\.metragem, valorEspecial, faixasDoTipo\(dados\.tipo_dtf/.test(readFileSync('src/lib/store.tsx', 'utf8')),
+  true,
+)
 
 try {
   lerCodigoConexao('codigo-errado')

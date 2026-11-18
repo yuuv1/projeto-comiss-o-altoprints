@@ -817,7 +817,9 @@ export default function Configuracoes() {
           <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
             <b>Como funciona:</b> quando o vendedor digita a metragem da fila, o sistema pega o <b>valor do metro</b> da
             faixa em que ela cai e calcula o valor automaticamente. Cliente com <b>valor especial</b> continua usando o
-            valor dele.
+            valor dele. Quando a fila precisa de um preço só dela (uma condição especial combinada na hora), o vendedor
+            escolhe <b>Metro manual</b> ao registrar a fila e digita o valor do metro: o total sai da metragem × esse
+            valor, e a comissão usa a faixa desse valor do metro.
           </div>
 
           <Cartao hover={false}>

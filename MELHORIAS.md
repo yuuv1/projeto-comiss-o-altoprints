@@ -5,8 +5,10 @@ Cada ideia tem uma etiqueta de esforço: **🟢 pequeno** (faço em uma rodada) 
 
 No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 
-> **Já entregue até a versão 1.5.7:** login do proprietário, backup importável/sincronizável,
-> busca global, resumo de hoje, checklist e equipe em tabela. O site oficial é online-only e
+> **Já entregue até a versão 1.8.0:** login do proprietário, backup importável/sincronizável,
+> busca global, resumo de hoje, checklist e equipe em tabela, e o **valor de metragem manual**
+> ao registrar a fila (preço especial só naquele pedido, com a comissão proporcional ao valor).
+> O site oficial é online-only e
 > usa Supabase central; a publicação exige configuração válida e nunca cai para dados locais.
 > Para conferir os requisitos de implantação, consulte `PLANO-NUVEM-E-PUBLICACAO.md` e
 > `LANCAMENTO.md`.
@@ -32,6 +34,7 @@ No fim tem a **ordem que eu sugeriria** para o lançamento ficar redondo.
 
 | Ideia | Por que ajuda | Esforço |
 | --- | --- | --- |
+| ✅ **Valor de metragem manual** ao registrar a fila (preço do metro combinado só naquele pedido, com a comissão proporcional ao valor) | Fazer uma condição especial com o cliente sem mexer na tabela nem no cadastro do cliente | 🟢 |
 | **Fechamento do mês da comissão** — "fechar mês" guarda o valor, marca quem já recebeu e mantém o histórico | Para de refazer a conta e evita discussão de "quanto era mês passado" | 🟡 |
 | **Contas a receber** — pedidos entregues e ainda não pagos, com botão de cobrança no WhatsApp | É dinheiro parado que hoje só aparece se alguém procurar | 🟢 |
 | **Extrato/recibo de comissão por vendedor** (com botão de imprimir) | Ficou profissional na hora de pagar | 🟢 |

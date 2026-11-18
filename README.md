@@ -47,7 +47,8 @@ Outros comandos:
 
 ## Telas do sistema
 
-> **Versão atual: 1.5.7** — fixa a conexão do site ao Supabase central e bloqueia qualquer fallback para modo local; o PWA segue atualizando automaticamente.
+> **Versão atual: 1.8.0** — traz o **valor de metragem manual** ao registrar a fila (o preço do metro combinado só
+> naquele pedido) e corrige o valor do metro mostrado nas informações da fila (agora é o valor realmente cobrado).
 > O login do proprietário usa um único campo de usuário e senha; o e-mail dele pode ser o usuário.
 > O número aparece no rodapé; se estiver antigo, feche e abra o app para receber a atualização.
 
@@ -216,7 +217,18 @@ usuário e senha. Quem abrir o endereço sem a senha não encontra dados: apenas
 | 20 m ou mais | R$ 44,90 |
 
 - Se o cliente tiver **valor especial do metro**, esse valor é usado no lugar da tabela.
-- O botão **Auto / Manual** alterna entre o cálculo automático e o valor digitado.
+- Ao registrar a fila, o valor pode ser calculado de três jeitos (**Tabela**,
+  **Metro manual** ou **Total manual**):
+  - **Tabela** — o valor do metro vem da faixa da metragem (ou do valor especial do cliente);
+  - **Metro manual** (o *valor de metragem manual*) — o vendedor digita o **preço do metro
+    só nesta fila** (quando combina uma condição especial com o cliente) e o total sai da
+    metragem × esse preço;
+  - **Total manual** — o vendedor digita o valor total da fila.
+- A **comissão** acompanha o valor praticado: numa fila com valor de metragem manual, o
+  percentual é o da faixa do **valor do metro** que foi combinado, e o valor da comissão é
+  proporcional ao total da fila (metragem × preço do metro).
+- O painel da fila mostra o **valor do metro realmente cobrado** (valor ÷ metragem), e não
+  o preço da tabela — assim uma fila de R$ 59,90 aparece com o metro que valeu de verdade.
 - Ao marcar o pagamento como **Pago**, a data do pagamento é preenchida com hoje.
 
 Cada pedido é uma **fila** com um estágio (`em andamento` ou `concluído` — "saiu da

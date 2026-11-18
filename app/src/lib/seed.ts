@@ -11,7 +11,7 @@
  *     As contas de verdade são criadas pela porta administrativa (#/administracao)
  *     ou em Equipe → Nova conta. Não existe mais usuário/senha padrão no sistema.
  */
-import { calcularValor } from './pricing'
+import { calcularValor, faixasDoTipo } from './pricing'
 import { novoId } from './files'
 import {
   CONFIG_PADRAO,
@@ -21,6 +21,7 @@ import {
   type Impressao,
   MOTIVOS_REIMPRESSAO,
   type Pedido,
+  type TipoDtf,
   type Vendedor,
 } from './types'
 
@@ -99,7 +100,9 @@ export function gerarDadosDemo(): DB {
 
     const cliente = clientes[Math.floor(rnd() * clientes.length)]
     const metragem = Number((0.5 + rnd() * 12).toFixed(2))
-    const valor = calcularValor(metragem, cliente.valor_especial_metro)
+    /** cada fila usa a tabela de preço do seu tipo de DTF (o UV tem a dele) */
+    const tipoDtf: TipoDtf = i % 5 === 0 ? 'uv' : 'textil'
+    const valor = calcularValor(metragem, cliente.valor_especial_metro, faixasDoTipo(tipoDtf, CONFIG_PADRAO))
 
     /**
      * As filas mais novas (as últimas registradas) ficam em andamento — as duas
@@ -119,10 +122,11 @@ export function gerarDadosDemo(): DB {
       cliente_id: cliente.id,
       vendedor_id: cliente.vendedor_id,
       descricao: rnd() < 0.22 ? DESCRICOES[Math.floor(rnd() * DESCRICOES.length)] : '',
-      tipo_dtf: i % 5 === 0 ? 'uv' : 'textil',
+      tipo_dtf: tipoDtf,
       metragem,
       valor,
       valor_modo: 'auto',
+      valor_metro_manual: null,
       estagio,
       iniciado_em,
       entregue,

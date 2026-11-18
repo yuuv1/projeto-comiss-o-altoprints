@@ -70,6 +70,21 @@ export const calcularValor = (
   return arredonda(metros * base)
 }
 
+/**
+ * Valor da fila quando o **valor do metro é digitado à mão** (o “valor de
+ * metragem manual”): o total sai da metragem cadastrada × o preço do metro.
+ * É o que permite fazer um valor especial só nesta fila.
+ */
+export const calcularValorPorMetro = (
+  m: number | null | undefined,
+  valorMetro: number | null | undefined,
+) => {
+  const metros = Number(m) || 0
+  const preco = Number(valorMetro) || 0
+  if (metros <= 0 || preco <= 0) return 0
+  return arredonda(metros * preco)
+}
+
 /* ------------------------------------------------------------------ */
 /* Metros e centímetros                                                */
 /* ------------------------------------------------------------------ */
@@ -88,8 +103,18 @@ export const deMetros = (metros: number | null | undefined, unidade: UnidadeMetr
   return unidade === 'cm' ? Number((m * 100).toFixed(0)) : Number(m.toFixed(2))
 }
 
-/** Valor por metro efetivamente praticado no pedido */
-export const valorPorMetro = (p: Pick<Pedido, 'metragem' | 'valor' | 'valor_modo'>) => {
+/**
+ * Valor por metro efetivamente praticado no pedido.
+ *
+ * Quando a fila tem “valor de metragem manual”, esse valor é o praticado (e
+ * não o total dividido pela metragem, que já vem com o arredondamento do
+ * centavo). Nos demais casos, é o total ÷ metragem.
+ */
+export const valorPorMetro = (
+  p: Pick<Pedido, 'metragem' | 'valor'> & Partial<Pick<Pedido, 'valor_metro_manual'>>,
+) => {
+  const manual = Number(p.valor_metro_manual) || 0
+  if (manual > 0) return Number(manual.toFixed(2))
   const m = Number(p.metragem) || 0
   if (!m) return 0
   return Number((Number(p.valor) / m).toFixed(2))
