@@ -231,6 +231,88 @@ async function main() {
   if (!extrasOk) falhas++
   console.log(`  ${extrasOk ? '✅' : '❌'} “Mais opções” mostra entrega, datas e observações`)
 
+  // ---------- fila nova: valor de metragem manual (preço especial) ----------
+  /** digita num campo controlado pelo React (jsdom precisa do setter nativo) */
+  const digitar = (campo: HTMLInputElement | null | undefined, texto: string) => {
+    if (!campo) return false
+    const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')?.set
+    setter?.call(campo, texto)
+    campo.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    return true
+  }
+  const campos = () => [...(raiz?.querySelectorAll('input') ?? [])] as HTMLInputElement[]
+  /** valor mostrado na linha do resumo (o rótulo e o valor ficam no mesmo pai) */
+  const valorNoResumo = (rotulo: string) => {
+    const linha = [...(raiz?.querySelectorAll('span') ?? [])].find((s) => (s.textContent ?? '').trim() === rotulo)
+    // o "R$" da moeda vem com espaço especial (o mesmo do resto do sistema)
+    return (linha?.parentElement?.textContent ?? '').replace(/\u00a0/g, ' ')
+  }
+
+  dom.window.location.hash = '#/pedido/novo'
+  await espera(700)
+  const textoValor = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const temOpcoesValor = ['Tabela', 'Metro manual', 'Total manual'].every((t) => textoValor.includes(t))
+
+  // DTF Têxtil abre a metragem em metros; 5 m caem na faixa de R$ 54,90/m
+  const clicouTextil = clicar(raiz, 'DTF Têxtil')
+  await espera(400)
+  const digitouMetragem = digitar(
+    campos().find((c) => c.placeholder === 'Ex.: 1,45'),
+    '5',
+  )
+  await espera(500)
+  const tabelaCerta = valorNoResumo('Total').includes('R$ 274,50') && valorNoResumo('Valor do metro').includes('R$ 54,90')
+
+  // “Metro manual”: o preço do metro digitado é o que vale (e o total sai da metragem)
+  const clicouMetroManual = clicar(raiz, 'Metro manual')
+  await espera(400)
+  const digitouMetro = digitar(
+    campos().find((c) => c.placeholder === 'Ex.: 65,00'),
+    '65',
+  )
+  await espera(500)
+  const textoManual = (raiz?.textContent ?? '').replace(/\s+/g, ' ')
+  const metroManualOk =
+    valorNoResumo('Total').includes('R$ 325,00') &&
+    valorNoResumo('Valor do metro').includes('R$ 65,00') &&
+    textoManual.includes('valor de metragem manual desta fila')
+
+  // “Total manual”: o valor do metro mostrado é o praticado (R$ 59,90 ÷ 5 m),
+  // e não o preço da tabela (R$ 54,90) — era o que aparecia errado
+  const clicouTotalManual = clicar(raiz, 'Total manual')
+  await espera(400)
+  const digitouTotal = digitar(
+    campos().find((c) => c.className.includes('pl-11') && !c.readOnly),
+    '59,90',
+  )
+  await espera(500)
+  const totalManual = valorNoResumo('Total')
+  const metroInformado = valorNoResumo('Valor do metro')
+  const valorMetroCerto =
+    totalManual.includes('R$ 59,90') &&
+    metroInformado.includes('R$ 11,98') &&
+    !metroInformado.includes('R$ 54,90')
+
+  const valorManualOk =
+    temOpcoesValor &&
+    clicouTextil &&
+    digitouMetragem &&
+    tabelaCerta &&
+    clicouMetroManual &&
+    digitouMetro &&
+    metroManualOk &&
+    clicouTotalManual &&
+    digitouTotal &&
+    valorMetroCerto
+  if (!valorManualOk) falhas++
+  console.log(
+    `  ${valorManualOk ? '✅' : '❌'} fila nova tem “valor de metragem manual” e o valor do metro mostrado é o praticado`,
+  )
+  if (!valorManualOk) {
+    console.log('     opcoes:', temOpcoesValor, 'tabela:', tabelaCerta, 'metro manual:', metroManualOk)
+    console.log('     resumo:', totalManual, '|', metroInformado)
+  }
+
   // ---------- só o proprietário cadastra/exclui funcionário ----------
   dom.window.location.hash = '#/equipe'
   await espera(800)

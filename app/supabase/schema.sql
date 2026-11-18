@@ -49,6 +49,8 @@ create table if not exists public.pedidos (
   metragem         double precision,
   valor            double precision default 0,
   valor_modo       text default 'auto',
+  -- valor do metro digitado à mão nesta fila (quando valor_modo = 'metro')
+  valor_metro_manual double precision,
   -- campos atuais da fila; as colunas antigas abaixo são mantidas para migrar backups
   estagio          text not null default 'concluido',
   iniciado_em      text,
@@ -160,6 +162,9 @@ alter table public.pedidos add column if not exists iniciado_em text;
 alter table public.pedidos add column if not exists entregue boolean;
 alter table public.pedidos add column if not exists pago boolean;
 alter table public.pedidos add column if not exists tipo_dtf text not null default 'textil';
+
+-- “valor de metragem manual”: o preço do metro combinado só nesta fila.
+alter table public.pedidos add column if not exists valor_metro_manual double precision;
 
 update public.pedidos
 set estagio = case

@@ -50,6 +50,7 @@ const COLUNAS_TABELA: Record<Tabela, readonly string[]> = {
     'metragem',
     'valor',
     'valor_modo',
+    'valor_metro_manual',
     'estagio',
     'iniciado_em',
     'entregue',

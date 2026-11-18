@@ -28,7 +28,7 @@ import {
   limparAvisoDeConexao,
   nuvemObrigatoria,
 } from './supabase'
-import { calcularValor, proximoNumero } from './pricing'
+import { calcularValor, calcularValorPorMetro, faixasDoTipo, proximoNumero } from './pricing'
 import { gerarDadosDemo } from './seed'
 import { prepararBackup } from './backup'
 import { prepararMesclaRelatorioCSV, type MesclaRelatorio } from './relatorio-backup'
@@ -466,11 +466,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const clienteCriado = !db.clientes.some((c) => c.id === clienteVinculado?.id)
       const valorEspecial = clienteVinculado?.valor_especial_metro ?? null
+      /** “valor de metragem manual”: o preço do metro combinado só nesta fila */
+      const valorMetroManual = dados.valor_modo === 'metro' ? Number(dados.valor_metro_manual) || 0 : 0
 
       const valor =
         dados.valor_modo === 'auto'
-          ? calcularValor(dados.metragem, valorEspecial, db.configuracoes.faixas_preco)
-          : Number(Number(dados.valor || 0).toFixed(2))
+          ? // a tabela é a do tipo de DTF (o UV tem a dele: 159,90/149,90)
+            calcularValor(dados.metragem, valorEspecial, faixasDoTipo(dados.tipo_dtf, db.configuracoes))
+          : dados.valor_modo === 'metro' && valorMetroManual > 0
+            ? // total = metragem × o valor do metro digitado à mão
+              calcularValorPorMetro(dados.metragem, valorMetroManual)
+            : Number(Number(dados.valor || 0).toFixed(2))
 
       const dataPedidoISO = dados.data_pedido || agora
       const registro: Pedido = {
@@ -483,6 +489,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         cliente_nome: dados.cliente_nome.trim(),
         cliente_id: clienteVinculado?.id ?? existente?.cliente_id ?? null,
         valor,
+        valor_metro_manual: valorMetroManual > 0 ? valorMetroManual : null,
         id: id ?? novoId(),
         numero: existente?.numero ?? proximoNumero(db.pedidos.map((p) => p.numero)),
         created_at: existente?.created_at ?? agora,

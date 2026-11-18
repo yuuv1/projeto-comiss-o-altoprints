@@ -117,8 +117,20 @@ export function normalizarRegras(entrada: EntradaRegras, semMetragem = 0): Regra
 /* Regra do valor do metro                                             */
 /* ------------------------------------------------------------------ */
 
-/** Valor do metro praticado no pedido (valor ÷ metragem) — null quando não dá para saber */
-export const valorDoMetroPedido = (pedido: Pick<Pedido, 'metragem' | 'valor'>): number | null => {
+/**
+ * Valor do metro praticado no pedido.
+ *
+ *  • fila com **valor de metragem manual** → é o valor digitado (o preço do
+ *    metro que o vendedor combinou nesta fila);
+ *  • demais filas → valor ÷ metragem.
+ *
+ * Null quando não dá para saber (sem metragem ou sem valor).
+ */
+export const valorDoMetroPedido = (
+  pedido: Pick<Pedido, 'metragem' | 'valor'> & Partial<Pick<Pedido, 'valor_metro_manual'>>,
+): number | null => {
+  const manual = Number(pedido.valor_metro_manual) || 0
+  if (manual > 0) return manual
   const m = Number(pedido.metragem) || 0
   const v = Number(pedido.valor) || 0
   if (m <= 0 || v <= 0) return null
@@ -146,7 +158,7 @@ export function usaRegraPorValor(
  */
 /** Valor do metro já encaixado na faixa mais próxima (usado no relatório) */
 export const valorMetroParaFaixa = (
-  pedido: Pick<Pedido, 'metragem' | 'valor'>,
+  pedido: Pick<Pedido, 'metragem' | 'valor'> & Partial<Pick<Pedido, 'valor_metro_manual'>>,
   entrada: EntradaRegras = REGRAS_PADRAO,
 ): number | null => {
   const regras = normalizarRegras(entrada)
@@ -263,7 +275,7 @@ export function faixaDoPedido(
  */
 export function regraDoPedido(
   pedido: Pick<Pedido, 'metragem' | 'valor' | 'data_pagamento' | 'data_pedido' | 'created_at'> &
-    Partial<Pick<Pedido, 'tipo_dtf'>>,
+    Partial<Pick<Pedido, 'tipo_dtf' | 'valor_metro_manual'>>,
   entrada: EntradaRegras,
   percentualSemMetragem = 0,
 ): { percentual: number; rotulo: string; id: string; modelo: ModeloComissao | 'sem_metragem'; valorMetro: number | null } {
